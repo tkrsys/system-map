@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>tkrsys System Map - Graphic Recording</title>
+<title>tkrsys &#12471;&#12473;&#12486;&#12512;&#12510;&#12483;&#12503; - Graphic Recording</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Maru+Gothic:wght@400;700;900&family=Kosugi+Maru&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,6 +34,7 @@
   .card-title { font-family: 'Yomogi', cursive; font-size: 1.2em; font-weight: 700; color: #333; line-height: 1.3; }
   .card-desc { font-family: 'Kosugi Maru', sans-serif; font-size: 0.78em; color: #666; line-height: 1.6; }
   .card-url { font-family: 'Kosugi Maru', sans-serif; font-size: 0.68em; color: #999; word-break: break-all; border-top: 1px dashed rgba(0,0,0,0.15); padding-top: 8px; margin-top: auto; }
+  .card-url::before { content: '&#128279; '; }
   .footer-note { text-align: center; font-family: 'Yomogi', cursive; font-size: 1em; color: #b0a090; margin-top: 30px; position: relative; z-index: 1; }
   .footer-note span { background: rgba(255,213,79,0.25); padding: 4px 16px; border-radius: 20px; }
   .stats { display: flex; justify-content: center; gap: 30px; margin: 30px 0 50px; position: relative; z-index: 1; flex-wrap: wrap; }
@@ -51,6 +52,7 @@
   .stat-bubble.orange .stat-num { color: #e65100; }
   .stat-label { font-size: 0.78em; color: #666; margin-top: 4px; }
   .memo { position: relative; z-index: 1; font-family: 'Yomogi', cursive; font-size: 0.95em; color: #8d6e63; padding: 14px 20px; background: rgba(255,243,224,0.6); border: 2px solid #d7ccc8; border-radius: 12px; display: inline-block; margin: 10px 0 20px 40px; max-width: 500px; line-height: 1.7; transform: rotate(-0.5deg); }
+  .memo::before { content: '&#128221;'; position: absolute; top: -16px; left: 14px; font-size: 1.4em; }
   .flow-arrow { text-align: center; font-size: 1.6em; color: #bcaaa4; margin: 10px 0; position: relative; z-index: 1; font-family: 'Yomogi', cursive; letter-spacing: 0.3em; }
   .tech-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 20px 0; position: relative; z-index: 1; }
   .tech-tag { font-family: 'Kosugi Maru', sans-serif; font-size: 0.72em; padding: 4px 12px; border-radius: 20px; background: rgba(0,0,0,0.05); border: 1.5px solid rgba(0,0,0,0.1); color: #78909c; }
@@ -60,14 +62,14 @@
 <body>
 <div class="canvas">
   <div class="title-area">
-    <h1>tkrsys System Map</h1>
-    <div class="title-sub">Care x Law x Technology</div>
-    <div class="date-stamp">2026.04.26 | 8 Projects</div>
+    <h1>&#128394;&#65039; tkrsys &#12471;&#12473;&#12486;&#12512;&#12510;&#12483;&#12503;</h1>
+    <div class="title-sub">&#12316; &#20171;&#35703; &#215; &#27861;&#24459; &#215; &#12486;&#12463;&#12494;&#12525;&#12472;&#12540; &#12398;&#12464;&#12521;&#12524;&#12467; &#12316;</div>
+    <div class="date-stamp">2026.04.26 &#29694;&#22312; &#65372; &#20840;8&#12503;&#12525;&#12472;&#12455;&#12463;&#12488;</div>
   </div>
   <div class="stats">
-    <div class="stat-bubble green"><div class="stat-num">2</div><div class="stat-label">Care</div></div>
-    <div class="stat-bubble blue"><div class="stat-num">4</div><div class="stat-label">Admin Law</div></div>
-    <div class="stat-bubble orange"><div class="stat-num">2</div><div class="stat-label">Guardianship</div></div>
+    <div class="stat-bubble green"><div class="stat-num">2</div><div class="stat-label">&#20171;&#35703;&#23455;&#21209;&#31995;</div></div>
+    <div class="stat-bubble blue"><div class="stat-num">4</div><div class="stat-label">&#34892;&#25919;&#27861;&#12460;&#12452;&#12489;</div></div>
+    <div class="stat-bubble orange"><div class="stat-num">2</div><div class="stat-label">&#24460;&#35211;&#38306;&#36899;</div></div>
   </div>
   <div class="tech-tags">
     <span class="tech-tag">Next.js</span>
@@ -78,70 +80,81 @@
     <span class="tech-tag">TypeScript</span>
   </div>
   <div class="section section-kaigo">
-    <div class="section-label">Care Plan Systems</div>
+    <div class="section-label">&#127973; &#20171;&#35703;&#23455;&#21209;&#31995;</div>
+    <div class="memo">&#12465;&#12450;&#12510;&#12493;&#26989;&#21209;&#12434;&#20013;&#24515;&#12395;&#12289;&#12465;&#12450;&#12503;&#12521;&#12531;&#20316;&#25104;&#12434;<br>AI&#12398;&#21147;&#12391;&#12469;&#12509;&#12540;&#12488;&#12377;&#12427;&#12471;&#12473;&#12486;&#12512;&#12383;&#12385; &#10024;</div>
     <div class="cards">
       <a class="card" href="https://careplan-delivery.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F4CB;</div>
-        <div class="card-title">Care Plan Generator</div>
-        <div class="card-desc">Auto-generate care service plans (Tables 1-3). PDF, history, PIN access control.</div>
+        <div class="card-icon">&#128203;</div>
+        <div class="card-title">&#12465;&#12450;&#12503;&#12521;&#12531;&#20316;&#25104;&#25903;&#25588;<br><small style="font-size:0.65em;color:#888;">&#65288;&#26368;&#26032;&#29256;&#65289;</small></div>
+        <div class="card-desc">&#23621;&#23429;&#12469;&#12540;&#12499;&#12473;&#35336;&#30011;&#26360;&#65288;&#31532;1&#12316;3&#34920;&#65289;&#12398;&#33258;&#21205;&#29983;&#25104;&#12290;PDF&#21360;&#21047;&#12539;&#23653;&#27508;&#31649;&#29702;&#12539;&#26376;&#27425;&#21033;&#29992;&#19978;&#38480;&#12539;PIN&#12450;&#12463;&#12475;&#12473;&#21046;&#24481;&#12395;&#23550;&#24540;&#12290;</div>
         <div class="card-url">careplan-delivery.vercel.app</div>
       </a>
       <a class="card" href="https://care-plan-agent.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F916;</div>
-        <div class="card-title">Multi-Agent AI</div>
-        <div class="card-desc">8 specialist AIs (Doctor, Pharmacist, Nurse, PT, OT, ST, Social Worker, Caregiver) review care plans.</div>
+        <div class="card-icon">&#129302;</div>
+        <div class="card-title">&#22810;&#32887;&#31278;AI&#12456;&#12540;&#12472;&#12455;&#12531;&#12488;</div>
+        <div class="card-desc">&#21307;&#24107;&#12539;&#34220;&#21092;&#24107;&#12539;&#30475;&#35703;&#24107;&#12539;PT&#12539;OT&#12539;ST&#12539;&#31038;&#20250;&#31119;&#31049;&#22763;&#12539;&#20171;&#35703;&#22763;&#12398;8&#23554;&#38272;&#32887;AI&#12364;&#12465;&#12450;&#12503;&#12521;&#12531;&#12434;&#22810;&#35282;&#30340;&#12395;&#26908;&#35342;&#12290;</div>
         <div class="card-url">care-plan-agent.vercel.app</div>
       </a>
     </div>
   </div>
+  <div class="flow-arrow">&#10209; &#9472; &#9472; &#9472; &#10209; &#9472; &#9472; &#9472; &#10209;</div>
   <div class="section section-gyosei">
-    <div class="section-label">Administrative Law Guides</div>
+    <div class="section-label">&#9878;&#65039; &#34892;&#25919;&#27861;&#12460;&#12452;&#12489;&#12471;&#12522;&#12540;&#12474;</div>
+    <div class="memo">&#34892;&#25919;&#25937;&#28168;&#27861;&#12398;4&#26412;&#26609;&#12434;&#32178;&#32645;&#65281;&#20840;&#26465;&#25991;&#35299;&#35500; &#215; 3&#27573;&#38542;&#35299;&#35500; &#215; &#26908;&#32034;&#27231;&#33021;&#12391;<br>&#23455;&#21209;&#12395;&#12418;&#35430;&#39443;&#23550;&#31574;&#12395;&#12418;&#20351;&#12360;&#12427;&#27861;&#24459;&#12460;&#12452;&#12489; &#128218;</div>
     <div class="cards">
       <a class="card" href="https://gyosei-tetsuduki-guide.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F4D6;</div>
-        <div class="card-title">Administrative Procedure Act</div>
-        <div class="card-desc">Full 46-article guide with e-Gov API and search.</div>
+        <div class="card-icon">&#128214;</div>
+        <div class="card-title">&#34892;&#25919;&#25163;&#32154;&#27861;<br>&#20840;46&#26465;&#35299;&#35500;</div>
+        <div class="card-desc">&#25163;&#32154;&#12365;&#12398;&#27969;&#12428;&#38918;&#12395;&#25972;&#29702;&#12290;e-Gov API&#23550;&#24540;&#12539;&#26908;&#32034;&#27231;&#33021;&#20184;&#12365;&#12290;</div>
         <div class="card-url">gyosei-tetsuduki-guide.vercel.app</div>
       </a>
       <a class="card" href="https://gyosei-fufuku-zenbun.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F4DC;</div>
-        <div class="card-title">Administrative Appeal Act</div>
-        <div class="card-desc">Complete guide with 3-level explanations.</div>
+        <div class="card-icon">&#128220;</div>
+        <div class="card-title">&#34892;&#25919;&#19981;&#26381;&#23529;&#26619;&#27861;<br>&#20840;&#25991;&#35299;&#35500;</div>
+        <div class="card-desc">&#23529;&#26619;&#35531;&#27714;&#12398;&#25163;&#32154;&#12365;&#20840;&#20307;&#12434;3&#27573;&#38542;&#35299;&#35500;&#12391;&#20998;&#12363;&#12426;&#12420;&#12377;&#12367;&#12290;</div>
         <div class="card-url">gyosei-fufuku-zenbun.vercel.app</div>
       </a>
       <a class="card" href="https://gyosei-jiken-soshou-guide.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F3DB;</div>
-        <div class="card-title">Administrative Case Litigation Act</div>
-        <div class="card-desc">Focus on revocation lawsuits and administrative litigation.</div>
+        <div class="card-icon">&#127963;&#65039;</div>
+        <div class="card-title">&#34892;&#25919;&#20107;&#20214;&#35380;&#35359;&#27861;<br>&#35299;&#35500;&#12460;&#12452;&#12489;</div>
+        <div class="card-desc">&#21462;&#28040;&#35380;&#35359;&#12434;&#20013;&#24515;&#12395;&#34892;&#25919;&#35380;&#35359;&#12398;&#20840;&#20307;&#20687;&#12434;&#35299;&#35500;&#12290;</div>
         <div class="card-url">gyosei-jiken-soshou-guide.vercel.app</div>
       </a>
       <a class="card" href="https://kokka-baishou-sonshitsu-guide.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F4B0;</div>
-        <div class="card-title">State Compensation Guide</div>
-        <div class="card-desc">State compensation law and loss compensation from a practical perspective.</div>
+        <div class="card-icon">&#128176;</div>
+        <div class="card-title">&#22269;&#23478;&#36064;&#20767;&#12539;<br>&#25613;&#22833;&#35036;&#20767;&#12460;&#12452;&#12489;</div>
+        <div class="card-desc">&#22269;&#23478;&#36064;&#20767;&#27861;&#12392;&#25613;&#22833;&#35036;&#20767;&#12398;&#20307;&#31995;&#12434;&#23455;&#21209;&#35222;&#28857;&#12391;&#35299;&#35500;&#12290;</div>
         <div class="card-url">kokka-baishou-sonshitsu-guide.vercel.app</div>
       </a>
     </div>
   </div>
+  <div class="flow-arrow">&#10209; &#9472; &#9472; &#9472; &#10209; &#9472; &#9472; &#9472; &#10209;</div>
   <div class="section section-kouken">
-    <div class="section-label">Guardianship</div>
+    <div class="section-label">&#128737;&#65039; &#24460;&#35211;&#38306;&#36899;</div>
+    <div class="memo">&#24460;&#35211;&#20154;&#12392;&#12375;&#12390;&#12398;&#23455;&#21209;&#12434;&#27861;&#24459;&#38754;&#12539;&#22577;&#21578;&#26989;&#21209;&#12398;&#20001;&#38754;&#12363;&#12425;&#12469;&#12509;&#12540;&#12488;&#12290;<br>&#20845;&#27861;&#12398;&#27178;&#26029;&#26908;&#32034;&#65286;&#26376;&#27425;&#22577;&#21578;&#26360;&#12398;&#20316;&#25104;&#12434;&#12473;&#12512;&#12540;&#12474;&#12395; &#128269;</div>
     <div class="cards">
       <a class="card" href="https://koken-roppou.vercel.app" target="_blank">
-        <div class="card-icon">&#x2696;</div>
-        <div class="card-title">Guardianship Six Codes</div>
-        <div class="card-desc">Cross-search 6 related laws for adult guardianship.</div>
+        <div class="card-icon">&#9878;&#65039;</div>
+        <div class="card-title">&#24460;&#35211;&#20845;&#27861;&#12460;&#12452;&#12489;</div>
+        <div class="card-desc">&#25104;&#24180;&#24460;&#35211;&#21046;&#24230;&#12395;&#38306;&#36899;&#12377;&#12427;6&#12388;&#12398;&#27861;&#24459;&#12434;&#27178;&#26029;&#30340;&#12395;&#26908;&#32034;&#12539;&#21442;&#29031;&#12391;&#12365;&#12427;&#12460;&#12452;&#12489;&#12290;</div>
         <div class="card-url">koken-roppou.vercel.app</div>
       </a>
       <a class="card" href="https://kouken-monthly-report.vercel.app" target="_blank">
-        <div class="card-icon">&#x1F4CA;</div>
-        <div class="card-title">Monthly Report</div>
-        <div class="card-desc">Efficiently create and manage monthly guardianship reports for family court.</div>
+        <div class="card-icon">&#128202;</div>
+        <div class="card-title">&#24460;&#35211;&#26376;&#27425;&#22577;&#21578;</div>
+        <div class="card-desc">&#25104;&#24180;&#24460;&#35211;&#20154;&#12392;&#12375;&#12390;&#12398;&#26376;&#27425;&#22577;&#21578;&#26360;&#12434;&#21177;&#29575;&#30340;&#12395;&#20316;&#25104;&#12539;&#31649;&#29702;&#12290;&#23478;&#35009;&#12408;&#12398;&#25552;&#20986;&#26989;&#21209;&#12434;&#25903;&#25588;&#12290;</div>
         <div class="card-url">kouken-monthly-report.vercel.app</div>
       </a>
     </div>
   </div>
+  <div class="flow-arrow" style="margin-top:40px;">&#10022; &#9472; &#9472; &#9472; &#9472; &#9472; &#9472; &#10022;</div>
+  <svg width="100%" height="120" viewBox="0 0 1000 120" style="position:relative;z-index:1;margin-top:10px;" xmlns="http://www.w3.org/2000/svg">
+    <path d="M200,20 Q500,5 800,20 Q810,60 800,100 Q500,115 200,100 Q190,60 200,20" fill="none" stroke="#bcaaa4" stroke-width="2" stroke-dasharray="6,4"/>
+    <text x="500" y="50" text-anchor="middle" font-family="'Yomogi', cursive" font-size="18" fill="#8d6e63">&#20171;&#35703;&#12398;&#29694;&#22580;&#12363;&#12425;&#12289;&#12486;&#12463;&#12494;&#12525;&#12472;&#12540;&#12391;&#12300;&#12420;&#12373;&#12375;&#12356;&#20181;&#32068;&#12415;&#12301;&#12434;</text>
+    <text x="500" y="80" text-anchor="middle" font-family="'Kosugi Maru', sans-serif" font-size="13" fill="#b0a090">&#12377;&#12409;&#12390;&#12398;&#12471;&#12473;&#12486;&#12512;&#12399; Vercel &#12391;&#31292;&#20685;&#20013; &#128640;</text>
+  </svg>
   <div class="footer-note">
-    <span>Graphic Recording by Claude x tkrsys</span>
+    <span>&#9999;&#65039; Graphic Recording by Claude &#215; tkrsys &#9999;&#65039;</span>
   </div>
 </div>
 </body>
