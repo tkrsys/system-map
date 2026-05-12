@@ -3,427 +3,750 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1100">
-<title>tkrsys 御絵図 ― 京都風グラフィックレコード</title>
+<title>とくり堂 御絵図 ― 京都夜景</title>
 <style>
-  /* ===== 京都の伝統色 ===== */
+  /* ===== 京の夜の伝統色 ===== */
   :root{
-    --sumi:#1a1a1a;        /* 墨色 */
-    --shu:#C73E3A;         /* 朱色（鳥居） */
-    --beni:#A4243B;        /* 紅 */
-    --ai:#1F4E79;          /* 藍 */
-    --asagi:#5B8FB9;       /* 浅葱 */
-    --matcha:#6E8B3D;      /* 抹茶 */
-    --moegi:#8B9D4B;       /* 萌黄 */
-    --yamabuki:#E8B95B;    /* 山吹（金箔） */
-    --kincha:#B58B3C;      /* 金茶 */
-    --sakura:#F5C9D0;      /* 桜色 */
-    --tori:#F5EFE0;        /* 鳥の子色（背景） */
-    --kinari:#EFE6D2;      /* 生成り */
-    --kuro-ai:#0F2A3F;     /* 紺青 */
+    --yozora-deep:#060814;     /* 深い夜空 */
+    --yozora:#0E1A30;          /* 紺青 */
+    --yozora-mid:#18253F;      /* 中間 */
+    --sumi:#08080F;            /* 墨 */
+    --akari:#FFD78A;           /* 灯火 */
+    --akari-strong:#FFE5A8;    /* 強灯 */
+    --kogane:#E8B95B;          /* 黄金 */
+    --kincha:#B58B3C;          /* 金茶 */
+    --shu:#E04A47;             /* 朱 */
+    --shu-deep:#B53C39;        /* 深朱 */
+    --beni:#A4243B;            /* 紅 */
+    --ai-light:#6BA0CC;        /* 浅葱 */
+    --ruri:#3866A0;            /* 瑠璃 */
+    --matcha:#8EB060;          /* 抹茶 */
+    --moegi:#A8C078;           /* 萌黄 */
+    --tori:#F5EFE0;            /* 鳥の子色 */
+    --kinari:#E8DFC8;          /* 生成り */
   }
 
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN","HG明朝E",serif;color:var(--sumi);background:var(--tori)}
-
+  html,body{
+    font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN","HG明朝E",serif;
+    color:var(--kinari);
+    background:var(--yozora-deep);
+  }
   body{
-    background-image:
-      radial-gradient(circle at 10% 10%, rgba(199,62,58,0.04) 0, transparent 40%),
-      radial-gradient(circle at 90% 90%, rgba(31,78,121,0.04) 0, transparent 40%),
-      repeating-linear-gradient(60deg, rgba(26,26,26,0.025) 0 1px, transparent 1px 28px),
-      repeating-linear-gradient(-60deg, rgba(26,26,26,0.025) 0 1px, transparent 1px 28px),
-      repeating-linear-gradient(0deg, rgba(26,26,26,0.025) 0 1px, transparent 1px 28px);
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(232,185,91,0.10) 0%, transparent 55%),
+      radial-gradient(ellipse at 18% 5%, rgba(59,102,160,0.18) 0%, transparent 50%),
+      linear-gradient(180deg, var(--sumi) 0%, var(--yozora) 30%, var(--yozora-mid) 70%, #1F2F4E 100%);
+    background-attachment:fixed;
     min-height:100vh;
     padding:32px 0;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* 星の散布 */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      radial-gradient(1px 1px at 8% 9%, rgba(255,255,255,0.8), transparent 60%),
+      radial-gradient(1px 1px at 22% 14%, rgba(255,255,255,0.6), transparent 60%),
+      radial-gradient(1.5px 1.5px at 38% 6%, rgba(255,230,180,0.9), transparent 60%),
+      radial-gradient(1px 1px at 53% 21%, rgba(255,255,255,0.5), transparent 60%),
+      radial-gradient(1px 1px at 68% 11%, rgba(255,255,255,0.7), transparent 60%),
+      radial-gradient(2px 2px at 84% 24%, rgba(255,230,180,0.9), transparent 60%),
+      radial-gradient(1px 1px at 14% 32%, rgba(255,255,255,0.4), transparent 60%),
+      radial-gradient(1px 1px at 91% 8%, rgba(255,255,255,0.6), transparent 60%),
+      radial-gradient(1px 1px at 4% 24%, rgba(255,255,255,0.5), transparent 60%),
+      radial-gradient(1.5px 1.5px at 64% 34%, rgba(255,230,180,0.7), transparent 60%),
+      radial-gradient(1px 1px at 32% 28%, rgba(255,255,255,0.5), transparent 60%),
+      radial-gradient(1px 1px at 78% 38%, rgba(255,255,255,0.6), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* 三日月 */
+  .moon{
+    position:fixed; top:64px; right:90px;
+    width:90px; height:90px;
+    z-index:1; pointer-events:none;
+    filter:drop-shadow(0 0 25px rgba(255,229,168,0.5));
+  }
+
+  /* 五重塔 (左) */
+  .pagoda{
+    position:fixed; bottom:0; left:50px;
+    width:170px; height:300px;
+    opacity:0.22;
+    z-index:1; pointer-events:none;
+  }
+  /* 八坂塔 (右) */
+  .pagoda-r{
+    position:fixed; bottom:0; right:30px;
+    width:130px; height:220px;
+    opacity:0.18;
+    z-index:1; pointer-events:none;
+  }
+  /* 東山シルエット */
+  .mountain{
+    position:fixed; bottom:0; left:0; right:0;
+    height:130px;
+    opacity:0.28;
+    z-index:1; pointer-events:none;
+  }
+  /* 鳥居 */
+  .torii{
+    position:fixed; top:130px; left:48px;
+    width:64px; height:84px;
+    opacity:0.32;
+    z-index:1; pointer-events:none;
+    filter:drop-shadow(0 0 8px rgba(181,60,57,0.4));
   }
 
   .scroll{
-    max-width:1100px;
-    margin:0 auto;
-    background:linear-gradient(180deg, #fbf6e8 0%, #f5efe0 50%, #efe6d2 100%);
-    border:1px solid #c9b98a;
-    box-shadow:
-      0 0 0 8px var(--tori),
-      0 0 0 9px #c9b98a,
-      0 30px 80px rgba(0,0,0,0.15);
+    max-width:1100px; margin:0 auto;
+    position:relative; z-index:2;
     padding:48px 56px 64px;
-    position:relative;
-    overflow:hidden;
-  }
-  .scroll::before,.scroll::after{
-    content:"";position:absolute;left:0;right:0;height:14px;
     background:
-      linear-gradient(90deg, var(--shu) 0%, var(--beni) 50%, var(--shu) 100%);
-    box-shadow:inset 0 -2px 0 rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.2);
+      linear-gradient(180deg,
+        rgba(20,32,55,0.88) 0%,
+        rgba(12,22,42,0.94) 50%,
+        rgba(8,16,32,0.96) 100%);
+    border:1px solid rgba(232,185,91,0.35);
+    border-radius:2px;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.5),
+      0 0 80px rgba(232,185,91,0.10),
+      0 30px 80px rgba(0,0,0,0.7);
+  }
+  /* 上下の朱の梁（鳥居の笠木） */
+  .scroll::before, .scroll::after{
+    content:""; position:absolute; left:0; right:0; height:8px;
+    background:linear-gradient(90deg,
+      transparent 0%, var(--shu-deep) 10%, var(--shu) 50%, var(--shu-deep) 90%, transparent 100%);
+    box-shadow:
+      0 0 14px rgba(224,74,71,0.55),
+      inset 0 -1px 0 rgba(0,0,0,0.4);
   }
   .scroll::before{top:0}
   .scroll::after{bottom:0}
 
+  /* ===== Header ===== */
   header{
     text-align:center;
-    padding:12px 0 28px;
-    border-bottom:1px dashed #b5a06a;
-    margin-bottom:32px;
+    padding:16px 0 36px;
+    border-bottom:1px dashed rgba(232,185,91,0.32);
+    margin-bottom:36px;
     position:relative;
   }
   .stamp{
     position:absolute; top:6px; right:0;
     width:78px; height:78px;
     background:var(--shu);
-    color:#fff8e7;
+    color:#FFE5A8;
     display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:13px; line-height:1.3;
-    text-align:center;
-    border-radius:6px;
+    font-weight:700; font-size:13px; line-height:1.35;
+    text-align:center; border-radius:6px;
     transform:rotate(-6deg);
-    box-shadow:0 4px 0 rgba(0,0,0,0.2), inset 0 0 0 2px #fff8e7, inset 0 0 0 4px var(--shu);
+    box-shadow:
+      0 0 22px rgba(224,74,71,0.6),
+      0 4px 0 rgba(0,0,0,0.4),
+      inset 0 0 0 2px #FFE5A8,
+      inset 0 0 0 4px var(--shu);
     letter-spacing:1px;
   }
   .era{
-    font-size:13px; letter-spacing:8px; color:var(--kincha);
-    margin-bottom:8px;
+    font-size:13px; letter-spacing:8px;
+    color:var(--kogane);
+    margin-bottom:10px;
+    text-shadow:0 0 10px rgba(232,185,91,0.45);
   }
   h1{
     font-size:46px; letter-spacing:14px;
-    color:var(--sumi);
-    text-shadow:1px 1px 0 #fff, 2px 2px 0 rgba(199,62,58,0.15);
+    color:var(--akari-strong);
+    text-shadow:
+      0 0 22px rgba(255,215,138,0.45),
+      0 0 6px rgba(255,215,138,0.7),
+      2px 2px 0 rgba(0,0,0,0.6);
   }
-  h1 .gold{color:var(--kincha)}
+  h1 .gold{
+    color:var(--kogane);
+    text-shadow:
+      0 0 26px rgba(232,185,91,0.8),
+      0 0 8px rgba(232,185,91,0.95);
+  }
   .sub{
     margin-top:14px;
-    font-size:15px; letter-spacing:6px; color:var(--ai);
+    font-size:15px; letter-spacing:6px;
+    color:var(--ai-light);
+    text-shadow:0 0 10px rgba(107,160,204,0.35);
   }
   .pillar{
     display:flex; justify-content:center; gap:18px;
-    margin-top:18px; font-size:12px; color:#5a4a26;
-    letter-spacing:3px;
+    margin-top:20px; font-size:12px;
+    color:var(--kinari); letter-spacing:3px;
   }
   .pillar span{
     padding:4px 12px;
-    border:1px solid #c9b98a;
-    background:#fff8e8;
+    border:1px solid rgba(232,185,91,0.4);
+    background:rgba(0,0,0,0.3);
   }
 
+  /* ===== 三本の提灯（章） ===== */
   .three{
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
     gap:24px;
-    margin-bottom:36px;
+    margin-bottom:40px;
   }
   .yagura{
-    background:#fffaeb;
-    border:1px solid #c9b98a;
-    border-radius:4px 4px 18px 18px;
+    background:linear-gradient(180deg,
+      rgba(15,26,46,0.65) 0%,
+      rgba(8,16,32,0.85) 100%);
+    border:1px solid rgba(232,185,91,0.32);
+    border-radius:4px 4px 10px 10px;
     padding:0 0 16px;
     position:relative;
-    box-shadow:0 6px 0 rgba(181,160,106,0.25);
+    box-shadow:
+      0 0 32px rgba(232,185,91,0.10),
+      0 6px 0 rgba(0,0,0,0.45);
   }
+  /* 提灯の紐 */
+  .yagura::before{
+    content:""; position:absolute;
+    left:50%; top:-22px; width:1px; height:22px;
+    background:linear-gradient(180deg, transparent, rgba(232,185,91,0.65));
+    transform:translateX(-0.5px);
+  }
+  /* 提灯の上飾り */
+  .yagura::after{
+    content:""; position:absolute;
+    left:50%; top:-6px;
+    width:24px; height:6px;
+    background:#0a0a14;
+    border:1px solid rgba(232,185,91,0.4);
+    border-radius:2px;
+    transform:translateX(-50%);
+  }
+
   .roof{
-    height:36px;
-    background:linear-gradient(180deg, var(--kuro-ai) 0%, #1a3a55 100%);
+    height:40px;
+    background:linear-gradient(180deg, #1a1a2a 0%, #0a0a14 100%);
     margin:0 -1px;
     position:relative;
     border-radius:4px 4px 0 0;
+    border-bottom:1px solid rgba(232,185,91,0.32);
   }
   .roof::before{
-    content:"";
-    position:absolute; left:-10px; right:-10px; bottom:-6px; height:10px;
-    background:var(--kuro-ai);
+    content:""; position:absolute;
+    left:-10px; right:-10px; bottom:-8px; height:10px;
+    background:#0a0a14;
     clip-path:polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+    border-bottom:1px solid rgba(232,185,91,0.25);
   }
   .roof-line{
-    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    color:#fff8e7; font-size:13px; letter-spacing:6px;
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    color:var(--akari); font-size:13px; letter-spacing:6px;
+    text-shadow:0 0 12px rgba(255,215,138,0.65);
   }
+
+  /* 提灯本体 */
   .noren{
     margin:0 14px;
-    padding:14px 12px 18px;
-    background:repeating-linear-gradient(180deg, transparent 0 22px, rgba(0,0,0,0.04) 22px 24px);
+    padding:18px 12px 22px;
+    background:repeating-linear-gradient(180deg,
+      transparent 0 24px, rgba(0,0,0,0.25) 24px 26px);
     border-bottom:2px solid currentColor;
     text-align:center;
+    position:relative;
   }
-  .yagura.kaigo .noren{background-color:rgba(199,62,58,0.12); color:var(--shu)}
-  .yagura.hou  .noren{background-color:rgba(31,78,121,0.10); color:var(--ai)}
-  .yagura.kouken .noren{background-color:rgba(110,139,61,0.12); color:var(--matcha)}
+  .yagura.kaigo .noren{
+    background-color:rgba(224,74,71,0.26);
+    color:#FF9D7A;
+    box-shadow:inset 0 0 32px rgba(255,139,107,0.22);
+  }
+  .yagura.hou .noren{
+    background-color:rgba(107,160,204,0.20);
+    color:var(--ai-light);
+    box-shadow:inset 0 0 32px rgba(107,160,204,0.22);
+  }
+  .yagura.kouken .noren{
+    background-color:rgba(142,176,96,0.20);
+    color:var(--moegi);
+    box-shadow:inset 0 0 32px rgba(168,192,120,0.22);
+  }
   .noren h2{
-    font-size:22px; letter-spacing:8px; color:inherit;
+    font-size:22px; letter-spacing:8px;
+    color:inherit;
     margin-bottom:4px;
+    text-shadow:0 0 14px currentColor;
   }
-  .noren .en{ font-size:11px; letter-spacing:3px; color:#5a4a26; }
+  .noren .en{
+    font-size:11px; letter-spacing:3px;
+    color:var(--kinari); opacity:0.7;
+  }
 
-  .yagura ul{ list-style:none; padding:8px 16px 0 }
+  /* 個別の灯篭 */
+  .yagura ul{ list-style:none; padding:12px 14px 0 }
   .yagura li{
-    background:#fff;
-    border:1px solid #d9c89a;
-    border-left:4px solid var(--kincha);
-    padding:10px 12px;
+    background:linear-gradient(180deg,
+      rgba(30,42,68,0.7) 0%,
+      rgba(15,22,40,0.88) 100%);
+    border:1px solid rgba(232,185,91,0.28);
+    border-left:3px solid var(--kogane);
+    padding:11px 13px;
     margin-bottom:10px;
     border-radius:2px;
     position:relative;
+    transition:all 0.2s ease;
   }
-  .yagura.kaigo  li{border-left-color:var(--shu)}
-  .yagura.hou    li{border-left-color:var(--ai)}
-  .yagura.kouken li{border-left-color:var(--matcha)}
+  .yagura li:hover{
+    border-color:rgba(255,215,138,0.7);
+    box-shadow:0 0 22px rgba(255,215,138,0.22);
+    transform:translateY(-1px);
+  }
+  .yagura.kaigo  li{ border-left-color:var(--shu) }
+  .yagura.hou    li{ border-left-color:var(--ai-light) }
+  .yagura.kouken li{ border-left-color:var(--moegi) }
+
   .yagura li .ttl{
-    font-size:15px; font-weight:700; letter-spacing:2px;
-    display:flex; align-items:center; gap:6px;
-    margin-bottom:4px;
+    font-size:14.5px; font-weight:700; letter-spacing:1.5px;
+    display:flex; align-items:center; gap:7px;
+    margin-bottom:5px;
+    color:var(--akari-strong);
   }
   .yagura li .mark{
-    display:inline-block; width:18px; height:18px; border-radius:50%;
-    background:var(--yamabuki); color:#fff; font-size:11px;
-    line-height:18px; text-align:center; font-weight:700;
+    display:inline-block; width:20px; height:20px;
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, var(--akari-strong), var(--kogane) 70%);
+    color:#3a2810; font-size:11px;
+    line-height:20px; text-align:center; font-weight:700;
+    box-shadow:0 0 12px rgba(255,215,138,0.55);
+    flex-shrink:0;
   }
   .yagura li .url{
     font-family:"Consolas","Yu Gothic",monospace;
-    font-size:11px; color:#7a5a26; word-break:break-all;
+    font-size:11px;
+    color:#D4B97A; word-break:break-all;
+    margin-bottom:4px;
   }
-  .yagura li .url a{ color:inherit; text-decoration:none; border-bottom:1px dotted #b58b3c }
-  .yagura li .url a:hover{ color:var(--shu); border-bottom-color:var(--shu) }
+  .yagura li .url a{
+    color:inherit; text-decoration:none;
+    border-bottom:1px dotted rgba(232,185,91,0.5);
+  }
+  .yagura li .url a:hover{
+    color:var(--akari-strong);
+    border-bottom-color:var(--akari-strong);
+  }
   .yagura li .desc{
-    font-size:12px; color:#444; margin-top:4px; letter-spacing:0.5px;
+    font-size:12px;
+    color:var(--kinari); margin-top:4px;
+    letter-spacing:0.5px; opacity:0.88;
+    line-height:1.55;
   }
   .tag{
-    display:inline-block; font-size:10px; padding:1px 6px;
-    background:var(--kinari); border:1px solid #c9b98a;
-    color:#5a4a26; margin-right:4px; margin-top:4px;
+    display:inline-block; font-size:10px;
+    padding:1px 7px;
+    background:rgba(0,0,0,0.4);
+    border:1px solid rgba(232,185,91,0.4);
+    color:var(--kogane);
+    margin-right:4px; margin-top:5px;
+    letter-spacing:1px;
   }
 
+  /* ===== 礎 ===== */
   .ishizue{
     margin-top:8px;
-    padding:18px 20px;
-    background:linear-gradient(180deg, #fff8e8 0%, #f0e3b8 100%);
-    border:1px solid #c9b98a;
+    padding:22px 24px;
+    background:linear-gradient(180deg,
+      rgba(20,32,55,0.6) 0%,
+      rgba(10,16,30,0.82) 100%);
+    border:1px solid rgba(232,185,91,0.32);
     border-radius:4px;
     position:relative;
+    box-shadow:inset 0 0 32px rgba(232,185,91,0.06);
   }
   .ishizue h3{
-    text-align:center; font-size:16px; letter-spacing:10px;
-    color:var(--kincha); margin-bottom:12px;
+    text-align:center;
+    font-size:16px; letter-spacing:10px;
+    color:var(--kogane);
+    margin-bottom:16px;
+    text-shadow:0 0 14px rgba(232,185,91,0.45);
   }
   .ishizue h3::before, .ishizue h3::after{
-    content:"❖"; color:var(--shu); margin:0 12px; font-size:14px;
+    content:"❖"; color:var(--shu);
+    margin:0 12px; font-size:14px;
+    text-shadow:0 0 10px rgba(224,74,71,0.55);
   }
   .ishizue .row{
     display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
   }
   .chip{
-    background:#fff;
-    border:1px solid #c9b98a;
+    background:rgba(20,32,55,0.6);
+    border:1px solid rgba(232,185,91,0.4);
     padding:6px 14px;
     font-size:13px; letter-spacing:2px;
     border-radius:18px;
-    color:var(--sumi);
-    box-shadow:0 2px 0 rgba(181,160,106,0.3);
+    color:var(--kinari);
+    box-shadow:0 2px 0 rgba(0,0,0,0.4);
   }
-  .chip.shu{ background:var(--shu); color:#fff; border-color:var(--shu)}
-  .chip.ai{  background:var(--ai); color:#fff; border-color:var(--ai)}
-  .chip.match{ background:var(--matcha); color:#fff; border-color:var(--matcha)}
-  .chip.gold{ background:var(--yamabuki); color:#3a2e10; border-color:var(--kincha)}
+  .chip.shu{
+    background:var(--shu-deep); color:#FFE5A8;
+    border-color:var(--shu);
+    box-shadow:0 0 14px rgba(224,74,71,0.45), 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .chip.ai{
+    background:var(--ruri); color:var(--kinari);
+    border-color:var(--ai-light);
+    box-shadow:0 0 14px rgba(107,160,204,0.35), 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .chip.match{
+    background:#4a6030; color:var(--moegi);
+    border-color:var(--matcha);
+    box-shadow:0 0 14px rgba(142,176,96,0.35), 0 2px 0 rgba(0,0,0,0.4);
+  }
+  .chip.gold{
+    background:var(--kogane); color:#3a2810;
+    border-color:var(--akari-strong);
+    box-shadow:0 0 16px rgba(232,185,91,0.55), 0 2px 0 rgba(0,0,0,0.4);
+  }
 
   .kankyo{
-    margin-top:24px;
+    margin-top:28px;
     display:grid; grid-template-columns:1fr 1fr; gap:16px;
   }
   .kankyo .box{
-    background:#fffaeb; border:1px solid #c9b98a; padding:14px 18px;
+    background:linear-gradient(180deg,
+      rgba(20,32,55,0.5) 0%,
+      rgba(10,16,30,0.72) 100%);
+    border:1px solid rgba(232,185,91,0.28);
+    padding:16px 20px;
     border-radius:3px;
   }
   .kankyo h4{
-    font-size:14px; letter-spacing:6px; color:var(--beni);
-    border-bottom:1px solid #d9c89a; padding-bottom:6px; margin-bottom:8px;
+    font-size:14px; letter-spacing:6px;
+    color:var(--shu);
+    border-bottom:1px solid rgba(232,185,91,0.3);
+    padding-bottom:8px; margin-bottom:10px;
+    text-shadow:0 0 10px rgba(224,74,71,0.45);
   }
-  .kankyo li{ font-size:12px; margin-left:1.2em; line-height:1.8 }
+  .kankyo li{
+    font-size:12px; margin-left:1.2em; line-height:1.85;
+    color:var(--kinari);
+  }
   .kankyo code{
-    font-family:Consolas,monospace; background:#f1e6c2; padding:1px 5px;
-    border-radius:3px; font-size:11px;
+    font-family:Consolas,monospace;
+    background:rgba(0,0,0,0.4);
+    color:var(--akari);
+    padding:1px 6px; border-radius:3px;
+    font-size:11px;
+    border:1px solid rgba(232,185,91,0.3);
   }
 
   footer{
-    margin-top:32px; padding-top:18px;
-    border-top:1px dashed #b5a06a;
+    margin-top:36px; padding-top:20px;
+    border-top:1px dashed rgba(232,185,91,0.3);
     display:flex; justify-content:space-between; align-items:flex-end;
-    font-size:11px; color:#5a4a26; letter-spacing:2px;
+    font-size:11px;
+    color:var(--kinari);
+    letter-spacing:2px;
+    opacity:0.92;
   }
   .seal{
-    width:46px; height:46px; background:var(--shu);
-    color:#fff8e7; display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:18px;
-    box-shadow:inset 0 0 0 2px #fff8e7;
-  }
-  .seigaiha{
-    position:absolute; left:-12px; bottom:24px; width:120px; height:80px; opacity:0.18;
-    pointer-events:none;
-  }
-  .seigaiha-r{
-    position:absolute; right:-12px; top:80px; width:120px; height:80px; opacity:0.18;
-    transform:scaleX(-1);
-    pointer-events:none;
+    width:50px; height:50px;
+    background:var(--shu);
+    color:#FFE5A8;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:20px;
+    box-shadow:
+      inset 0 0 0 2px #FFE5A8,
+      0 0 18px rgba(224,74,71,0.55);
   }
 
   @media print{
-    body{padding:0; background:#fff}
-    .scroll{box-shadow:none; border:none; max-width:none}
+    body{padding:0; background:#fff; color:#000}
+    body::before{display:none}
+    .scroll{box-shadow:none; border:1px solid #999; max-width:none; background:#fff; color:#000}
+    .moon, .pagoda, .pagoda-r, .mountain, .torii{display:none}
+    .yagura, .yagura li, .ishizue, .kankyo .box{background:#fff; color:#000; border-color:#999}
+    .yagura li .ttl, h1, h1 .gold, .era, .noren h2, .ishizue h3, .kankyo h4{color:#000; text-shadow:none}
+    .yagura li .url{color:#444}
+    .yagura li .desc, .kankyo li{color:#222}
+    .chip{background:#fff; color:#000; box-shadow:none}
+  }
+
+  @media (max-width:900px){
+    .three{grid-template-columns:1fr}
+    .kankyo{grid-template-columns:1fr}
+    .scroll{padding:32px 24px 40px}
+    h1{font-size:34px; letter-spacing:8px}
+    .moon, .pagoda, .pagoda-r, .torii{display:none}
   }
 </style>
 </head>
 <body>
-  <div class="scroll">
 
-    <svg class="seigaiha" viewBox="0 0 120 80">
-      <defs>
-        <pattern id="sg" x="0" y="0" width="30" height="15" patternUnits="userSpaceOnUse">
-          <circle cx="15" cy="15" r="14" fill="none" stroke="#1F4E79" stroke-width="1.2"/>
-          <circle cx="0"  cy="15" r="14" fill="none" stroke="#1F4E79" stroke-width="1.2"/>
-          <circle cx="30" cy="15" r="14" fill="none" stroke="#1F4E79" stroke-width="1.2"/>
-        </pattern>
-      </defs>
-      <rect width="120" height="80" fill="url(#sg)"/>
-    </svg>
-    <svg class="seigaiha-r" viewBox="0 0 120 80">
-      <rect width="120" height="80" fill="url(#sg)"/>
-    </svg>
+<!-- 三日月 -->
+<svg class="moon" viewBox="0 0 100 100" aria-hidden="true">
+  <defs>
+    <radialGradient id="moonGlow">
+      <stop offset="0%" stop-color="#FFE5A8" stop-opacity="0.5"/>
+      <stop offset="55%" stop-color="#FFD78A" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#E8B95B" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="crescent">
+      <rect width="100" height="100" fill="white"/>
+      <circle cx="62" cy="46" r="28" fill="black"/>
+    </mask>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="url(#moonGlow)"/>
+  <circle cx="50" cy="50" r="30" fill="#FFE5A8" mask="url(#crescent)"/>
+</svg>
 
-    <header>
-      <div class="stamp">令和八<br>卯月<br>廿六日</div>
-      <div class="era">令 和 八 年 卯 月</div>
-      <h1>と く り <span class="gold">堂</span> 御 絵 図</h1>
-      <div class="sub">tkrsys ― 介 護 と 法 律 と 後 見 の 八 絵 巻</div>
-      <div class="pillar">
-        <span>八 葉</span>
-        <span>三 柱</span>
-        <span>令 和 八 年 四 月 廿 六 日 更 新</span>
+<!-- 鳥居 -->
+<svg class="torii" viewBox="0 0 64 84" aria-hidden="true">
+  <g fill="#B53C39">
+    <path d="M 0 14 Q 32 6 64 14 L 64 22 Q 32 16 0 22 Z"/>
+    <rect x="2" y="22" width="60" height="4"/>
+    <rect x="6" y="32" width="52" height="4"/>
+    <rect x="10" y="14" width="6" height="70"/>
+    <rect x="48" y="14" width="6" height="70"/>
+  </g>
+</svg>
+
+<!-- 五重塔 (左) -->
+<svg class="pagoda" viewBox="0 0 170 300" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
+  <g fill="#06060c">
+    <rect x="55" y="278" width="60" height="22"/>
+    <!-- 1層 -->
+    <rect x="38" y="248" width="94" height="6"/>
+    <polygon points="22,248 148,248 138,232 32,232"/>
+    <rect x="42" y="232" width="86" height="16"/>
+    <!-- 2層 -->
+    <rect x="42" y="202" width="86" height="6"/>
+    <polygon points="28,202 142,202 132,188 38,188"/>
+    <rect x="46" y="188" width="78" height="14"/>
+    <!-- 3層 -->
+    <rect x="46" y="160" width="78" height="6"/>
+    <polygon points="34,160 136,160 126,146 44,146"/>
+    <rect x="50" y="146" width="70" height="14"/>
+    <!-- 4層 -->
+    <rect x="50" y="120" width="70" height="6"/>
+    <polygon points="40,120 130,120 122,108 48,108"/>
+    <rect x="54" y="108" width="62" height="12"/>
+    <!-- 5層 -->
+    <rect x="54" y="84" width="62" height="6"/>
+    <polygon points="44,84 126,84 119,72 51,72"/>
+    <rect x="58" y="72" width="54" height="12"/>
+    <!-- 相輪 -->
+    <line x1="85" y1="72" x2="85" y2="22" stroke="#06060c" stroke-width="3"/>
+    <circle cx="85" cy="28" r="3"/>
+    <circle cx="85" cy="38" r="4"/>
+    <circle cx="85" cy="49" r="5"/>
+    <circle cx="85" cy="61" r="5.5"/>
+  </g>
+</svg>
+
+<!-- 八坂塔 (右) -->
+<svg class="pagoda-r" viewBox="0 0 130 220" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
+  <g fill="#06060c">
+    <rect x="40" y="200" width="50" height="20"/>
+    <rect x="28" y="174" width="74" height="5"/>
+    <polygon points="14,174 116,174 108,162 22,162"/>
+    <rect x="32" y="162" width="66" height="12"/>
+    <rect x="32" y="138" width="66" height="5"/>
+    <polygon points="20,138 110,138 102,127 28,127"/>
+    <rect x="35" y="127" width="60" height="11"/>
+    <rect x="36" y="104" width="58" height="5"/>
+    <polygon points="24,104 106,104 99,93 31,93"/>
+    <rect x="39" y="93" width="52" height="11"/>
+    <rect x="40" y="72" width="50" height="5"/>
+    <polygon points="28,72 102,72 96,62 34,62"/>
+    <rect x="43" y="62" width="44" height="10"/>
+    <line x1="65" y1="62" x2="65" y2="24" stroke="#06060c" stroke-width="2.5"/>
+    <circle cx="65" cy="30" r="2.5"/>
+    <circle cx="65" cy="39" r="3.5"/>
+    <circle cx="65" cy="49" r="4.5"/>
+  </g>
+</svg>
+
+<!-- 東山シルエット + 街灯り -->
+<svg class="mountain" viewBox="0 0 1400 130" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
+  <defs>
+    <linearGradient id="mtn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a14" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="1"/>
+    </linearGradient>
+    <radialGradient id="machi">
+      <stop offset="0%" stop-color="#FFD78A" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#FFD78A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <path d="M 0 90 L 80 50 L 160 78 L 240 38 L 340 68 L 440 32 L 520 72 L 620 42 L 720 62 L 820 25 L 920 58 L 1020 38 L 1120 68 L 1220 48 L 1320 72 L 1400 58 L 1400 130 L 0 130 Z" fill="url(#mtn)"/>
+  <!-- 街明かり -->
+  <circle cx="180" cy="95" r="2" fill="url(#machi)"/>
+  <circle cx="320" cy="100" r="2" fill="url(#machi)"/>
+  <circle cx="460" cy="93" r="2" fill="url(#machi)"/>
+  <circle cx="640" cy="98" r="2" fill="url(#machi)"/>
+  <circle cx="780" cy="92" r="2" fill="url(#machi)"/>
+  <circle cx="940" cy="102" r="2" fill="url(#machi)"/>
+  <circle cx="1080" cy="96" r="2" fill="url(#machi)"/>
+  <circle cx="1260" cy="100" r="2" fill="url(#machi)"/>
+</svg>
+
+<div class="scroll">
+
+  <header>
+    <div class="stamp">令和八<br>皐月<br>十二日</div>
+    <div class="era">令 和 八 年 皐 月</div>
+    <h1>と く り <span class="gold">堂</span> 御 絵 図</h1>
+    <div class="sub">tkrsys ― 京 の 夜 に 灯 る 九 つ の 灯</div>
+    <div class="pillar">
+      <span>九 灯</span>
+      <span>三 柱</span>
+      <span>令 和 八 年 皐 月 十 二 日 改 訂</span>
+    </div>
+  </header>
+
+  <section class="three">
+
+    <!-- 介護之灯 -->
+    <div class="yagura kaigo">
+      <div class="roof"><span class="roof-line">介 護 実 務</span></div>
+      <div class="noren">
+        <h2>介 護 之 灯</h2>
+        <div class="en">― CARE PRACTICE ―</div>
       </div>
-    </header>
+      <ul>
+        <li>
+          <div class="ttl"><span class="mark">壱</span>居宅サービス計画書システム</div>
+          <div class="url"><a href="https://tkrsys-careplan.vercel.app" target="_blank" rel="noopener">tkrsys-careplan.vercel.app</a></div>
+          <div class="desc">居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核</div>
+          <span class="tag">主軸</span><span class="tag">PIN</span><span class="tag">Neon</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">弐</span>ももケアプラン</div>
+          <div class="url"><a href="https://tkrsys-momocare.vercel.app" target="_blank" rel="noopener">tkrsys-momocare.vercel.app</a></div>
+          <div class="desc">ケアプラン関連の派生システム</div>
+          <span class="tag">派生</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">参</span>ヘルパーマッチング</div>
+          <div class="url"><a href="https://helper-matching-app.vercel.app" target="_blank" rel="noopener">helper-matching-app.vercel.app</a></div>
+          <div class="desc">ヘルパー登録・空き時間管理、利用者希望との突合せ</div>
+          <span class="tag">HelperMatch</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">肆</span>ヘルパー活動報告書</div>
+          <div class="url"><a href="https://helper-report.vercel.app" target="_blank" rel="noopener">helper-report.vercel.app</a></div>
+          <div class="desc">訪問支援の記録・PDF出力。福祉事業所向け</div>
+          <span class="tag">PDF</span>
+        </li>
+      </ul>
+    </div>
 
-    <section class="three">
-
-      <div class="yagura kaigo">
-        <div class="roof"><span class="roof-line">介 護 実 務</span></div>
-        <div class="noren">
-          <h2>介 護 之 間</h2>
-          <div class="en">― CARE PRACTICE ―</div>
-        </div>
-        <ul>
-          <li>
-            <div class="ttl"><span class="mark">壱</span>居宅サービス計画書 自動生成</div>
-            <div class="url"><a href="https://careplan-delivery.vercel.app" target="_blank" rel="noopener">careplan-delivery.vercel.app</a></div>
-            <div class="desc">第1〜3表生成・PDF印刷・履歴管理・月次利用上限・PIN認証</div>
-            <span class="tag">最新版</span><span class="tag">PIN</span><span class="tag">Neon</span>
-          </li>
-          <li>
-            <div class="ttl"><span class="mark">弐</span>多職種 AI エージェント</div>
-            <div class="url"><a href="https://care-plan-agent.vercel.app" target="_blank" rel="noopener">care-plan-agent.vercel.app</a></div>
-            <div class="desc">医師・薬剤師・看護師・PT・OT・ST・社会福祉士・介護士 八職種で多角検討</div>
-            <span class="tag">八職種</span><span class="tag">Claude</span>
-          </li>
-        </ul>
+    <!-- 法律之灯 -->
+    <div class="yagura hou">
+      <div class="roof"><span class="roof-line">法 律 学 習</span></div>
+      <div class="noren">
+        <h2>法 律 之 灯</h2>
+        <div class="en">― LAW & GUIDE ―</div>
       </div>
+      <ul>
+        <li>
+          <div class="ttl"><span class="mark">伍</span>行政法 統合ポータル</div>
+          <div class="url"><a href="https://gyoseiho-guide.vercel.app" target="_blank" rel="noopener">gyoseiho-guide.vercel.app</a></div>
+          <div class="desc">行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合</div>
+          <span class="tag">四法統合</span><span class="tag">e-Gov</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">陸</span>民法ガイド</div>
+          <div class="url"><a href="https://minpo-guide.vercel.app" target="_blank" rel="noopener">minpo-guide.vercel.app</a></div>
+          <div class="desc">民法6分野・約200条を三段階解説。行政書士試験対策</div>
+          <span class="tag">200条</span><span class="tag">三段解説</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">漆</span>健康保険法ガイド</div>
+          <div class="url"><a href="https://kenkou-hoken-guide.vercel.app" target="_blank" rel="noopener">kenkou-hoken-guide.vercel.app</a></div>
+          <div class="desc">健康保険法 全125条 完全解説。社労士試験対策・実務参照</div>
+          <span class="tag">全125条</span><span class="tag">e-Gov</span>
+        </li>
+      </ul>
+    </div>
 
-      <div class="yagura hou">
-        <div class="roof"><span class="roof-line">行 政 法 学</span></div>
-        <div class="noren">
-          <h2>行 政 之 間</h2>
-          <div class="en">― ADMINISTRATIVE LAW ―</div>
-        </div>
-        <ul>
-          <li>
-            <div class="ttl"><span class="mark">参</span>行政手続法 全四十六条</div>
-            <div class="url"><a href="https://gyosei-tetsuduki-guide.vercel.app" target="_blank" rel="noopener">gyosei-tetsuduki-guide.vercel.app</a></div>
-            <div class="desc">e-Gov API 連携、条文検索機能つき</div>
-            <span class="tag">完成</span><span class="tag">e-Gov</span>
-          </li>
-          <li>
-            <div class="ttl"><span class="mark">肆</span>行政不服審査法 全文解説</div>
-            <div class="url"><a href="https://gyosei-fufuku-zenbun.vercel.app" target="_blank" rel="noopener">gyosei-fufuku-zenbun.vercel.app</a></div>
-            <div class="desc">三段階解説・審査請求手続きの実務ガイド</div>
-            <span class="tag">三段解説</span>
-          </li>
-          <li>
-            <div class="ttl"><span class="mark">伍</span>行政事件訴訟法ガイド</div>
-            <div class="url"><a href="https://gyosei-jiken-soshou-guide.vercel.app" target="_blank" rel="noopener">gyosei-jiken-soshou-guide.vercel.app</a></div>
-            <div class="desc">取消訴訟を中心とした実務志向の解説</div>
-            <span class="tag">取消訴訟</span>
-          </li>
-          <li>
-            <div class="ttl"><span class="mark">陸</span>国家賠償・損失補償ガイド</div>
-            <div class="url"><a href="https://kokka-baishou-sonshitsu-guide.vercel.app" target="_blank" rel="noopener">kokka-baishou-sonshitsu-guide.vercel.app</a></div>
-            <div class="desc">現場視点での損害賠償・損失補償</div>
-            <span class="tag">実務志向</span>
-          </li>
-        </ul>
+    <!-- 後見之灯 -->
+    <div class="yagura kouken">
+      <div class="roof"><span class="roof-line">後 見 制 度</span></div>
+      <div class="noren">
+        <h2>後 見 之 灯</h2>
+        <div class="en">― GUARDIANSHIP ―</div>
       </div>
+      <ul>
+        <li>
+          <div class="ttl"><span class="mark">捌</span>後見実務サポートガイド</div>
+          <div class="url"><a href="https://koken-roppou.vercel.app" target="_blank" rel="noopener">koken-roppou.vercel.app</a></div>
+          <div class="desc">就任直後・財産管理・身上監護 の事例（基礎90＋応用44件）</div>
+          <span class="tag">事例134件</span>
+        </li>
+        <li>
+          <div class="ttl"><span class="mark">玖</span>後見月次報告</div>
+          <div class="url"><a href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">kouken-monthly-report.vercel.app</a></div>
+          <div class="desc">月次報告書の作成・管理。家庭裁判所への提出支援</div>
+          <span class="tag">家裁提出</span><span class="tag">認証要</span>
+        </li>
+      </ul>
+    </div>
 
-      <div class="yagura kouken">
-        <div class="roof"><span class="roof-line">後 見 制 度</span></div>
-        <div class="noren">
-          <h2>後 見 之 間</h2>
-          <div class="en">― GUARDIANSHIP ―</div>
-        </div>
-        <ul>
-          <li>
-            <div class="ttl"><span class="mark">漆</span>後見六法ガイド</div>
-            <div class="url"><a href="https://koken-roppou.vercel.app" target="_blank" rel="noopener">koken-roppou.vercel.app</a></div>
-            <div class="desc">成年後見制度関連 六法律 を横断検索</div>
-            <span class="tag">六法横断</span>
-          </li>
-          <li>
-            <div class="ttl"><span class="mark">捌</span>後見月次報告</div>
-            <div class="url"><a href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">kouken-monthly-report.vercel.app</a></div>
-            <div class="desc">月次報告書の作成・管理、家庭裁判所への提出支援</div>
-            <span class="tag">家裁提出</span>
-          </li>
-        </ul>
-      </div>
+  </section>
 
-    </section>
+  <section class="ishizue">
+    <h3>礎 ― 共 通 之 技 ―</h3>
+    <div class="row">
+      <span class="chip ai">Next.js</span>
+      <span class="chip ai">App Router</span>
+      <span class="chip shu">Vercel</span>
+      <span class="chip match">Neon PostgreSQL</span>
+      <span class="chip gold">Anthropic API</span>
+      <span class="chip gold">claude-sonnet-4-6</span>
+      <span class="chip">React</span>
+      <span class="chip">Tailwind CSS</span>
+      <span class="chip">e-Gov API</span>
+    </div>
+  </section>
 
-    <section class="ishizue">
-      <h3>礎 ― 共 通 之 技 ―</h3>
-      <div class="row">
-        <span class="chip ai">Next.js</span>
-        <span class="chip ai">App Router</span>
-        <span class="chip shu">Vercel</span>
-        <span class="chip match">Neon PostgreSQL</span>
-        <span class="chip gold">Anthropic API</span>
-        <span class="chip gold">claude-sonnet-4-6</span>
-        <span class="chip">React</span>
-        <span class="chip">TypeScript</span>
-        <span class="chip">Tailwind CSS</span>
-      </div>
-    </section>
+  <section class="kankyo">
+    <div class="box">
+      <h4>共 通 環 境 変 数</h4>
+      <ul>
+        <li><code>DATABASE_URL</code> ― Neon PostgreSQL 接続</li>
+        <li><code>ACCESS_PIN</code> ― 一般アクセス用 PIN</li>
+        <li><code>ADMIN_PIN</code> ― 管理者用 PIN</li>
+        <li><code>ANTHROPIC_API_KEY</code> ― Claude API キー（AI 系のみ）</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h4>御 約 束 事</h4>
+      <ul>
+        <li>main 直接コミット・Vercel 自動デプロイ</li>
+        <li>居宅サービス計画書／要介護／認定有効期間 等 正式表記を遵守</li>
+        <li>利用者の個人情報はログに出力せず</li>
+        <li>API 応答に <code>role</code>（権限）を必ず含む</li>
+      </ul>
+    </div>
+  </section>
 
-    <section class="kankyo">
-      <div class="box">
-        <h4>共 通 環 境 変 数</h4>
-        <ul>
-          <li><code>DATABASE_URL</code> ― Neon 接続（careplan / kigen / portal 共有）</li>
-          <li><code>ACCESS_PIN</code> ― 一般アクセス用 PIN（全アプリ共通）</li>
-          <li><code>ADMIN_PIN</code> ― 管理者 PIN（全アプリ共通）</li>
-          <li><code>ANTHROPIC_API_KEY</code> ― Claude API キー（AI 系のみ）</li>
-        </ul>
-      </div>
-      <div class="box">
-        <h4>御 約 束 事</h4>
-        <ul>
-          <li>main ブランチ直接コミット・Vercel 自動デプロイ</li>
-          <li>居宅サービス計画書／要介護／認定有効期間 等の正式表記を遵守</li>
-          <li>利用者の個人情報はログに出力せず</li>
-          <li>API 応答は <code>role</code> を必ず含む</li>
-        </ul>
-      </div>
-    </section>
+  <footer>
+    <div>
+      ◇ 凡 例 ：<span class="tag">朱</span> 介護　<span class="tag">藍</span> 法律　<span class="tag">萌黄</span> 後見　<span class="tag">金</span> 共通基盤
+    </div>
+    <div style="text-align:center">
+      <div>令和八年五月十二日 改訂</div>
+      <div style="margin-top:4px;font-size:10px;opacity:0.75">tkrsys/system-map ― 京 夜 景 御 絵 図</div>
+    </div>
+    <div class="seal">徳</div>
+  </footer>
 
-    <footer>
-      <div>
-        ◇ 凡 例 ：<span class="tag">朱</span> 介護　<span class="tag">藍</span> 行政法　<span class="tag">抹茶</span> 後見　<span class="tag">山吹</span> 共通基盤
-      </div>
-      <div style="text-align:center">
-        <div>令和八年四月廿六日 改訂</div>
-        <div style="margin-top:4px;font-size:10px">tkrsys/system-map</div>
-      </div>
-      <div class="seal">徳</div>
-    </footer>
-
-  </div>
+</div>
 </body>
 </html>
