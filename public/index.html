@@ -3,967 +3,1174 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>とくり堂 御絵図 ― 京都夜景</title>
+<title>京 町 屋 を 歩 く ― とくり堂 御絵図</title>
 <style>
-  /* ===== 京の夜の伝統色 ===== */
   :root{
-    --yozora-deep:#060814;     /* 深い夜空 */
-    --yozora:#0E1A30;          /* 紺青 */
-    --yozora-mid:#18253F;      /* 中間 */
-    --sumi:#08080F;            /* 墨 */
-    --akari:#FFD78A;           /* 灯火 */
-    --akari-strong:#FFE5A8;    /* 強灯 */
-    --kogane:#E8B95B;          /* 黄金 */
-    --kincha:#B58B3C;          /* 金茶 */
-    --shu:#E04A47;             /* 朱 */
-    --shu-deep:#B53C39;        /* 深朱 */
-    --beni:#A4243B;            /* 紅 */
-    --ai-light:#6BA0CC;        /* 浅葱 */
-    --ruri:#3866A0;            /* 瑠璃 */
-    --matcha:#8EB060;          /* 抹茶 */
-    --moegi:#A8C078;           /* 萌黄 */
-    --tori:#F5EFE0;            /* 鳥の子色 */
-    --kinari:#E8DFC8;          /* 生成り */
+    --akari:#FFD78A; --akari-strong:#FFE5A8; --kogane:#E8B95B;
+    --shu:#E04A47; --ai-light:#6BA0CC; --moegi:#A8C078;
+    --kinari:#E8DFC8; --sumi:#08080F;
   }
-
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{
-    font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN","HG明朝E",serif;
-    color:var(--kinari);
-    background:var(--yozora-deep);
-  }
+  html,body{height:100%}
   body{
-    background:
-      radial-gradient(ellipse at 50% 100%, rgba(232,185,91,0.10) 0%, transparent 55%),
-      radial-gradient(ellipse at 18% 5%, rgba(59,102,160,0.18) 0%, transparent 50%),
-      linear-gradient(180deg, var(--sumi) 0%, var(--yozora) 30%, var(--yozora-mid) 70%, #1F2F4E 100%);
-    background-attachment:fixed;
-    min-height:100vh;
-    padding:32px 0;
-    position:relative;
-    overflow-x:hidden;
+    background:var(--sumi);
+    color:var(--kinari);
+    font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN",serif;
+    overflow:hidden;
   }
+  #stage{position:fixed; inset:0}
+  #stage canvas{display:block; width:100%; height:100%}
 
-  /* 星の散布 */
-  body::before{
-    content:"";
-    position:fixed; inset:0;
-    background-image:
-      radial-gradient(1px 1px at 8% 9%, rgba(255,255,255,0.8), transparent 60%),
-      radial-gradient(1px 1px at 22% 14%, rgba(255,255,255,0.6), transparent 60%),
-      radial-gradient(1.5px 1.5px at 38% 6%, rgba(255,230,180,0.9), transparent 60%),
-      radial-gradient(1px 1px at 53% 21%, rgba(255,255,255,0.5), transparent 60%),
-      radial-gradient(1px 1px at 68% 11%, rgba(255,255,255,0.7), transparent 60%),
-      radial-gradient(2px 2px at 84% 24%, rgba(255,230,180,0.9), transparent 60%),
-      radial-gradient(1px 1px at 14% 32%, rgba(255,255,255,0.4), transparent 60%),
-      radial-gradient(1px 1px at 91% 8%, rgba(255,255,255,0.6), transparent 60%),
-      radial-gradient(1px 1px at 4% 24%, rgba(255,255,255,0.5), transparent 60%),
-      radial-gradient(1.5px 1.5px at 64% 34%, rgba(255,230,180,0.7), transparent 60%),
-      radial-gradient(1px 1px at 32% 28%, rgba(255,255,255,0.5), transparent 60%),
-      radial-gradient(1px 1px at 78% 38%, rgba(255,255,255,0.6), transparent 60%);
+  /* ===== 見出し（上） ===== */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    padding:18px 22px;
+    background:linear-gradient(180deg, rgba(4,8,18,0.82) 0%, rgba(4,8,18,0) 100%);
     pointer-events:none;
-    z-index:0;
   }
-
-  /* 三日月 */
-  .moon{
-    position:fixed; top:64px; right:90px;
-    width:90px; height:90px;
-    z-index:1; pointer-events:none;
-    filter:drop-shadow(0 0 25px rgba(255,229,168,0.5));
-  }
-
-  /* 五重塔 (左) */
-  .pagoda{
-    position:fixed; bottom:0; left:50px;
-    width:170px; height:300px;
-    opacity:0.13;
-    z-index:1; pointer-events:none;
-  }
-  /* 八坂塔 (右) */
-  .pagoda-r{
-    position:fixed; bottom:0; right:30px;
-    width:130px; height:220px;
-    opacity:0.10;
-    z-index:1; pointer-events:none;
-  }
-  /* 東山シルエット */
-  .mountain{
-    position:fixed; bottom:0; left:0; right:0;
-    height:130px;
-    opacity:0.20;
-    z-index:1; pointer-events:none;
-  }
-  /* 鳥居 */
-  .torii{
-    position:fixed; top:130px; left:48px;
-    width:64px; height:84px;
-    opacity:0.18;
-    z-index:1; pointer-events:none;
-    filter:drop-shadow(0 0 8px rgba(181,60,57,0.4));
-  }
-
-  .scroll{
-    max-width:1100px; margin:0 auto;
-    position:relative; z-index:2;
-    padding:48px 56px 64px;
-    background:
-      linear-gradient(180deg,
-        rgba(20,32,55,0.88) 0%,
-        rgba(12,22,42,0.94) 50%,
-        rgba(8,16,32,0.96) 100%);
-    border:1px solid rgba(232,185,91,0.35);
-    border-radius:2px;
-    box-shadow:
-      0 0 0 1px rgba(0,0,0,0.5),
-      0 0 80px rgba(232,185,91,0.10),
-      0 30px 80px rgba(0,0,0,0.7);
-  }
-  /* 上下の朱の梁（鳥居の笠木） */
-  .scroll::before, .scroll::after{
-    content:""; position:absolute; left:0; right:0; height:8px;
-    background:linear-gradient(90deg,
-      transparent 0%, var(--shu-deep) 10%, var(--shu) 50%, var(--shu-deep) 90%, transparent 100%);
-    box-shadow:
-      0 0 14px rgba(224,74,71,0.55),
-      inset 0 -1px 0 rgba(0,0,0,0.4);
-  }
-  .scroll::before{top:0}
-  .scroll::after{bottom:0}
-
-  /* ===== Header ===== */
-  header{
-    text-align:center;
-    padding:16px 0 36px;
-    border-bottom:1px dashed rgba(232,185,91,0.32);
-    margin-bottom:36px;
-    position:relative;
-  }
-  .stamp{
-    position:absolute; top:6px; right:0;
-    width:78px; height:78px;
-    background:var(--shu);
-    color:#FFE5A8;
-    display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:13px; line-height:1.35;
-    text-align:center; border-radius:6px;
-    transform:rotate(-6deg);
-    box-shadow:
-      0 0 22px rgba(224,74,71,0.6),
-      0 4px 0 rgba(0,0,0,0.4),
-      inset 0 0 0 2px #FFE5A8,
-      inset 0 0 0 4px var(--shu);
-    letter-spacing:1px;
-  }
-  .era{
-    font-size:13px; letter-spacing:8px;
-    color:var(--kogane);
-    margin-bottom:10px;
-    text-shadow:0 0 10px rgba(232,185,91,0.45);
-  }
-  h1{
-    font-size:46px; letter-spacing:14px;
+  .topbar .ttl{
+    font-size:19px; letter-spacing:7px;
     color:var(--akari-strong);
-    text-shadow:
-      0 0 22px rgba(255,215,138,0.45),
-      0 0 6px rgba(255,215,138,0.7),
-      2px 2px 0 rgba(0,0,0,0.6);
+    text-shadow:0 0 16px rgba(255,215,138,0.5);
   }
-  h1 .gold{
-    color:var(--kogane);
-    text-shadow:
-      0 0 26px rgba(232,185,91,0.8),
-      0 0 8px rgba(232,185,91,0.95);
+  .topbar .sub{
+    margin-top:5px; font-size:11.5px; letter-spacing:3px;
+    color:var(--kogane); opacity:0.85;
   }
-  .sub{
-    margin-top:14px;
-    font-size:15px; letter-spacing:6px;
-    color:var(--ai-light);
-    text-shadow:0 0 10px rgba(107,160,204,0.35);
+  .topbar a{
+    pointer-events:auto;
+    color:var(--kinari); text-decoration:none;
+    font-size:12px; letter-spacing:2px;
+    border:1px solid rgba(232,185,91,0.45);
+    background:rgba(6,10,22,0.6);
+    padding:9px 13px; border-radius:2px;
+    white-space:nowrap;
   }
-  .pillar{
-    display:flex; justify-content:center; gap:18px;
-    margin-top:20px; font-size:12px;
-    color:var(--kinari); letter-spacing:3px;
-  }
-  .pillar span{
-    padding:4px 12px;
+  .topbar a:hover{ color:var(--akari-strong); border-color:var(--akari-strong) }
+
+  /* ===== 町屋の札（下） ===== */
+  .fuda{
+    position:fixed; left:50%; bottom:92px; z-index:10;
+    transform:translateX(-50%) translateY(14px);
+    width:min(520px, calc(100vw - 32px));
+    padding:18px 22px 20px;
+    background:linear-gradient(180deg, rgba(16,26,46,0.94), rgba(8,14,28,0.96));
     border:1px solid rgba(232,185,91,0.4);
-    background:rgba(0,0,0,0.3);
-  }
-
-  /* ===== 三本の提灯（章） ===== */
-  .three{
-    display:grid;
-    grid-template-columns:1fr 1fr 1fr;
-    gap:24px;
-    margin-bottom:40px;
-  }
-  .yagura{
-    background:linear-gradient(180deg,
-      rgba(15,26,46,0.65) 0%,
-      rgba(8,16,32,0.85) 100%);
-    border:1px solid rgba(232,185,91,0.32);
-    border-radius:4px 4px 10px 10px;
-    padding:0 0 16px;
-    position:relative;
-    box-shadow:
-      0 0 32px rgba(232,185,91,0.10),
-      0 6px 0 rgba(0,0,0,0.45);
-  }
-  /* 提灯の紐 */
-  .yagura::before{
-    content:""; position:absolute;
-    left:50%; top:-22px; width:1px; height:22px;
-    background:linear-gradient(180deg, transparent, rgba(232,185,91,0.65));
-    transform:translateX(-0.5px);
-  }
-  /* 提灯の上飾り */
-  .yagura::after{
-    content:""; position:absolute;
-    left:50%; top:-6px;
-    width:24px; height:6px;
-    background:#0a0a14;
-    border:1px solid rgba(232,185,91,0.4);
-    border-radius:2px;
-    transform:translateX(-50%);
-  }
-
-  .roof{
-    height:40px;
-    background:linear-gradient(180deg, #1a1a2a 0%, #0a0a14 100%);
-    margin:0 -1px;
-    position:relative;
-    border-radius:4px 4px 0 0;
-    border-bottom:1px solid rgba(232,185,91,0.32);
-  }
-  .roof::before{
-    content:""; position:absolute;
-    left:-10px; right:-10px; bottom:-8px; height:10px;
-    background:#0a0a14;
-    clip-path:polygon(0 0, 100% 0, 95% 100%, 5% 100%);
-    border-bottom:1px solid rgba(232,185,91,0.25);
-  }
-  .roof-line{
-    position:absolute; left:50%; top:50%;
-    transform:translate(-50%,-50%);
-    color:var(--akari); font-size:13px; letter-spacing:6px;
-    text-shadow:0 0 12px rgba(255,215,138,0.65);
-  }
-
-  /* 提灯本体 */
-  .noren{
-    margin:0 14px;
-    padding:18px 12px 22px;
-    background:repeating-linear-gradient(180deg,
-      transparent 0 24px, rgba(0,0,0,0.25) 24px 26px);
-    border-bottom:2px solid currentColor;
-    text-align:center;
-    position:relative;
-  }
-  .yagura.kaigo .noren{
-    background-color:rgba(224,74,71,0.26);
-    color:#FF9D7A;
-    box-shadow:inset 0 0 32px rgba(255,139,107,0.22);
-  }
-  .yagura.hou .noren{
-    background-color:rgba(107,160,204,0.20);
-    color:var(--ai-light);
-    box-shadow:inset 0 0 32px rgba(107,160,204,0.22);
-  }
-  .yagura.kouken .noren{
-    background-color:rgba(142,176,96,0.20);
-    color:var(--moegi);
-    box-shadow:inset 0 0 32px rgba(168,192,120,0.22);
-  }
-  .noren h2{
-    font-size:22px; letter-spacing:8px;
-    color:inherit;
-    margin-bottom:4px;
-    text-shadow:0 0 14px currentColor;
-  }
-  .noren .en{
-    font-size:11px; letter-spacing:3px;
-    color:var(--kinari); opacity:0.7;
-  }
-
-  /* 個別の灯篭 */
-  .yagura ul{ list-style:none; padding:12px 14px 0 }
-  .yagura li{
-    background:linear-gradient(180deg,
-      rgba(30,42,68,0.7) 0%,
-      rgba(15,22,40,0.88) 100%);
-    border:1px solid rgba(232,185,91,0.28);
-    border-left:3px solid var(--kogane);
-    margin-bottom:10px;
-    border-radius:2px;
-    position:relative;
-    transition:all 0.2s ease;
-  }
-  .yagura li:hover{
-    border-color:rgba(255,215,138,0.7);
-    box-shadow:0 0 22px rgba(255,215,138,0.22);
-    transform:translateY(-1px);
-  }
-  /* カード全体を1つのリンクにする（当たり判定を面で取る） */
-  .yagura li > .card{
-    display:block;
-    padding:12px 14px 13px;
-    min-height:44px;
-    color:inherit; text-decoration:none;
-  }
-  .yagura li > .card:focus-visible{
-    outline:2px solid var(--akari-strong);
-    outline-offset:2px;
-  }
-  .yagura.kaigo  li{ border-left-color:var(--shu) }
-  .yagura.hou    li{ border-left-color:var(--ai-light) }
-  .yagura.kouken li{ border-left-color:var(--moegi) }
-
-  /* ── 情報の段は 3 段だけ：名前 → 説明 → 補足 ── */
-  /* 第1段：名前 */
-  .yagura li .ttl{
-    font-size:17px; font-weight:700; letter-spacing:1px;
-    display:flex; align-items:center; gap:9px;
-    margin-bottom:7px;
-    padding-right:24px; /* 隅の小印（通し番号）と重ねない */
-    line-height:1.4;
-    color:var(--akari-strong);
-  }
-  /* 手描き風ピクトグラム（文字を読む前の識別子） */
-  .yagura li .icon{
-    width:28px; height:28px; flex-shrink:0;
-    fill:none; stroke:currentColor;
-    stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
-    opacity:0.95;
-  }
-  .yagura.kaigo  li .icon{ color:#FF9D7A }
-  .yagura.hou    li .icon{ color:var(--ai-light) }
-  .yagura.kouken li .icon{ color:var(--moegi) }
-  /* 通し番号は隅の小印に退避（名前と競わせない） */
-  .yagura li .mark{
-    position:absolute; top:7px; right:8px;
-    width:19px; height:19px;
-    border-radius:50%;
-    background:radial-gradient(circle at 30% 30%, var(--akari-strong), var(--kogane) 70%);
-    color:#3a2810; font-size:10.5px;
-    line-height:19px; text-align:center; font-weight:700;
-    box-shadow:0 0 10px rgba(255,215,138,0.4);
-    opacity:0.85;
-  }
-  /* 第2段：説明 */
-  .yagura li .desc{
-    font-size:13.5px;
-    color:var(--kinari); margin-top:2px;
-    letter-spacing:0.3px; opacity:0.86;
-    line-height:1.65;
-  }
-  /* 第3段：補足（URL・タグ） */
-  .yagura li .url{
-    font-family:"Consolas","Yu Gothic",monospace;
-    font-size:11px;
-    color:#D4B97A; word-break:break-all;
-    opacity:0.6;
-    margin-top:7px;
-  }
-  .tag{
-    display:inline-block; font-size:11px;
-    padding:2px 8px;
-    background:rgba(0,0,0,0.4);
-    border:1px solid rgba(232,185,91,0.4);
-    color:var(--kogane);
-    margin-right:4px; margin-top:7px;
-    letter-spacing:1px;
-  }
-
-  /* ===== 礎 ===== */
-  .ishizue{
-    margin-top:8px;
-    padding:22px 24px;
-    background:linear-gradient(180deg,
-      rgba(20,32,55,0.6) 0%,
-      rgba(10,16,30,0.82) 100%);
-    border:1px solid rgba(232,185,91,0.32);
-    border-radius:4px;
-    position:relative;
-    box-shadow:inset 0 0 32px rgba(232,185,91,0.06);
-  }
-  .ishizue h3{
-    text-align:center;
-    font-size:16px; letter-spacing:10px;
-    color:var(--kogane);
-    margin-bottom:16px;
-    text-shadow:0 0 14px rgba(232,185,91,0.45);
-  }
-  .ishizue h3::before, .ishizue h3::after{
-    content:"❖"; color:var(--shu);
-    margin:0 12px; font-size:14px;
-    text-shadow:0 0 10px rgba(224,74,71,0.55);
-  }
-  .ishizue .row{
-    display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
-  }
-  .chip{
-    background:rgba(20,32,55,0.6);
-    border:1px solid rgba(232,185,91,0.4);
-    padding:6px 14px;
-    font-size:13px; letter-spacing:2px;
-    border-radius:18px;
-    color:var(--kinari);
-    box-shadow:0 2px 0 rgba(0,0,0,0.4);
-  }
-  .chip.shu{
-    background:var(--shu-deep); color:#FFE5A8;
-    border-color:var(--shu);
-    box-shadow:0 0 14px rgba(224,74,71,0.45), 0 2px 0 rgba(0,0,0,0.4);
-  }
-  .chip.ai{
-    background:var(--ruri); color:var(--kinari);
-    border-color:var(--ai-light);
-    box-shadow:0 0 14px rgba(107,160,204,0.35), 0 2px 0 rgba(0,0,0,0.4);
-  }
-  .chip.match{
-    background:#4a6030; color:var(--moegi);
-    border-color:var(--matcha);
-    box-shadow:0 0 14px rgba(142,176,96,0.35), 0 2px 0 rgba(0,0,0,0.4);
-  }
-  .chip.gold{
-    background:var(--kogane); color:#3a2810;
-    border-color:var(--akari-strong);
-    box-shadow:0 0 16px rgba(232,185,91,0.55), 0 2px 0 rgba(0,0,0,0.4);
-  }
-
-  .kankyo{
-    margin-top:28px;
-    display:grid; grid-template-columns:1fr 1fr; gap:16px;
-  }
-  .kankyo .box{
-    background:linear-gradient(180deg,
-      rgba(20,32,55,0.5) 0%,
-      rgba(10,16,30,0.72) 100%);
-    border:1px solid rgba(232,185,91,0.28);
-    padding:16px 20px;
+    border-top:3px solid var(--kogane);
     border-radius:3px;
+    box-shadow:0 0 44px rgba(0,0,0,0.75), 0 0 22px rgba(232,185,91,0.12);
+    opacity:0; transition:opacity .5s ease, transform .5s ease;
+    pointer-events:none;
   }
-  .kankyo h4{
-    font-size:14px; letter-spacing:6px;
-    color:var(--shu);
-    border-bottom:1px solid rgba(232,185,91,0.3);
-    padding-bottom:8px; margin-bottom:10px;
-    text-shadow:0 0 10px rgba(224,74,71,0.45);
-  }
-  .kankyo li{
-    font-size:12px; margin-left:1.2em; line-height:1.85;
-    color:var(--kinari);
-  }
-  .kankyo code{
-    font-family:Consolas,monospace;
-    background:rgba(0,0,0,0.4);
-    color:var(--akari);
-    padding:1px 6px; border-radius:3px;
-    font-size:11px;
-    border:1px solid rgba(232,185,91,0.3);
-  }
+  .fuda.on{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto }
+  .fuda.kaigo { border-top-color:var(--shu) }
+  .fuda.hou   { border-top-color:var(--ai-light) }
+  .fuda.kouken{ border-top-color:var(--moegi) }
 
-  footer{
-    margin-top:36px; padding-top:20px;
-    border-top:1px dashed rgba(232,185,91,0.3);
-    display:flex; justify-content:space-between; align-items:flex-end;
-    font-size:11px;
-    color:var(--kinari);
-    letter-spacing:2px;
-    opacity:0.92;
+  .fuda .no{
+    display:inline-block; width:24px; height:24px; line-height:24px;
+    text-align:center; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, var(--akari-strong), var(--kogane) 70%);
+    color:#3a2810; font-size:12.5px; font-weight:700;
+    margin-right:9px; vertical-align:2px;
   }
-  .seal{
-    width:50px; height:50px;
-    background:var(--shu);
-    color:#FFE5A8;
-    display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:20px;
-    box-shadow:
-      inset 0 0 0 2px #FFE5A8,
-      0 0 18px rgba(224,74,71,0.55);
+  .fuda h2{
+    display:inline; font-size:19px; letter-spacing:1px;
+    color:var(--akari-strong); font-weight:700;
   }
-
-  /* ===== 一目之図（グラフィックレコード風の俯瞰）===== */
-  .zukai{
-    margin-bottom:34px;
-    padding:18px 20px 10px;
-    background:rgba(8,16,32,0.45);
-    border:1px solid rgba(232,185,91,0.22);
-    border-radius:4px;
-  }
-  .zukai .lead{
-    font-size:13.5px; line-height:1.8;
+  .fuda .kind{ margin-top:9px; font-size:11.5px; letter-spacing:2.5px }
+  .fuda.kaigo  .kind{ color:#FF9D7A }
+  .fuda.hou    .kind{ color:var(--ai-light) }
+  .fuda.kouken .kind{ color:var(--moegi) }
+  .fuda .desc{
+    margin-top:9px; font-size:13.5px; line-height:1.7;
     color:var(--kinari); opacity:0.9;
-    text-align:center; margin-bottom:14px;
-    letter-spacing:0.5px;
   }
-  .zukai svg{ display:block; width:100%; height:auto }
-  /* 図中の文字は本文の明朝と役割を分けてゴシック太字に */
-  .zukai text{
-    font-family:"Yu Gothic","游ゴシック","Hiragino Sans",sans-serif;
-    font-weight:700;
+  .fuda .tags{ margin-top:10px }
+  .fuda .tag{
+    display:inline-block; font-size:11px; padding:2px 8px;
+    border:1px solid rgba(232,185,91,0.4); color:var(--kogane);
+    background:rgba(0,0,0,0.4); margin-right:5px; letter-spacing:1px;
   }
+  .fuda .enter{
+    display:block; margin-top:15px; text-align:center;
+    padding:12px 0; min-height:44px;
+    font-size:14.5px; letter-spacing:4px;
+    color:#2a1a08; text-decoration:none; font-weight:700;
+    background:linear-gradient(180deg, var(--akari-strong), var(--kogane));
+    border-radius:2px;
+    box-shadow:0 0 22px rgba(255,215,138,0.35);
+  }
+  .fuda .enter:hover{ filter:brightness(1.1) }
+  .fuda .enter:focus-visible{ outline:2px solid #fff; outline-offset:2px }
 
-  /* ===== 凡例（一覧より前に置く）===== */
-  .legend{
-    display:flex; flex-wrap:wrap; gap:8px 18px;
-    justify-content:center; align-items:center;
-    margin-bottom:26px;
-    font-size:12.5px; letter-spacing:1px;
+  /* ===== 操作（最下部） ===== */
+  .kaji{
+    position:fixed; left:50%; bottom:18px; z-index:11;
+    transform:translateX(-50%);
+    display:flex; align-items:center; justify-content:center;
+    flex-wrap:wrap; row-gap:5px; gap:10px;
+    max-width:calc(100vw - 20px);
+    padding:8px 12px;
+    background:rgba(6,10,22,0.72);
+    border:1px solid rgba(232,185,91,0.35);
+    border-radius:26px;
+  }
+  .kaji button{
+    font-family:inherit; cursor:pointer;
+    background:rgba(20,32,55,0.8);
+    border:1px solid rgba(232,185,91,0.4);
     color:var(--kinari);
+    min-width:44px; min-height:38px;
+    padding:0 14px; border-radius:19px;
+    font-size:13px; letter-spacing:1.5px;
+    white-space:nowrap;
   }
-  .legend .item{ display:flex; align-items:center; gap:7px }
-  .legend .swatch{
-    width:13px; height:13px; border-radius:2px;
-    box-shadow:0 0 8px currentColor;
-    background:currentColor;
+  .kaji button:hover{ border-color:var(--akari-strong); color:var(--akari-strong) }
+  .kaji button:focus-visible{ outline:2px solid var(--akari-strong); outline-offset:2px }
+  .kaji .dots{ display:flex; gap:2px; padding:0 4px }
+  /* 点は小さく見せるが、押せる面は 28px 確保する */
+  .kaji .dot{
+    min-width:0; min-height:0;
+    width:28px; height:28px; padding:0;
+    background:none; border:none; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
   }
-  .legend .s-kaigo { color:var(--shu) }
-  .legend .s-hou   { color:var(--ai-light) }
-  .legend .s-kouken{ color:var(--moegi) }
-  .legend .s-gold  { color:var(--kogane) }
+  .kaji .dot::before{
+    content:""; display:block;
+    width:11px; height:11px; border-radius:50%;
+    background:rgba(232,185,91,0.22);
+    border:1px solid rgba(232,185,91,0.45);
+    transition:transform .2s ease;
+  }
+  .kaji .dot:hover::before{ border-color:var(--akari-strong); transform:scale(1.25) }
+  .kaji .dot.on::before{ transform:scale(1.3) }
+  .kaji .dot.kaigo.on::before { background:var(--shu);      box-shadow:0 0 10px var(--shu) }
+  .kaji .dot.hou.on::before   { background:var(--ai-light); box-shadow:0 0 10px var(--ai-light) }
+  .kaji .dot.kouken.on::before{ background:var(--moegi);    box-shadow:0 0 10px var(--moegi) }
 
-  @media print{
-    body{padding:0; background:#fff; color:#000}
-    body::before{display:none}
-    .scroll{box-shadow:none; border:1px solid #999; max-width:none; background:#fff; color:#000}
-    .moon, .pagoda, .pagoda-r, .mountain, .torii{display:none}
-    .yagura, .yagura li, .ishizue, .kankyo .box{background:#fff; color:#000; border-color:#999}
-    .yagura li .ttl, h1, h1 .gold, .era, .noren h2, .ishizue h3, .kankyo h4{color:#000; text-shadow:none}
-    .yagura li .url{color:#444}
-    .yagura li .desc, .kankyo li{color:#222}
-    .chip{background:#fff; color:#000; box-shadow:none}
-    .zukai{background:#fff; border-color:#999}
-    .zukai .lead, .zukai text{color:#000; fill:#000; opacity:1}
-    .legend{color:#000}
-    .yagura li .icon{color:#000}
-    .yagura li .mark{background:#fff; color:#000; border:1px solid #999; box-shadow:none}
+  .hint{
+    position:fixed; left:50%; bottom:66px; z-index:10;
+    transform:translateX(-50%);
+    font-size:11px; letter-spacing:2px; color:var(--kogane);
+    opacity:0.55; white-space:nowrap; pointer-events:none;
   }
 
-  @media (max-width:900px){
-    .three{grid-template-columns:1fr}
-    .kankyo{grid-template-columns:1fr}
-    .scroll{padding:32px 24px 40px}
-    h1{font-size:34px; letter-spacing:8px}
-    .moon, .pagoda, .pagoda-r, .torii{display:none}
+  #fallback{
+    position:fixed; inset:0; display:none;
+    align-items:center; justify-content:center; text-align:center;
+    padding:32px; font-size:14px; line-height:2; z-index:20;
   }
+
   @media (max-width:560px){
-    body{padding:14px 0}
-    .scroll{padding:26px 16px 32px; margin:0 8px}
-    h1{font-size:25px; letter-spacing:5px}
-    .era{letter-spacing:4px}
-    .sub{font-size:13px; letter-spacing:2px}
-    .stamp{position:static; margin:0 auto 14px; transform:rotate(-4deg)}
-    .pillar{flex-wrap:wrap; gap:8px}
-    .noren h2{font-size:19px; letter-spacing:5px}
-    .ishizue h3{letter-spacing:5px; font-size:15px}
-    .kankyo h4{letter-spacing:3px}
-    .zukai{padding:14px 12px 8px}
-    /* 図は横に長いので、縮めず横スクロールで原寸を保つ */
-    .zukai .canvas{overflow-x:auto; -webkit-overflow-scrolling:touch}
-    .zukai .canvas svg{width:820px; max-width:none}
-    footer{flex-direction:column; gap:14px; align-items:center; text-align:center}
+    .topbar{ padding:12px 14px }
+    .topbar .ttl{ font-size:15px; letter-spacing:4px }
+    .topbar .sub{ font-size:10.5px; letter-spacing:1.5px }
+    .fuda{ bottom:84px; padding:15px 16px 17px }
+    .fuda h2{ font-size:16.5px }
+    .fuda .desc{ font-size:13px }
+    .kaji{ gap:6px; padding:7px 9px }
+    .kaji button{ padding:0 10px; font-size:12px }
+    /* 狭い画面では点列を二段目へ回す */
+    .kaji .dots{ order:9; width:100%; justify-content:center }
+    .hint{ display:none }
   }
 </style>
 </head>
 <body>
 
-<!-- ===== 絵符（ピクトグラム）と手描き線のフィルタ ===== -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <!-- 墨で引いたような線のゆらぎ -->
-    <filter id="fude" x="-5%" y="-5%" width="110%" height="110%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="3" seed="7" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
+<div id="stage"></div>
 
-    <symbol id="ic-careplan" viewBox="0 0 24 24"><!-- 第1〜3表（重ねた書類） -->
-      <path d="M4.5 7 v13.5 h9.5"/>
-      <path d="M7.5 3.5 h8 l3.5 3.5 v13.5 h-11.5 z"/>
-      <path d="M15.5 3.5 v3.5 h3.5"/>
-      <path d="M10 11 h6.5 M10 14 h6.5 M10 17 h4"/>
-    </symbol>
-    <symbol id="ic-momo" viewBox="0 0 24 24"><!-- 桃 -->
-      <path d="M12 8 C9.2 5, 4.8 6.3, 4.8 10.6 C4.8 15.4, 8.6 20, 12 20 C15.4 20, 19.2 15.4, 19.2 10.6 C19.2 6.3, 14.8 5, 12 8 Z"/>
-      <path d="M12 8.6 V19.6"/>
-      <path d="M12.7 7 C13.6 4.4, 15.7 3.4, 17.3 3.6"/>
-    </symbol>
-    <symbol id="ic-helper" viewBox="0 0 24 24"><!-- 訪問して記録する -->
-      <path d="M3.5 11 L12 4 L20.5 11"/>
-      <path d="M6 9.6 V20 H18 V9.6"/>
-      <path d="M9 14.8 l2.2 2.3 4.3 -4.6"/>
-    </symbol>
-    <symbol id="ic-gyosei" viewBox="0 0 24 24"><!-- 法（天秤） -->
-      <path d="M12 4.5 V20.5 M7 20.5 h10"/>
-      <path d="M3.5 8 h17"/>
-      <path d="M3.5 8 l-2 4.8 h4 z"/>
-      <path d="M20.5 8 l-2 4.8 h4 z"/>
-      <circle cx="12" cy="8" r="1.3"/>
-    </symbol>
-    <symbol id="ic-minpo" viewBox="0 0 24 24"><!-- 条文（開いた本） -->
-      <path d="M12 6.6 C9.5 5, 6.5 4.6, 3.6 5.3 V18 C6.5 17.3, 9.5 17.7, 12 19.3"/>
-      <path d="M12 6.6 C14.5 5, 17.5 4.6, 20.4 5.3 V18 C17.5 17.3, 14.5 17.7, 12 19.3"/>
-      <path d="M12 6.6 V19.3"/>
-    </symbol>
-    <symbol id="ic-kenkou" viewBox="0 0 24 24"><!-- 健康保険（証＋十字） -->
-      <rect x="3" y="5.5" width="18" height="13" rx="1.6"/>
-      <path d="M8.2 9.2 v5.6 M5.4 12 h5.6"/>
-      <path d="M14 10.4 h4.2 M14 13.6 h4.2"/>
-    </symbol>
-    <symbol id="ic-kouken" viewBox="0 0 24 24"><!-- 家庭裁判所 -->
-      <path d="M3.2 9.2 L12 4 L20.8 9.2"/>
-      <path d="M6 10.4 v7.6 M10 10.4 v7.6 M14 10.4 v7.6 M18 10.4 v7.6"/>
-      <path d="M3.8 18.4 h16.4 M2.8 20.4 h18.4"/>
-    </symbol>
-  </defs>
-</svg>
-
-<!-- 三日月 -->
-<svg class="moon" viewBox="0 0 100 100" aria-hidden="true">
-  <defs>
-    <radialGradient id="moonGlow">
-      <stop offset="0%" stop-color="#FFE5A8" stop-opacity="0.5"/>
-      <stop offset="55%" stop-color="#FFD78A" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#E8B95B" stop-opacity="0"/>
-    </radialGradient>
-    <mask id="crescent">
-      <rect width="100" height="100" fill="white"/>
-      <circle cx="62" cy="46" r="28" fill="black"/>
-    </mask>
-  </defs>
-  <circle cx="50" cy="50" r="46" fill="url(#moonGlow)"/>
-  <circle cx="50" cy="50" r="30" fill="#FFE5A8" mask="url(#crescent)"/>
-</svg>
-
-<!-- 鳥居 -->
-<svg class="torii" viewBox="0 0 64 84" aria-hidden="true">
-  <g fill="#B53C39">
-    <path d="M 0 14 Q 32 6 64 14 L 64 22 Q 32 16 0 22 Z"/>
-    <rect x="2" y="22" width="60" height="4"/>
-    <rect x="6" y="32" width="52" height="4"/>
-    <rect x="10" y="14" width="6" height="70"/>
-    <rect x="48" y="14" width="6" height="70"/>
-  </g>
-</svg>
-
-<!-- 五重塔 (左) -->
-<svg class="pagoda" viewBox="0 0 170 300" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
-  <g fill="#06060c">
-    <rect x="55" y="278" width="60" height="22"/>
-    <!-- 1層 -->
-    <rect x="38" y="248" width="94" height="6"/>
-    <polygon points="22,248 148,248 138,232 32,232"/>
-    <rect x="42" y="232" width="86" height="16"/>
-    <!-- 2層 -->
-    <rect x="42" y="202" width="86" height="6"/>
-    <polygon points="28,202 142,202 132,188 38,188"/>
-    <rect x="46" y="188" width="78" height="14"/>
-    <!-- 3層 -->
-    <rect x="46" y="160" width="78" height="6"/>
-    <polygon points="34,160 136,160 126,146 44,146"/>
-    <rect x="50" y="146" width="70" height="14"/>
-    <!-- 4層 -->
-    <rect x="50" y="120" width="70" height="6"/>
-    <polygon points="40,120 130,120 122,108 48,108"/>
-    <rect x="54" y="108" width="62" height="12"/>
-    <!-- 5層 -->
-    <rect x="54" y="84" width="62" height="6"/>
-    <polygon points="44,84 126,84 119,72 51,72"/>
-    <rect x="58" y="72" width="54" height="12"/>
-    <!-- 相輪 -->
-    <line x1="85" y1="72" x2="85" y2="22" stroke="#06060c" stroke-width="3"/>
-    <circle cx="85" cy="28" r="3"/>
-    <circle cx="85" cy="38" r="4"/>
-    <circle cx="85" cy="49" r="5"/>
-    <circle cx="85" cy="61" r="5.5"/>
-  </g>
-</svg>
-
-<!-- 八坂塔 (右) -->
-<svg class="pagoda-r" viewBox="0 0 130 220" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
-  <g fill="#06060c">
-    <rect x="40" y="200" width="50" height="20"/>
-    <rect x="28" y="174" width="74" height="5"/>
-    <polygon points="14,174 116,174 108,162 22,162"/>
-    <rect x="32" y="162" width="66" height="12"/>
-    <rect x="32" y="138" width="66" height="5"/>
-    <polygon points="20,138 110,138 102,127 28,127"/>
-    <rect x="35" y="127" width="60" height="11"/>
-    <rect x="36" y="104" width="58" height="5"/>
-    <polygon points="24,104 106,104 99,93 31,93"/>
-    <rect x="39" y="93" width="52" height="11"/>
-    <rect x="40" y="72" width="50" height="5"/>
-    <polygon points="28,72 102,72 96,62 34,62"/>
-    <rect x="43" y="62" width="44" height="10"/>
-    <line x1="65" y1="62" x2="65" y2="24" stroke="#06060c" stroke-width="2.5"/>
-    <circle cx="65" cy="30" r="2.5"/>
-    <circle cx="65" cy="39" r="3.5"/>
-    <circle cx="65" cy="49" r="4.5"/>
-  </g>
-</svg>
-
-<!-- 東山シルエット + 街灯り -->
-<svg class="mountain" viewBox="0 0 1400 130" preserveAspectRatio="xMidYEnd meet" aria-hidden="true">
-  <defs>
-    <linearGradient id="mtn" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0a0a14" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#000" stop-opacity="1"/>
-    </linearGradient>
-    <radialGradient id="machi">
-      <stop offset="0%" stop-color="#FFD78A" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="#FFD78A" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <path d="M 0 90 L 80 50 L 160 78 L 240 38 L 340 68 L 440 32 L 520 72 L 620 42 L 720 62 L 820 25 L 920 58 L 1020 38 L 1120 68 L 1220 48 L 1320 72 L 1400 58 L 1400 130 L 0 130 Z" fill="url(#mtn)"/>
-  <!-- 街明かり -->
-  <circle cx="180" cy="95" r="2" fill="url(#machi)"/>
-  <circle cx="320" cy="100" r="2" fill="url(#machi)"/>
-  <circle cx="460" cy="93" r="2" fill="url(#machi)"/>
-  <circle cx="640" cy="98" r="2" fill="url(#machi)"/>
-  <circle cx="780" cy="92" r="2" fill="url(#machi)"/>
-  <circle cx="940" cy="102" r="2" fill="url(#machi)"/>
-  <circle cx="1080" cy="96" r="2" fill="url(#machi)"/>
-  <circle cx="1260" cy="100" r="2" fill="url(#machi)"/>
-</svg>
-
-<div class="scroll">
-
-  <header>
-    <div class="stamp">令和八<br>皐月<br>三十日</div>
-    <div class="era">令 和 八 年 皐 月</div>
-    <h1>と く り <span class="gold">堂</span> 御 絵 図</h1>
-    <div class="sub">tkrsys ― 京 の 夜 に 灯 る 七 つ の 灯</div>
-    <div class="pillar">
-      <span>七 灯</span>
-      <span>三 柱</span>
-      <span>令 和 八 年 皐 月 三 十 日 改 訂</span>
-    </div>
-  </header>
-
-  <!-- ===== 一目之図：七つの灯の関係を一枚で ===== -->
-  <section class="zukai" aria-label="全体の俯瞰図">
-    <p class="lead">
-      tkrsys が運用する七つの Web システムの所在図。<br>
-      三つの柱 ―― <b>介護実務・法律学習・後見制度</b> ―― が、ひとつの共通の礎の上に建っています。
-    </p>
-    <div class="canvas">
-      <svg viewBox="0 0 1000 262" role="img"
-           aria-label="介護実務3件・法律学習3件・後見制度1件の計7システムが、Next.js / Vercel / Neon PostgreSQL という共通の礎の上に建つ構成図。ももケアプランは居宅サービス計画書システムからの派生。">
-
-        <!-- 手描きの線（文字はフィルタ外に置いて可読性を保つ） -->
-        <g filter="url(#fude)" fill="none" stroke-width="1.6" stroke-linecap="round">
-          <!-- 柱から礎へ下ろす脚 -->
-          <path d="M160 176 V205" stroke="#E04A47" stroke-width="2"/>
-          <path d="M500 176 V205" stroke="#6BA0CC" stroke-width="2"/>
-          <path d="M840 88  V205" stroke="#A8C078" stroke-width="2"/>
-
-          <!-- 介護之灯 -->
-          <rect x="20" y="8" width="280" height="36" rx="5" stroke="#E04A47" fill="rgba(224,74,71,0.13)"/>
-          <rect x="36" y="56"  width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="36" y="100" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="36" y="144" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 法律之灯 -->
-          <rect x="360" y="8" width="280" height="36" rx="5" stroke="#6BA0CC" fill="rgba(107,160,204,0.13)"/>
-          <rect x="376" y="56"  width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="376" y="100" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="376" y="144" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 後見之灯 -->
-          <rect x="700" y="8" width="280" height="36" rx="5" stroke="#A8C078" fill="rgba(168,192,120,0.13)"/>
-          <rect x="716" y="56" width="248" height="32" rx="4" stroke="rgba(168,192,120,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 礎 -->
-          <rect x="20" y="205" width="960" height="44" rx="6" stroke="#E8B95B" fill="rgba(232,185,91,0.10)"/>
-
-          <!-- 派生（居宅サービス計画書 → ももケアプラン） -->
-          <path d="M284 72 C324 76, 324 112, 290 116" stroke="#FF9D7A" stroke-width="1.6" stroke-dasharray="5 4"/>
-          <path d="M290 116 l9 -5.5 M290 116 l6.5 7.5" stroke="#FF9D7A" stroke-width="1.6"/>
-        </g>
-
-        <!-- 見出し -->
-        <text x="160" y="32" text-anchor="middle" font-size="15" fill="#FF9D7A" letter-spacing="4">介 護 実 務</text>
-        <text x="500" y="32" text-anchor="middle" font-size="15" fill="#6BA0CC" letter-spacing="4">法 律 学 習</text>
-        <text x="840" y="32" text-anchor="middle" font-size="15" fill="#A8C078" letter-spacing="4">後 見 制 度</text>
-
-        <!-- 各システム -->
-        <text x="160" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">居宅サービス計画書システム</text>
-        <text x="160" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ももケアプラン</text>
-        <text x="160" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ヘルパー活動報告書</text>
-
-        <text x="500" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">行政法 統合ポータル</text>
-        <text x="500" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">民法ガイド</text>
-        <text x="500" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">健康保険法ガイド</text>
-
-        <text x="840" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">後見月次報告</text>
-
-        <!-- 派生ラベル -->
-        <text x="330" y="98" font-size="11.5" fill="#FF9D7A" letter-spacing="1">派生</text>
-
-        <!-- 礎 -->
-        <text x="500" y="226" text-anchor="middle" font-size="14" fill="#E8B95B" letter-spacing="3">礎 ― 共 通 之 技 ―</text>
-        <text x="500" y="242" text-anchor="middle" font-size="11.5" fill="#E8DFC8" opacity="0.8">Next.js / App Router ・ Vercel ・ Neon PostgreSQL ・ Anthropic API</text>
-      </svg>
-    </div>
-  </section>
-
-  <!-- ===== 凡例（一覧を読む前に色の意味を渡す）===== -->
-  <div class="legend">
-    <span class="item"><span class="swatch s-kaigo"></span>朱 ― 介護実務</span>
-    <span class="item"><span class="swatch s-hou"></span>藍 ― 法律学習</span>
-    <span class="item"><span class="swatch s-kouken"></span>萌黄 ― 後見制度</span>
-    <span class="item"><span class="swatch s-gold"></span>金 ― 共通基盤</span>
+<div class="topbar">
+  <div>
+    <div class="ttl">京 町 屋 を 歩 く</div>
+    <div class="sub">tkrsys ― 七 軒 の 灯 を た ず ね て</div>
   </div>
-
-  <section class="three">
-
-    <!-- 介護之灯 -->
-    <div class="yagura kaigo">
-      <div class="roof"><span class="roof-line">介 護 実 務</span></div>
-      <div class="noren">
-        <h2>介 護 之 灯</h2>
-        <div class="en">― CARE PRACTICE ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://tkrsys-careplan.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">壱</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-careplan"/></svg><span>居宅サービス計画書システム</span></div>
-            <div class="desc">居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核</div>
-            <span class="tag">主軸</span><span class="tag">PIN</span><span class="tag">Neon</span>
-            <div class="url">tkrsys-careplan.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://tkrsys-momocare.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">弐</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-momo"/></svg><span>ももケアプラン</span></div>
-            <div class="desc">ケアプラン関連の派生システム</div>
-            <span class="tag">派生</span>
-            <div class="url">tkrsys-momocare.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://helper-report.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">参</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-helper"/></svg><span>ヘルパー活動報告書</span></div>
-            <div class="desc">訪問支援の記録・PDF出力。福祉事業所向け</div>
-            <span class="tag">PDF</span>
-            <div class="url">helper-report.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-    <!-- 法律之灯 -->
-    <div class="yagura hou">
-      <div class="roof"><span class="roof-line">法 律 学 習</span></div>
-      <div class="noren">
-        <h2>法 律 之 灯</h2>
-        <div class="en">― LAW & GUIDE ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://gyoseiho-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">肆</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-gyosei"/></svg><span>行政法 統合ポータル</span></div>
-            <div class="desc">行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合</div>
-            <span class="tag">四法統合</span><span class="tag">e-Gov</span>
-            <div class="url">gyoseiho-guide.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://minpo-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">伍</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-minpo"/></svg><span>民法ガイド</span></div>
-            <div class="desc">民法6分野・約200条を三段階解説。行政書士試験対策</div>
-            <span class="tag">200条</span><span class="tag">三段解説</span>
-            <div class="url">minpo-guide.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://kenkou-hoken-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">陸</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kenkou"/></svg><span>健康保険法ガイド</span></div>
-            <div class="desc">健康保険法 全125条 完全解説。社労士試験対策・実務参照</div>
-            <span class="tag">全125条</span><span class="tag">e-Gov</span>
-            <div class="url">kenkou-hoken-guide.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-    <!-- 後見之灯 -->
-    <div class="yagura kouken">
-      <div class="roof"><span class="roof-line">後 見 制 度</span></div>
-      <div class="noren">
-        <h2>後 見 之 灯</h2>
-        <div class="en">― GUARDIANSHIP ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">漆</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kouken"/></svg><span>後見月次報告</span></div>
-            <div class="desc">月次報告書の作成・管理。家庭裁判所への提出支援</div>
-            <span class="tag">家裁提出</span><span class="tag">認証要</span>
-            <div class="url">kouken-monthly-report.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-  </section>
-
-  <section class="ishizue">
-    <h3>礎 ― 共 通 之 技 ―</h3>
-    <div class="row">
-      <span class="chip ai">Next.js</span>
-      <span class="chip ai">App Router</span>
-      <span class="chip shu">Vercel</span>
-      <span class="chip match">Neon PostgreSQL</span>
-      <span class="chip gold">Anthropic API</span>
-      <span class="chip gold">claude-sonnet-4-6</span>
-      <span class="chip">React</span>
-      <span class="chip">Tailwind CSS</span>
-      <span class="chip">e-Gov API</span>
-    </div>
-  </section>
-
-  <section class="kankyo">
-    <div class="box">
-      <h4>共 通 環 境 変 数</h4>
-      <ul>
-        <li><code>DATABASE_URL</code> ― Neon PostgreSQL 接続</li>
-        <li><code>ACCESS_PIN</code> ― 一般アクセス用 PIN</li>
-        <li><code>ADMIN_PIN</code> ― 管理者用 PIN</li>
-        <li><code>ANTHROPIC_API_KEY</code> ― Claude API キー（AI 系のみ）</li>
-      </ul>
-    </div>
-    <div class="box">
-      <h4>御 約 束 事</h4>
-      <ul>
-        <li>main 直接コミット・Vercel 自動デプロイ</li>
-        <li>居宅サービス計画書／要介護／認定有効期間 等 正式表記を遵守</li>
-        <li>利用者の個人情報はログに出力せず</li>
-        <li>API 応答に <code>role</code>（権限）を必ず含む</li>
-      </ul>
-    </div>
-  </section>
-
-  <footer>
-    <div>
-      ◇ 三 柱 七 灯　―　朱 介護 三灯　藍 法律 三灯　萌黄 後見 一灯
-    </div>
-    <div style="text-align:center">
-      <div>令和八年五月三十日 改訂</div>
-      <div style="margin-top:4px;font-size:10px;opacity:0.75">tkrsys/system-map ― 京 夜 景 御 絵 図</div>
-    </div>
-    <div class="seal">徳</div>
-  </footer>
-
+  <a href="./ezu.html">一覧（御絵図）へ</a>
 </div>
+
+<div class="fuda" id="fuda" aria-live="polite">
+  <div><span class="no" id="f-no">壱</span><h2 id="f-name">―</h2></div>
+  <div class="kind" id="f-kind">―</div>
+  <div class="desc" id="f-desc">―</div>
+  <div class="tags" id="f-tags"></div>
+  <a class="enter" id="f-enter" href="#" target="_blank" rel="noopener">暖 簾 を く ぐ る</a>
+</div>
+
+<div class="hint">← → で隣の町屋へ　／　町屋をクリックでも選べます</div>
+
+<div class="kaji">
+  <button id="btn-prev" aria-label="前の町屋へ">◀</button>
+  <div class="dots" id="dots"></div>
+  <button id="btn-next" aria-label="次の町屋へ">▶</button>
+  <button id="btn-auto" aria-pressed="true">自動で流す</button>
+</div>
+
+<div id="fallback">
+  この端末では 3D 表示ができないようです。<br>
+  <a href="./ezu.html" style="color:#FFE5A8">御絵図（一覧）へ</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+if (typeof THREE === 'undefined') {
+  document.getElementById('fallback').style.display = 'flex';
+  return;
+}
+
+/* ============================================================
+   1. 七軒の町屋（通りに並ぶ順＝朱三軒 → 藍三軒 → 萌黄一軒）
+   ============================================================ */
+const KIND = {
+  kaigo : { hex:0xE04A47, soft:0xFF9D7A, label:'介 護 実 務' },
+  hou   : { hex:0x6BA0CC, soft:0x8FBEE0, label:'法 律 学 習' },
+  kouken: { hex:0xA8C078, soft:0xC2D89A, label:'後 見 制 度' }
+};
+
+const HOUSES = [
+  { kanji:'壱', name:'居宅サービス計画書システム', kind:'kaigo',
+    url:'https://tkrsys-careplan.vercel.app',
+    desc:'居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核',
+    tags:['主軸','PIN','Neon'], side:-1, z:-6 },
+  { kanji:'弐', name:'ももケアプラン', kind:'kaigo',
+    url:'https://tkrsys-momocare.vercel.app',
+    desc:'ケアプラン関連の派生システム',
+    tags:['派生'], side:1, z:-14 },
+  { kanji:'参', name:'ヘルパー活動報告書', kind:'kaigo',
+    url:'https://helper-report.vercel.app',
+    desc:'訪問支援の記録・PDF出力。福祉事業所向け',
+    tags:['PDF'], side:-1, z:-22 },
+  { kanji:'肆', name:'行政法 統合ポータル', kind:'hou',
+    url:'https://gyoseiho-guide.vercel.app',
+    desc:'行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合',
+    tags:['四法統合','e-Gov'], side:1, z:-30 },
+  { kanji:'伍', name:'民法ガイド', kind:'hou',
+    url:'https://minpo-guide.vercel.app',
+    desc:'民法6分野・約200条を三段階解説。行政書士試験対策',
+    tags:['200条','三段解説'], side:-1, z:-38 },
+  { kanji:'陸', name:'健康保険法ガイド', kind:'hou',
+    url:'https://kenkou-hoken-guide.vercel.app',
+    desc:'健康保険法 全125条 完全解説。社労士試験対策・実務参照',
+    tags:['全125条','e-Gov'], side:1, z:-46 },
+  { kanji:'漆', name:'後見月次報告', kind:'kouken',
+    url:'https://kouken-monthly-report.vercel.app',
+    desc:'月次報告書の作成・管理。家庭裁判所への提出支援',
+    tags:['家裁提出','認証要'], side:-1, z:-54 }
+];
+
+const STREET_X = 5.0;          // 町屋の中心
+const HOUSE_W  = 3.6;          // 間口
+const HOUSE_D  = 5.0;          // 奥行 → 正面は |x| = 2.5（通り幅 5m の路地）
+const FACADE_X = STREET_X - HOUSE_D / 2;
+
+/* ============================================================
+   2. 下地（シーン・カメラ・描画器）
+   ============================================================ */
+const stage    = document.getElementById('stage');
+const scene    = new THREE.Scene();
+scene.fog      = new THREE.FogExp2(0x0a1424, 0.020);
+
+const camera = new THREE.PerspectiveCamera(56, 1, 0.1, 400);
+camera.position.set(1.3, 1.62, -2.5);
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+} catch (e) {
+  document.getElementById('fallback').style.display = 'flex';
+  return;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x05080f, 1);
+stage.appendChild(renderer.domElement);
+
+function resize(){
+  const w = stage.clientWidth  || window.innerWidth;
+  const h = stage.clientHeight || window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---- 明かり ---- */
+scene.add(new THREE.AmbientLight(0x33405e, 0.62));
+const moonLight = new THREE.DirectionalLight(0xb8cdf0, 0.40);
+moonLight.position.set(-8, 16, 6);
+scene.add(moonLight);
+
+// 提灯の灯りは 3 灯だけを使い回す（近い町屋へ移動させる）
+const roamLights = [];
+for (let i = 0; i < 3; i++){
+  const p = new THREE.PointLight(0xffc978, 0.0, 13, 2);
+  scene.add(p);
+  roamLights.push(p);
+}
+
+/* ============================================================
+   3. 絵の具（canvas テクスチャ）
+   ============================================================ */
+function cv(w, h){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+function tex(canvas, rx, ry){
+  const t = new THREE.CanvasTexture(canvas);
+  if (rx || ry){
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(rx || 1, ry || 1);
+  }
+  return t;
+}
+function hexStr(h){ return '#' + h.toString(16).padStart(6,'0'); }
+
+/* 石畳 */
+function stoneTexture(){
+  const c = cv(256, 256), g = c.getContext('2d');
+  g.fillStyle = '#1a1d26'; g.fillRect(0, 0, 256, 256);
+  let seed = 1;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let row = 0; row < 8; row++){
+    const off = (row % 2) * 16;
+    for (let col = -1; col < 8; col++){
+      const x = col * 32 + off + 2, y = row * 32 + 2;
+      const v = 26 + Math.floor(rnd() * 22);
+      g.fillStyle = 'rgb(' + v + ',' + (v + 3) + ',' + (v + 9) + ')';
+      g.fillRect(x, y, 28, 28);
+      g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5;
+      g.strokeRect(x, y, 28, 28);
+    }
+  }
+  return tex(c, 10, 34);
+}
+/* 木（縦目） */
+function woodTexture(base){
+  const c = cv(64, 256), g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 26; i++){
+    g.strokeStyle = 'rgba(0,0,0,' + (0.05 + (i % 4) * 0.035) + ')';
+    g.lineWidth = 1 + (i % 3);
+    g.beginPath();
+    g.moveTo((i * 7) % 64, 0);
+    g.lineTo(((i * 7) % 64) + 5, 256);
+    g.stroke();
+  }
+  return tex(c, 1, 1);
+}
+/* 漆喰 */
+function plasterTexture(){
+  const c = cv(128, 128), g = c.getContext('2d');
+  g.fillStyle = '#4a4638'; g.fillRect(0, 0, 128, 128);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+  for (let i = 0; i < 900; i++){
+    const a = 0.03 + rnd() * 0.06;
+    g.fillStyle = rnd() > 0.5 ? 'rgba(255,255,255,' + a + ')' : 'rgba(0,0,0,' + a + ')';
+    g.fillRect(rnd() * 128, rnd() * 128, 2, 2);
+  }
+  return tex(c, 2, 1);
+}
+/* 屋号看板 */
+function signTexture(name, hex){
+  const c = cv(1024, 190), g = c.getContext('2d');
+  g.fillStyle = '#100d09'; g.fillRect(0, 0, 1024, 190);
+  g.strokeStyle = hexStr(hex); g.lineWidth = 7;
+  g.strokeRect(11, 11, 1002, 168);
+  g.fillStyle = '#F2E4C2';
+  g.font = '600 74px "Yu Mincho","游明朝",serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  let size = 74;
+  while (g.measureText(name).width > 930 && size > 30){
+    size -= 3;
+    g.font = '600 ' + size + 'px "Yu Mincho","游明朝",serif';
+  }
+  g.fillText(name, 512, 99);
+  return tex(c);
+}
+/* 暖簾（三枚のうち中央に屋号印） */
+function norenTexture(kanji, hex){
+  const c = cv(256, 384), g = c.getContext('2d');
+  g.fillStyle = hexStr(hex); g.fillRect(0, 0, 256, 384);
+  const grd = g.createLinearGradient(0, 0, 0, 384);
+  grd.addColorStop(0, 'rgba(0,0,0,0.45)');
+  grd.addColorStop(0.35, 'rgba(0,0,0,0.05)');
+  grd.addColorStop(1, 'rgba(0,0,0,0.30)');
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 384);
+  g.fillStyle = 'rgba(250,240,215,0.93)';
+  g.beginPath(); g.arc(128, 150, 58, 0, Math.PI * 2); g.fill();
+  g.fillStyle = hexStr(hex);
+  g.font = '700 74px "Yu Mincho","游明朝",serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(kanji, 128, 154);
+  return tex(c);
+}
+/* ぼんやり光る円（灯りの照り返し・蛍） */
+function glowTexture(){
+  const c = cv(128, 128), g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0,    'rgba(255,225,170,1)');
+  grd.addColorStop(0.28, 'rgba(255,205,130,0.55)');
+  grd.addColorStop(1,    'rgba(255,190,110,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return tex(c);
+}
+/* 側溝の水面 */
+function waterTexture(){
+  const c = cv(64, 256), g = c.getContext('2d');
+  g.fillStyle = '#0b1626'; g.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 40; i++){
+    g.strokeStyle = 'rgba(150,190,230,' + (0.05 + (i % 5) * 0.03) + ')';
+    g.lineWidth = 1;
+    const y = (i * 6.4) % 256;
+    g.beginPath();
+    g.moveTo(0, y);
+    g.bezierCurveTo(20, y + 3, 44, y - 3, 64, y + 1);
+    g.stroke();
+  }
+  return tex(c, 1, 12);
+}
+/* 遠景：東山と五重塔のシルエット */
+function ridgeTexture(){
+  const c = cv(2048, 360), g = c.getContext('2d');
+  g.clearRect(0, 0, 2048, 360);
+  g.fillStyle = '#070a13';
+  g.beginPath(); g.moveTo(0, 360);
+  const pts = [[0,250],[150,190],[320,235],[520,150],[760,215],[980,130],[1200,205],[1420,160],[1650,225],[1860,175],[2048,230]];
+  pts.forEach(p => g.lineTo(p[0], p[1]));
+  g.lineTo(2048, 360); g.closePath(); g.fill();
+  // 五重塔
+  g.fillStyle = '#05070e';
+  const bx = 1330, by = 205;
+  for (let i = 0; i < 5; i++){
+    const w = 96 - i * 13, h = 26, y = by - i * 30;
+    g.beginPath();
+    g.moveTo(bx - w / 2 - 12, y); g.lineTo(bx + w / 2 + 12, y);
+    g.lineTo(bx + w / 2 - 6, y - 14); g.lineTo(bx - w / 2 + 6, y - 14);
+    g.closePath(); g.fill();
+    g.fillRect(bx - (w - 18) / 2, y - h - 4, w - 18, h);
+  }
+  g.fillRect(bx - 2.5, by - 200, 5, 52);
+  return tex(c);
+}
+/* 空（上は墨、下は町明かりの残照） */
+function skyTexture(){
+  const c = cv(8, 512), g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 512);
+  grd.addColorStop(0,    '#04060e');
+  grd.addColorStop(0.42, '#0a1226');
+  grd.addColorStop(0.76, '#132039');
+  grd.addColorStop(1,    '#25324b');
+  g.fillStyle = grd; g.fillRect(0, 0, 8, 512);
+  return tex(c);
+}
+
+const TEX = {
+  stone  : stoneTexture(),
+  wood   : woodTexture('#3a2a1c'),
+  woodDk : woodTexture('#241a11'),
+  plaster: plasterTexture(),
+  glow   : glowTexture(),
+  water  : waterTexture(),
+  ridge  : ridgeTexture(),
+  sky    : skyTexture()
+};
+
+/* ============================================================
+   4. 空・遠景・地面
+   ============================================================ */
+scene.background = TEX.sky;
+
+// 星（霧の影響を受けない）
+(function stars(){
+  const N = 420, pos = new Float32Array(N * 3);
+  let seed = 99;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++){
+    const r = 150 + rnd() * 60;
+    const th = rnd() * Math.PI * 2;
+    const ph = rnd() * 0.62 + 0.06;          // 上空寄り
+    pos[i*3]   = Math.cos(th) * Math.sin(ph) * r;
+    pos[i*3+1] = Math.cos(ph) * r + 20;
+    pos[i*3+2] = Math.sin(th) * Math.sin(ph) * r - 30;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color:0xfff0d0, size:0.95, sizeAttenuation:true,
+    transparent:true, opacity:0.85, fog:false, depthWrite:false
+  });
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+// 三日月
+(function moon(){
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(4.2, 40),
+    new THREE.MeshBasicMaterial({ color:0xFFE9BE, fog:false })
+  );
+  const bite = new THREE.Mesh(
+    new THREE.CircleGeometry(3.6, 40),
+    new THREE.MeshBasicMaterial({ color:0x0a1226, fog:false })
+  );
+  bite.position.set(2.0, 0.7, 0.05);
+  const halo = new THREE.Mesh(
+    new THREE.PlaneGeometry(26, 26),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, transparent:true, opacity:0.42,
+                                  blending:THREE.AdditiveBlending, depthWrite:false, fog:false })
+  );
+  g.add(halo, disc, bite);
+  g.position.set(-38, 42, -120);
+  scene.add(g);
+})();
+
+// 東山＋五重塔
+(function ridge(){
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(320, 56),
+    new THREE.MeshBasicMaterial({ map:TEX.ridge, transparent:true, fog:false, depthWrite:false })
+  );
+  m.position.set(0, 16, -150);
+  scene.add(m);
+})();
+
+// 石畳
+(function ground(){
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(60, 180),
+    new THREE.MeshLambertMaterial({ map:TEX.stone })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, 0, -55);
+  scene.add(m);
+})();
+
+// 両脇の側溝（水がゆっくり流れる）
+const waterStrips = [];
+[-1, 1].forEach(s => {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.38, 150),
+    new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.85 })
+  );
+  m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
+  m.material.map.repeat.set(1, 14);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(s * 2.28, 0.015, -55);
+  scene.add(m);
+  waterStrips.push(m);
+});
+
+/* ============================================================
+   5. 町屋をこしらえる
+   ============================================================ */
+const MAT = {
+  wall   : new THREE.MeshLambertMaterial({ map:TEX.wood }),
+  wallDk : new THREE.MeshLambertMaterial({ map:TEX.woodDk }),
+  plaster: new THREE.MeshLambertMaterial({ map:TEX.plaster }),
+  roof   : new THREE.MeshLambertMaterial({ color:0x2b2f3a }),
+  roofEdge:new THREE.MeshLambertMaterial({ color:0x3d424f }),
+  bar    : new THREE.MeshLambertMaterial({ color:0x2a1d12 }),
+  bamboo : new THREE.MeshLambertMaterial({ color:0x574a2e }),
+  dark   : new THREE.MeshBasicMaterial({ color:0x080a10 }),
+  inner  : new THREE.MeshBasicMaterial({ color:0xffb968 })   // 中から漏れる灯り
+};
+
+const GEO = {
+  bar     : new THREE.BoxGeometry(0.035, 1, 0.045),
+  mushiBar: new THREE.BoxGeometry(0.075, 0.42, 0.09),
+  bamboo  : new THREE.CylinderGeometry(0.028, 0.028, 1, 6),
+  lantern : new THREE.SphereGeometry(0.17, 14, 11)
+};
+
+/**
+ * 町屋一軒。正面は必ず +Z を向いて建て、最後に group ごと回して通りに向ける。
+ * 京町屋の要素：起り屋根・一文字瓦・厨子二階・虫籠窓・出格子・格子戸・暖簾・犬矢来・提灯
+ */
+function buildMachiya(opt){
+  const g = new THREE.Group();
+  const W = opt.width || HOUSE_W;
+  const D = HOUSE_D;
+  const H1 = 2.40;                 // 一階
+  const H2 = opt.simple ? 1.15 : 1.50;   // 厨子二階（低い）
+  const HT = H1 + H2;
+  const F  = D / 2;                // 正面の z
+  const accent = opt.hex || 0x8a6a3a;
+
+  // 躯体
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, HT, D), MAT.wall);
+  body.position.set(0, HT / 2, 0);
+  g.add(body);
+
+  // 二階は漆喰塗り込め
+  const plast = new THREE.Mesh(new THREE.BoxGeometry(W + 0.04, H2, 0.09), MAT.plaster);
+  plast.position.set(0, H1 + H2 / 2, F + 0.02);
+  g.add(plast);
+
+  // ── 屋根（平入・起り）──
+  const eave = 0.55, rise = 0.85;
+  const run  = F + eave;
+  const slope = Math.sqrt(run * run + rise * rise);
+  const ang  = Math.atan2(rise, run);
+  [1, -1].forEach(dir => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(W + 0.85, 0.13, slope), MAT.roof);
+    p.rotation.x = dir * ang;
+    p.position.set(0, HT + rise / 2, dir * run / 2);
+    g.add(p);
+  });
+  // 棟
+  const mune = new THREE.Mesh(new THREE.BoxGeometry(W + 0.95, 0.17, 0.34), MAT.roofEdge);
+  mune.position.set(0, HT + rise + 0.04, 0);
+  g.add(mune);
+  // 一文字瓦（軒先）
+  const nokishita = new THREE.Mesh(new THREE.BoxGeometry(W + 0.85, 0.11, 0.1), MAT.roofEdge);
+  nokishita.position.set(0, HT + 0.02, run);
+  g.add(nokishita);
+
+  // ── 二階：虫籠窓 ──
+  [-0.82, 0.82].forEach(mx => {
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.5, 0.06), MAT.dark);
+    hole.position.set(mx, H1 + 0.72, F + 0.07);
+    g.add(hole);
+    const lit = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.44),
+      new THREE.MeshBasicMaterial({ color:0xd89a4e, transparent:true, opacity:0.5 }));
+    lit.position.set(mx, H1 + 0.72, F + 0.05);
+    g.add(lit);
+    for (let i = -1; i <= 1; i++){
+      const b = new THREE.Mesh(GEO.mushiBar, MAT.plaster);
+      b.position.set(mx + i * 0.22, H1 + 0.72, F + 0.10);
+      g.add(b);
+    }
+  });
+
+  // ── 一階の庇 ──
+  const hisashi = new THREE.Mesh(new THREE.BoxGeometry(W + 0.3, 0.09, 0.62), MAT.roofEdge);
+  hisashi.rotation.x = 0.13;
+  hisashi.position.set(0, H1 - 0.06, F + 0.27);
+  g.add(hisashi);
+
+  // ── 屋号看板（庇と二階のあいだ）──
+  let signMesh = null;
+  if (!opt.simple){
+    signMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(W - 0.7, 0.44),
+      new THREE.MeshBasicMaterial({ map:signTexture(opt.name, accent), transparent:true })
+    );
+    signMesh.position.set(0, H1 + 0.19, F + 0.075);
+    g.add(signMesh);
+  }
+
+  // ── 一階左：出格子 ──
+  const bayW = W * 0.52, bayX = -W * 0.21;
+  const bayBack = new THREE.Mesh(new THREE.BoxGeometry(bayW, 1.24, 0.05), MAT.inner);
+  bayBack.position.set(bayX, 1.44, F + 0.06);
+  g.add(bayBack);
+  const bayFrame = new THREE.Mesh(new THREE.BoxGeometry(bayW + 0.14, 1.4, 0.3), MAT.wallDk);
+  bayFrame.position.set(bayX, 1.44, F + 0.15);
+  bayFrame.scale.set(1, 1, 1);
+  g.add(bayFrame);
+  const bayHole = new THREE.Mesh(new THREE.BoxGeometry(bayW, 1.2, 0.04), MAT.inner);
+  bayHole.position.set(bayX, 1.44, F + 0.305);
+  g.add(bayHole);
+  const nBars = Math.max(8, Math.round(bayW / 0.15));
+  for (let i = 0; i < nBars; i++){
+    const b = new THREE.Mesh(GEO.bar, MAT.bar);
+    b.scale.y = 1.2;
+    b.position.set(bayX - bayW / 2 + (i + 0.5) * (bayW / nBars), 1.44, F + 0.325);
+    g.add(b);
+  }
+
+  // ── 一階右：格子戸と暖簾 ──
+  const doorW = W * 0.30, doorX = W * 0.29;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, 2.0, 0.05), MAT.inner);
+  door.position.set(doorX, 1.0, F + 0.03);
+  g.add(door);
+  const dBars = Math.max(5, Math.round(doorW / 0.16));
+  for (let i = 0; i < dBars; i++){
+    const b = new THREE.Mesh(GEO.bar, MAT.bar);
+    b.scale.y = 2.0;
+    b.position.set(doorX - doorW / 2 + (i + 0.5) * (doorW / dBars), 1.0, F + 0.06);
+    g.add(b);
+  }
+
+  const norenGroup = new THREE.Group();       // 上端で吊る
+  norenGroup.position.set(doorX, 2.02, F + 0.13);
+  const norenMat = new THREE.MeshLambertMaterial({
+    map: norenTexture(opt.kanji || '', accent),
+    side: THREE.DoubleSide, transparent:true
+  });
+  const panels = [];
+  for (let i = -1; i <= 1; i++){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(doorW / 3 - 0.02, 0.74), norenMat);
+    p.position.set(i * (doorW / 3), -0.37, 0);
+    const pivot = new THREE.Group();
+    pivot.position.set(i * (doorW / 3), 0, 0);
+    p.position.set(0, -0.37, 0);
+    pivot.add(p);
+    norenGroup.add(pivot);
+    panels.push(pivot);
+  }
+  g.add(norenGroup);
+
+  // ── 犬矢来 ──
+  const yaraiW = bayW + 0.3;
+  const nY = Math.round(yaraiW / 0.13);
+  for (let i = 0; i <= nY; i++){
+    const b = new THREE.Mesh(GEO.bamboo, MAT.bamboo);
+    b.scale.y = 0.92;
+    b.rotation.x = -0.2;
+    b.position.set(bayX - yaraiW / 2 + i * (yaraiW / nY), 0.46, F + 0.44);
+    g.add(b);
+  }
+  [0.22, 0.74].forEach(hy => {
+    const r = new THREE.Mesh(GEO.bamboo, MAT.bamboo);
+    r.scale.y = yaraiW / 1;
+    r.rotation.z = Math.PI / 2;
+    r.position.set(bayX, hy, F + 0.44 + (0.48 - hy) * 0.2);
+    g.add(r);
+  });
+
+  // ── 提灯 ──
+  const lanternPos = new THREE.Vector3(W * 0.5 - 0.12, 1.95, F + 0.42);
+  const lantern = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color:0xffd28a }));
+  lantern.scale.set(1, 1.28, 1);
+  lantern.position.copy(lanternPos);
+  g.add(lantern);
+  const lanternHalo = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 1.9),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, transparent:true, opacity:0.5,
+                                  blending:THREE.AdditiveBlending, depthWrite:false })
+  );
+  lanternHalo.position.copy(lanternPos);
+  g.add(lanternHalo);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.35, 4), MAT.bar);
+  cord.position.set(lanternPos.x, lanternPos.y + 0.38, lanternPos.z);
+  g.add(cord);
+
+  // ── 石畳への照り返し ──
+  const pool = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.4, 3.4),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, transparent:true, opacity:0.20,
+                                  blending:THREE.AdditiveBlending, depthWrite:false })
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(0, 0.02, F + 1.0);
+  g.add(pool);
+
+  // 通りへ向ける（左側は +X、右側は -X を向く）
+  g.position.set(opt.x, 0, opt.z);
+  g.rotation.y = opt.side < 0 ? Math.PI / 2 : -Math.PI / 2;
+
+  g.userData = {
+    lantern: lantern, halo: lanternHalo, pool: pool,
+    noren: panels, sign: signMesh, norenRoot: norenGroup,
+    lanternWorld: new THREE.Vector3(),
+    baseGlow: 0.5
+  };
+  scene.add(g);
+  return g;
+}
+
+/* 主役の七軒 */
+const houseGroups = HOUSES.map(h => buildMachiya({
+  name: h.name, kanji: h.kanji, hex: KIND[h.kind].hex,
+  x: h.side * STREET_X, z: h.z, side: h.side
+}));
+
+/* 通りを埋める端役（看板なし・簡素） */
+const FILLERS = [
+  { side:-1, z:  2 }, { side: 1, z: -2 }, { side: 1, z:-22 },
+  { side:-1, z:-30 }, { side: 1, z:-38 }, { side:-1, z:-46 },
+  { side: 1, z:-54 }, { side:-1, z:-62 }, { side: 1, z:-62 },
+  { side:-1, z:-70 }, { side: 1, z:-70 }
+];
+FILLERS.forEach((f, i) => buildMachiya({
+  name:'', kanji:'', hex:0x6d5636, simple:true,
+  width: 3.2 + (i % 3) * 0.35,
+  x: f.side * STREET_X, z: f.z, side: f.side
+}));
+
+/* 提灯の世界座標を控えておく（灯りの移動用） */
+houseGroups.forEach((g, i) => {
+  g.updateMatrixWorld(true);
+  g.userData.lanternWorld = g.userData.lantern.getWorldPosition(new THREE.Vector3());
+});
+
+/* ============================================================
+   6. 屋根の猫（参の町屋に一匹）
+   ============================================================ */
+const cat = (function(){
+  const g = new THREE.Group();
+  const fur = new THREE.MeshLambertMaterial({ color:0x1b1b22 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), fur);
+  body.scale.set(1.35, 0.95, 1);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), fur);
+  head.position.set(0.24, 0.17, 0);
+  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.1, 4), fur);
+  earL.position.set(0.24, 0.29, 0.07);
+  const earR = earL.clone(); earR.position.z = -0.07;
+  const eye = new THREE.MeshBasicMaterial({ color:0xffd88a });
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.019, 6, 6), eye);
+  eyeL.position.set(0.35, 0.19, 0.055);
+  const eyeR = eyeL.clone(); eyeR.position.z = -0.055;
+  const tail = new THREE.Group();
+  const tailMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.42, 6), fur);
+  tailMesh.position.y = 0.21;
+  tail.add(tailMesh);
+  tail.position.set(-0.24, 0.02, 0);
+  tail.rotation.z = 0.6;
+  g.add(body, head, earL, earR, eyeL, eyeR, tail);
+  g.userData.tail = tail;
+  // 参の町屋（index 2・左側）の棟の上へ
+  const h = HOUSES[2];
+  g.position.set(h.side * STREET_X + 0.5, 2.40 + 1.50 + 0.95, h.z + 0.7);
+  g.rotation.y = h.side < 0 ? Math.PI / 2 : -Math.PI / 2;
+  scene.add(g);
+  return g;
+})();
+
+/* ============================================================
+   7. 蛍（火の粉）
+   ============================================================ */
+const fireflies = (function(){
+  const N = 130;
+  const pos = new Float32Array(N * 3);
+  const phase = new Float32Array(N);
+  let seed = 4242;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++){
+    pos[i*3]   = (rnd() - 0.5) * 5.2;
+    pos[i*3+1] = rnd() * 3.4 + 0.25;
+    pos[i*3+2] = -rnd() * 78 + 4;
+    phase[i]   = rnd() * Math.PI * 2;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    map:TEX.glow, color:0xffd591, size:0.3, sizeAttenuation:true,
+    transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending
+  });
+  const p = new THREE.Points(geo, mat);
+  p.userData = { phase: phase, base: pos.slice() };
+  scene.add(p);
+  return p;
+})();
+
+/* ============================================================
+   8. カメラの流れ（自動＋停留）
+   ============================================================ */
+const TRAVEL_S = 2.9;
+const DWELL_S  = 6.2;
+
+const stops = HOUSES.map(h => ({
+  pos: new THREE.Vector3(-h.side * 1.35, 1.62, h.z + 3.2),
+  tgt: new THREE.Vector3(h.side * FACADE_X * 0.82, 1.88, h.z - 0.15)
+}));
+
+let idx     = 0;
+let phase   = 'travel';
+let t       = 0;
+let dwellT  = 0;
+let auto    = true;
+let fromPos = camera.position.clone();
+let fromTgt = new THREE.Vector3(stops[0].tgt.x, stops[0].tgt.y, stops[0].tgt.z + 6);
+const curTgt = fromTgt.clone();
+const ctrl   = new THREE.Vector3();
+
+const smooth = x => x * x * (3 - 2 * x);
+
+function goTo(i, byUser){
+  const n = HOUSES.length;
+  idx = ((i % n) + n) % n;
+  fromPos.copy(camera.position);
+  fromTgt.copy(curTgt);
+  t = 0; dwellT = 0; phase = 'travel';
+  hideFuda();
+  paintDots();
+  if (byUser) auto = false, syncAutoBtn();
+}
+
+function updateCamera(dt){
+  const s = stops[idx];
+  if (phase === 'travel'){
+    t = Math.min(1, t + dt / TRAVEL_S);
+    const e = smooth(t);
+    // 通りの真ん中をふくらんで進む（ベジェ）
+    ctrl.set(0, 1.6, (fromPos.z + s.pos.z) / 2);
+    const u = 1 - e;
+    camera.position.set(
+      u*u*fromPos.x + 2*u*e*ctrl.x + e*e*s.pos.x,
+      u*u*fromPos.y + 2*u*e*ctrl.y + e*e*s.pos.y,
+      u*u*fromPos.z + 2*u*e*ctrl.z + e*e*s.pos.z
+    );
+    curTgt.lerpVectors(fromTgt, s.tgt, e);
+    if (t >= 1){ phase = 'dwell'; dwellT = 0; showFuda(); }
+  } else {
+    dwellT += dt;
+    camera.position.x = s.pos.x + Math.sin(dwellT * 0.62) * 0.07;
+    camera.position.y = s.pos.y + Math.sin(dwellT * 0.85) * 0.035;
+    curTgt.copy(s.tgt);
+    if (auto && dwellT > DWELL_S) goTo(idx + 1, false);
+  }
+  camera.lookAt(curTgt);
+}
+
+/* ============================================================
+   9. 札と操作
+   ============================================================ */
+const fuda   = document.getElementById('fuda');
+const elNo   = document.getElementById('f-no');
+const elName = document.getElementById('f-name');
+const elKind = document.getElementById('f-kind');
+const elDesc = document.getElementById('f-desc');
+const elTags = document.getElementById('f-tags');
+const elEnt  = document.getElementById('f-enter');
+const dotsEl = document.getElementById('dots');
+const autoBtn= document.getElementById('btn-auto');
+
+function showFuda(){
+  const h = HOUSES[idx];
+  elNo.textContent   = h.kanji;
+  elName.textContent = h.name;
+  elKind.textContent = KIND[h.kind].label;
+  elDesc.textContent = h.desc;
+  elTags.innerHTML   = '';
+  h.tags.forEach(tg => {
+    const s = document.createElement('span');
+    s.className = 'tag'; s.textContent = tg;
+    elTags.appendChild(s);
+  });
+  elEnt.href = h.url;
+  fuda.className = 'fuda on ' + h.kind;
+  layoutBottom();
+}
+function hideFuda(){ fuda.className = 'fuda'; }
+
+HOUSES.forEach((h, i) => {
+  const b = document.createElement('button');
+  b.className = 'dot ' + h.kind;
+  b.title = h.kanji + '　' + h.name;
+  b.setAttribute('aria-label', h.name);
+  b.addEventListener('click', () => goTo(i, true));
+  dotsEl.appendChild(b);
+});
+function paintDots(){
+  [].forEach.call(dotsEl.children, (d, i) => {
+    d.className = 'dot ' + HOUSES[i].kind + (i === idx ? ' on' : '');
+  });
+}
+function syncAutoBtn(){
+  autoBtn.textContent = auto ? '自動で流す' : '止めている';
+  autoBtn.setAttribute('aria-pressed', String(auto));
+}
+/* 操作バーの高さは段組みで変わるので、札と手引きを毎回その上に置き直す */
+const kajiEl = document.querySelector('.kaji');
+const hintEl = document.querySelector('.hint');
+function layoutBottom(){
+  const base = 18 + kajiEl.offsetHeight;
+  const hintShown = getComputedStyle(hintEl).display !== 'none';
+  hintEl.style.bottom = (base + 8) + 'px';
+  fuda.style.bottom   = (base + (hintShown ? 30 : 12)) + 'px';
+}
+window.addEventListener('resize', layoutBottom);
+// 明朝の読み込みで操作バーの段数・高さが変わるので、確定後にもう一度置き直す
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutBottom);
+setTimeout(layoutBottom, 400);
+
+paintDots(); syncAutoBtn(); layoutBottom();
+
+document.getElementById('btn-prev').addEventListener('click', () => goTo(idx - 1, true));
+document.getElementById('btn-next').addEventListener('click', () => goTo(idx + 1, true));
+autoBtn.addEventListener('click', () => {
+  auto = !auto; syncAutoBtn();
+  if (auto && phase === 'dwell') dwellT = 0;
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight'){ goTo(idx + 1, true); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { goTo(idx - 1, true); e.preventDefault(); }
+});
+
+/* 町屋をクリックして選ぶ */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', ev => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.x =  ((ev.clientX - r.left) / r.width)  * 2 - 1;
+  ndc.y = -((ev.clientY - r.top)  / r.height) * 2 + 1;
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(houseGroups, true)[0];
+  if (!hit) return;
+  let o = hit.object;
+  while (o && houseGroups.indexOf(o) === -1) o = o.parent;
+  const i = houseGroups.indexOf(o);
+  if (i >= 0 && i !== idx) goTo(i, true);
+});
+
+/* ============================================================
+   10. 毎フレーム
+   ============================================================ */
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function update(dt){
+  elapsed += dt;
+  updateCamera(dt);
+
+  // 提灯：ゆらぐ灯り。停留中の一軒だけ明るく
+  houseGroups.forEach((g, i) => {
+    const u = g.userData;
+    const flick = 0.82 + Math.sin(elapsed * 3.1 + i * 1.7) * 0.09
+                       + Math.sin(elapsed * 7.9 + i * 3.3) * 0.05;
+    const focus = (i === idx && phase === 'dwell') ? 1.45 : 1.0;
+    u.halo.material.opacity = 0.5 * flick * focus;
+    u.pool.material.opacity = 0.20 * flick * focus;
+    u.lantern.scale.set(1, 1.28 + Math.sin(elapsed * 2.2 + i) * 0.015, 1);
+    // 暖簾が風に揺れる
+    u.noren.forEach((p, k) => {
+      p.rotation.x = Math.sin(elapsed * 1.25 + k * 0.9 + i) * 0.11;
+    });
+  });
+
+  // 灯りは近い三軒へ移す
+  const order = houseGroups
+    .map((g, i) => ({ i: i, d: g.userData.lanternWorld.distanceTo(camera.position) }))
+    .sort((a, b) => a.d - b.d);
+  roamLights.forEach((L, k) => {
+    const o = order[k];
+    if (!o){ L.intensity = 0; return; }
+    const w = houseGroups[o.i].userData.lanternWorld;
+    L.position.copy(w);
+    const flick = 0.85 + Math.sin(elapsed * 3.4 + o.i * 2.1) * 0.12;
+    L.intensity = (o.i === idx ? 1.55 : 1.05) * flick;
+  });
+
+  // 蛍がふわふわ漂う
+  const p = fireflies.geometry.attributes.position;
+  const ph = fireflies.userData.phase, base = fireflies.userData.base;
+  for (let i = 0; i < ph.length; i++){
+    p.array[i*3]   = base[i*3]   + Math.sin(elapsed * 0.55 + ph[i]) * 0.55;
+    p.array[i*3+1] = base[i*3+1] + Math.sin(elapsed * 0.42 + ph[i] * 1.7) * 0.32;
+    p.array[i*3+2] = base[i*3+2] + Math.cos(elapsed * 0.38 + ph[i]) * 0.5;
+  }
+  p.needsUpdate = true;
+
+  // 側溝の水が流れる
+  waterStrips.forEach(m => { m.material.map.offset.y = (elapsed * 0.045) % 1; });
+
+  // 猫のしっぽ
+  cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
+  cat.rotation.y = (HOUSES[2].side < 0 ? Math.PI / 2 : -Math.PI / 2)
+                 + Math.sin(elapsed * 0.31) * 0.22;
+}
+
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  renderer.render(scene, camera);
+}
+loop();
+
+/* ============================================================
+   11. 目視できない環境向けの検証口
+   ============================================================ */
+window.__machiya = {
+  /* 手送りで時間を進める（preview では rAF が止まることがあるため） */
+  step: function(frames, dt){
+    frames = frames || 1; dt = dt || 1/60;
+    for (let i = 0; i < frames; i++) update(dt);
+    renderer.render(scene, camera);
+    return { elapsed: +elapsed.toFixed(2), idx: idx, phase: phase };
+  },
+  /* 実際に描かれた画素を読む（スクリーンショットが撮れない環境の代替） */
+  pixels: function(){
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let sum = 0, nonBlack = 0, warm = 0, maxL = 0;
+    const n = w * h;
+    for (let i = 0; i < n; i++){
+      const r = buf[i*4], g2 = buf[i*4+1], b = buf[i*4+2];
+      const l = (r + g2 + b) / 3;
+      sum += l;
+      if (l > 12) nonBlack++;
+      if (r > 90 && r > b + 26) warm++;
+      if (l > maxL) maxL = l;
+    }
+    return {
+      size: w + 'x' + h,
+      meanLuma: +(sum / n).toFixed(2),
+      maxLuma: maxL,
+      nonBlackPct: +(nonBlack / n * 100).toFixed(1),
+      warmPct: +(warm / n * 100).toFixed(1)
+    };
+  },
+  info: function(){
+    let meshes = 0;
+    scene.traverse(o => { if (o.isMesh || o.isPoints) meshes++; });
+    return {
+      houses: houseGroups.length,
+      meshes: meshes,
+      drawCalls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      camera: camera.position.toArray().map(v => +v.toFixed(2)),
+      target: curTgt.toArray().map(v => +v.toFixed(2)),
+      idx: idx, phase: phase, auto: auto,
+      lights: roamLights.map(l => +l.intensity.toFixed(2)),
+      fudaOn: fuda.classList.contains('on'),
+      enterHref: elEnt.getAttribute('href')
+    };
+  },
+  /* 停留中の町屋が本当に画面の中に写っているか（看板・暖簾・提灯を投影して見る） */
+  aim: function(){
+    const g = houseGroups[idx];
+    g.updateMatrixWorld(true);
+    const parts = {
+      sign   : g.userData.sign,
+      noren  : g.userData.norenRoot,
+      lantern: g.userData.lantern
+    };
+    const out = { idx: idx, name: HOUSES[idx].name };
+    const v = new THREE.Vector3();
+    Object.keys(parts).forEach(k => {
+      const o = parts[k];
+      if (!o){ out[k] = null; return; }
+      o.getWorldPosition(v);
+      const dist = v.distanceTo(camera.position);
+      v.project(camera);
+      out[k] = {
+        ndc: [+v.x.toFixed(3), +v.y.toFixed(3)],
+        inFront: v.z < 1,
+        onScreen: Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1,
+        dist: +dist.toFixed(2)
+      };
+    });
+    return out;
+  },
+  /* 画面中央から光線を飛ばし、狙った町屋に当たるか */
+  centerHit: function(){
+    const r = new THREE.Raycaster();
+    r.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const hits = r.intersectObjects(houseGroups, true);
+    if (!hits.length) return { hit:null };
+    let o = hits[0].object;
+    while (o && houseGroups.indexOf(o) === -1) o = o.parent;
+    const i = houseGroups.indexOf(o);
+    return { hit: i, isCurrent: i === idx, dist: +hits[0].distance.toFixed(2) };
+  },
+  goTo: function(i){ goTo(i, true); return idx; },
+  setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; }
+};
+
+})();
+</script>
 </body>
 </html>
