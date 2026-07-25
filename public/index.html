@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1100">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>とくり堂 御絵図 ― 京都夜景</title>
 <style>
   /* ===== 京の夜の伝統色 ===== */
@@ -77,28 +77,28 @@
   .pagoda{
     position:fixed; bottom:0; left:50px;
     width:170px; height:300px;
-    opacity:0.22;
+    opacity:0.13;
     z-index:1; pointer-events:none;
   }
   /* 八坂塔 (右) */
   .pagoda-r{
     position:fixed; bottom:0; right:30px;
     width:130px; height:220px;
-    opacity:0.18;
+    opacity:0.10;
     z-index:1; pointer-events:none;
   }
   /* 東山シルエット */
   .mountain{
     position:fixed; bottom:0; left:0; right:0;
     height:130px;
-    opacity:0.28;
+    opacity:0.20;
     z-index:1; pointer-events:none;
   }
   /* 鳥居 */
   .torii{
     position:fixed; top:130px; left:48px;
     width:64px; height:84px;
-    opacity:0.32;
+    opacity:0.18;
     z-index:1; pointer-events:none;
     filter:drop-shadow(0 0 8px rgba(181,60,57,0.4));
   }
@@ -295,7 +295,6 @@
       rgba(15,22,40,0.88) 100%);
     border:1px solid rgba(232,185,91,0.28);
     border-left:3px solid var(--kogane);
-    padding:11px 13px;
     margin-bottom:10px;
     border-radius:2px;
     position:relative;
@@ -306,52 +305,74 @@
     box-shadow:0 0 22px rgba(255,215,138,0.22);
     transform:translateY(-1px);
   }
+  /* カード全体を1つのリンクにする（当たり判定を面で取る） */
+  .yagura li > .card{
+    display:block;
+    padding:12px 14px 13px;
+    min-height:44px;
+    color:inherit; text-decoration:none;
+  }
+  .yagura li > .card:focus-visible{
+    outline:2px solid var(--akari-strong);
+    outline-offset:2px;
+  }
   .yagura.kaigo  li{ border-left-color:var(--shu) }
   .yagura.hou    li{ border-left-color:var(--ai-light) }
   .yagura.kouken li{ border-left-color:var(--moegi) }
 
+  /* ── 情報の段は 3 段だけ：名前 → 説明 → 補足 ── */
+  /* 第1段：名前 */
   .yagura li .ttl{
-    font-size:14.5px; font-weight:700; letter-spacing:1.5px;
-    display:flex; align-items:center; gap:7px;
-    margin-bottom:5px;
+    font-size:17px; font-weight:700; letter-spacing:1px;
+    display:flex; align-items:center; gap:9px;
+    margin-bottom:7px;
+    padding-right:24px; /* 隅の小印（通し番号）と重ねない */
+    line-height:1.4;
     color:var(--akari-strong);
   }
+  /* 手描き風ピクトグラム（文字を読む前の識別子） */
+  .yagura li .icon{
+    width:28px; height:28px; flex-shrink:0;
+    fill:none; stroke:currentColor;
+    stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
+    opacity:0.95;
+  }
+  .yagura.kaigo  li .icon{ color:#FF9D7A }
+  .yagura.hou    li .icon{ color:var(--ai-light) }
+  .yagura.kouken li .icon{ color:var(--moegi) }
+  /* 通し番号は隅の小印に退避（名前と競わせない） */
   .yagura li .mark{
-    display:inline-block; width:20px; height:20px;
+    position:absolute; top:7px; right:8px;
+    width:19px; height:19px;
     border-radius:50%;
     background:radial-gradient(circle at 30% 30%, var(--akari-strong), var(--kogane) 70%);
-    color:#3a2810; font-size:11px;
-    line-height:20px; text-align:center; font-weight:700;
-    box-shadow:0 0 12px rgba(255,215,138,0.55);
-    flex-shrink:0;
+    color:#3a2810; font-size:10.5px;
+    line-height:19px; text-align:center; font-weight:700;
+    box-shadow:0 0 10px rgba(255,215,138,0.4);
+    opacity:0.85;
   }
+  /* 第2段：説明 */
+  .yagura li .desc{
+    font-size:13.5px;
+    color:var(--kinari); margin-top:2px;
+    letter-spacing:0.3px; opacity:0.86;
+    line-height:1.65;
+  }
+  /* 第3段：補足（URL・タグ） */
   .yagura li .url{
     font-family:"Consolas","Yu Gothic",monospace;
     font-size:11px;
     color:#D4B97A; word-break:break-all;
-    margin-bottom:4px;
-  }
-  .yagura li .url a{
-    color:inherit; text-decoration:none;
-    border-bottom:1px dotted rgba(232,185,91,0.5);
-  }
-  .yagura li .url a:hover{
-    color:var(--akari-strong);
-    border-bottom-color:var(--akari-strong);
-  }
-  .yagura li .desc{
-    font-size:12px;
-    color:var(--kinari); margin-top:4px;
-    letter-spacing:0.5px; opacity:0.88;
-    line-height:1.55;
+    opacity:0.6;
+    margin-top:7px;
   }
   .tag{
-    display:inline-block; font-size:10px;
-    padding:1px 7px;
+    display:inline-block; font-size:11px;
+    padding:2px 8px;
     background:rgba(0,0,0,0.4);
     border:1px solid rgba(232,185,91,0.4);
     color:var(--kogane);
-    margin-right:4px; margin-top:5px;
+    margin-right:4px; margin-top:7px;
     letter-spacing:1px;
   }
 
@@ -464,6 +485,46 @@
       0 0 18px rgba(224,74,71,0.55);
   }
 
+  /* ===== 一目之図（グラフィックレコード風の俯瞰）===== */
+  .zukai{
+    margin-bottom:34px;
+    padding:18px 20px 10px;
+    background:rgba(8,16,32,0.45);
+    border:1px solid rgba(232,185,91,0.22);
+    border-radius:4px;
+  }
+  .zukai .lead{
+    font-size:13.5px; line-height:1.8;
+    color:var(--kinari); opacity:0.9;
+    text-align:center; margin-bottom:14px;
+    letter-spacing:0.5px;
+  }
+  .zukai svg{ display:block; width:100%; height:auto }
+  /* 図中の文字は本文の明朝と役割を分けてゴシック太字に */
+  .zukai text{
+    font-family:"Yu Gothic","游ゴシック","Hiragino Sans",sans-serif;
+    font-weight:700;
+  }
+
+  /* ===== 凡例（一覧より前に置く）===== */
+  .legend{
+    display:flex; flex-wrap:wrap; gap:8px 18px;
+    justify-content:center; align-items:center;
+    margin-bottom:26px;
+    font-size:12.5px; letter-spacing:1px;
+    color:var(--kinari);
+  }
+  .legend .item{ display:flex; align-items:center; gap:7px }
+  .legend .swatch{
+    width:13px; height:13px; border-radius:2px;
+    box-shadow:0 0 8px currentColor;
+    background:currentColor;
+  }
+  .legend .s-kaigo { color:var(--shu) }
+  .legend .s-hou   { color:var(--ai-light) }
+  .legend .s-kouken{ color:var(--moegi) }
+  .legend .s-gold  { color:var(--kogane) }
+
   @media print{
     body{padding:0; background:#fff; color:#000}
     body::before{display:none}
@@ -474,6 +535,11 @@
     .yagura li .url{color:#444}
     .yagura li .desc, .kankyo li{color:#222}
     .chip{background:#fff; color:#000; box-shadow:none}
+    .zukai{background:#fff; border-color:#999}
+    .zukai .lead, .zukai text{color:#000; fill:#000; opacity:1}
+    .legend{color:#000}
+    .yagura li .icon{color:#000}
+    .yagura li .mark{background:#fff; color:#000; border:1px solid #999; box-shadow:none}
   }
 
   @media (max-width:900px){
@@ -483,9 +549,76 @@
     h1{font-size:34px; letter-spacing:8px}
     .moon, .pagoda, .pagoda-r, .torii{display:none}
   }
+  @media (max-width:560px){
+    body{padding:14px 0}
+    .scroll{padding:26px 16px 32px; margin:0 8px}
+    h1{font-size:25px; letter-spacing:5px}
+    .era{letter-spacing:4px}
+    .sub{font-size:13px; letter-spacing:2px}
+    .stamp{position:static; margin:0 auto 14px; transform:rotate(-4deg)}
+    .pillar{flex-wrap:wrap; gap:8px}
+    .noren h2{font-size:19px; letter-spacing:5px}
+    .ishizue h3{letter-spacing:5px; font-size:15px}
+    .kankyo h4{letter-spacing:3px}
+    .zukai{padding:14px 12px 8px}
+    /* 図は横に長いので、縮めず横スクロールで原寸を保つ */
+    .zukai .canvas{overflow-x:auto; -webkit-overflow-scrolling:touch}
+    .zukai .canvas svg{width:820px; max-width:none}
+    footer{flex-direction:column; gap:14px; align-items:center; text-align:center}
+  }
 </style>
 </head>
 <body>
+
+<!-- ===== 絵符（ピクトグラム）と手描き線のフィルタ ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 墨で引いたような線のゆらぎ -->
+    <filter id="fude" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+
+    <symbol id="ic-careplan" viewBox="0 0 24 24"><!-- 第1〜3表（重ねた書類） -->
+      <path d="M4.5 7 v13.5 h9.5"/>
+      <path d="M7.5 3.5 h8 l3.5 3.5 v13.5 h-11.5 z"/>
+      <path d="M15.5 3.5 v3.5 h3.5"/>
+      <path d="M10 11 h6.5 M10 14 h6.5 M10 17 h4"/>
+    </symbol>
+    <symbol id="ic-momo" viewBox="0 0 24 24"><!-- 桃 -->
+      <path d="M12 8 C9.2 5, 4.8 6.3, 4.8 10.6 C4.8 15.4, 8.6 20, 12 20 C15.4 20, 19.2 15.4, 19.2 10.6 C19.2 6.3, 14.8 5, 12 8 Z"/>
+      <path d="M12 8.6 V19.6"/>
+      <path d="M12.7 7 C13.6 4.4, 15.7 3.4, 17.3 3.6"/>
+    </symbol>
+    <symbol id="ic-helper" viewBox="0 0 24 24"><!-- 訪問して記録する -->
+      <path d="M3.5 11 L12 4 L20.5 11"/>
+      <path d="M6 9.6 V20 H18 V9.6"/>
+      <path d="M9 14.8 l2.2 2.3 4.3 -4.6"/>
+    </symbol>
+    <symbol id="ic-gyosei" viewBox="0 0 24 24"><!-- 法（天秤） -->
+      <path d="M12 4.5 V20.5 M7 20.5 h10"/>
+      <path d="M3.5 8 h17"/>
+      <path d="M3.5 8 l-2 4.8 h4 z"/>
+      <path d="M20.5 8 l-2 4.8 h4 z"/>
+      <circle cx="12" cy="8" r="1.3"/>
+    </symbol>
+    <symbol id="ic-minpo" viewBox="0 0 24 24"><!-- 条文（開いた本） -->
+      <path d="M12 6.6 C9.5 5, 6.5 4.6, 3.6 5.3 V18 C6.5 17.3, 9.5 17.7, 12 19.3"/>
+      <path d="M12 6.6 C14.5 5, 17.5 4.6, 20.4 5.3 V18 C17.5 17.3, 14.5 17.7, 12 19.3"/>
+      <path d="M12 6.6 V19.3"/>
+    </symbol>
+    <symbol id="ic-kenkou" viewBox="0 0 24 24"><!-- 健康保険（証＋十字） -->
+      <rect x="3" y="5.5" width="18" height="13" rx="1.6"/>
+      <path d="M8.2 9.2 v5.6 M5.4 12 h5.6"/>
+      <path d="M14 10.4 h4.2 M14 13.6 h4.2"/>
+    </symbol>
+    <symbol id="ic-kouken" viewBox="0 0 24 24"><!-- 家庭裁判所 -->
+      <path d="M3.2 9.2 L12 4 L20.8 9.2"/>
+      <path d="M6 10.4 v7.6 M10 10.4 v7.6 M14 10.4 v7.6 M18 10.4 v7.6"/>
+      <path d="M3.8 18.4 h16.4 M2.8 20.4 h18.4"/>
+    </symbol>
+  </defs>
+</svg>
 
 <!-- 三日月 -->
 <svg class="moon" viewBox="0 0 100 100" aria-hidden="true">
@@ -609,6 +742,81 @@
     </div>
   </header>
 
+  <!-- ===== 一目之図：七つの灯の関係を一枚で ===== -->
+  <section class="zukai" aria-label="全体の俯瞰図">
+    <p class="lead">
+      tkrsys が運用する七つの Web システムの所在図。<br>
+      三つの柱 ―― <b>介護実務・法律学習・後見制度</b> ―― が、ひとつの共通の礎の上に建っています。
+    </p>
+    <div class="canvas">
+      <svg viewBox="0 0 1000 262" role="img"
+           aria-label="介護実務3件・法律学習3件・後見制度1件の計7システムが、Next.js / Vercel / Neon PostgreSQL という共通の礎の上に建つ構成図。ももケアプランは居宅サービス計画書システムからの派生。">
+
+        <!-- 手描きの線（文字はフィルタ外に置いて可読性を保つ） -->
+        <g filter="url(#fude)" fill="none" stroke-width="1.6" stroke-linecap="round">
+          <!-- 柱から礎へ下ろす脚 -->
+          <path d="M160 176 V205" stroke="#E04A47" stroke-width="2"/>
+          <path d="M500 176 V205" stroke="#6BA0CC" stroke-width="2"/>
+          <path d="M840 88  V205" stroke="#A8C078" stroke-width="2"/>
+
+          <!-- 介護之灯 -->
+          <rect x="20" y="8" width="280" height="36" rx="5" stroke="#E04A47" fill="rgba(224,74,71,0.13)"/>
+          <rect x="36" y="56"  width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
+          <rect x="36" y="100" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
+          <rect x="36" y="144" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
+
+          <!-- 法律之灯 -->
+          <rect x="360" y="8" width="280" height="36" rx="5" stroke="#6BA0CC" fill="rgba(107,160,204,0.13)"/>
+          <rect x="376" y="56"  width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
+          <rect x="376" y="100" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
+          <rect x="376" y="144" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
+
+          <!-- 後見之灯 -->
+          <rect x="700" y="8" width="280" height="36" rx="5" stroke="#A8C078" fill="rgba(168,192,120,0.13)"/>
+          <rect x="716" y="56" width="248" height="32" rx="4" stroke="rgba(168,192,120,0.6)" fill="rgba(15,22,40,0.8)"/>
+
+          <!-- 礎 -->
+          <rect x="20" y="205" width="960" height="44" rx="6" stroke="#E8B95B" fill="rgba(232,185,91,0.10)"/>
+
+          <!-- 派生（居宅サービス計画書 → ももケアプラン） -->
+          <path d="M284 72 C324 76, 324 112, 290 116" stroke="#FF9D7A" stroke-width="1.6" stroke-dasharray="5 4"/>
+          <path d="M290 116 l9 -5.5 M290 116 l6.5 7.5" stroke="#FF9D7A" stroke-width="1.6"/>
+        </g>
+
+        <!-- 見出し -->
+        <text x="160" y="32" text-anchor="middle" font-size="15" fill="#FF9D7A" letter-spacing="4">介 護 実 務</text>
+        <text x="500" y="32" text-anchor="middle" font-size="15" fill="#6BA0CC" letter-spacing="4">法 律 学 習</text>
+        <text x="840" y="32" text-anchor="middle" font-size="15" fill="#A8C078" letter-spacing="4">後 見 制 度</text>
+
+        <!-- 各システム -->
+        <text x="160" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">居宅サービス計画書システム</text>
+        <text x="160" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ももケアプラン</text>
+        <text x="160" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ヘルパー活動報告書</text>
+
+        <text x="500" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">行政法 統合ポータル</text>
+        <text x="500" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">民法ガイド</text>
+        <text x="500" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">健康保険法ガイド</text>
+
+        <text x="840" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">後見月次報告</text>
+
+        <!-- 派生ラベル -->
+        <text x="330" y="98" font-size="11.5" fill="#FF9D7A" letter-spacing="1">派生</text>
+
+        <!-- 礎 -->
+        <text x="500" y="226" text-anchor="middle" font-size="14" fill="#E8B95B" letter-spacing="3">礎 ― 共 通 之 技 ―</text>
+        <text x="500" y="242" text-anchor="middle" font-size="11.5" fill="#E8DFC8" opacity="0.8">Next.js / App Router ・ Vercel ・ Neon PostgreSQL ・ Anthropic API</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===== 凡例（一覧を読む前に色の意味を渡す）===== -->
+  <div class="legend">
+    <span class="item"><span class="swatch s-kaigo"></span>朱 ― 介護実務</span>
+    <span class="item"><span class="swatch s-hou"></span>藍 ― 法律学習</span>
+    <span class="item"><span class="swatch s-kouken"></span>萌黄 ― 後見制度</span>
+    <span class="item"><span class="swatch s-gold"></span>金 ― 共通基盤</span>
+  </div>
+
   <section class="three">
 
     <!-- 介護之灯 -->
@@ -620,22 +828,31 @@
       </div>
       <ul>
         <li>
-          <div class="ttl"><span class="mark">壱</span>居宅サービス計画書システム</div>
-          <div class="url"><a href="https://tkrsys-careplan.vercel.app" target="_blank" rel="noopener">tkrsys-careplan.vercel.app</a></div>
-          <div class="desc">居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核</div>
-          <span class="tag">主軸</span><span class="tag">PIN</span><span class="tag">Neon</span>
+          <a class="card" href="https://tkrsys-careplan.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">壱</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-careplan"/></svg><span>居宅サービス計画書システム</span></div>
+            <div class="desc">居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核</div>
+            <span class="tag">主軸</span><span class="tag">PIN</span><span class="tag">Neon</span>
+            <div class="url">tkrsys-careplan.vercel.app</div>
+          </a>
         </li>
         <li>
-          <div class="ttl"><span class="mark">弐</span>ももケアプラン</div>
-          <div class="url"><a href="https://tkrsys-momocare.vercel.app" target="_blank" rel="noopener">tkrsys-momocare.vercel.app</a></div>
-          <div class="desc">ケアプラン関連の派生システム</div>
-          <span class="tag">派生</span>
+          <a class="card" href="https://tkrsys-momocare.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">弐</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-momo"/></svg><span>ももケアプラン</span></div>
+            <div class="desc">ケアプラン関連の派生システム</div>
+            <span class="tag">派生</span>
+            <div class="url">tkrsys-momocare.vercel.app</div>
+          </a>
         </li>
         <li>
-          <div class="ttl"><span class="mark">参</span>ヘルパー活動報告書</div>
-          <div class="url"><a href="https://helper-report.vercel.app" target="_blank" rel="noopener">helper-report.vercel.app</a></div>
-          <div class="desc">訪問支援の記録・PDF出力。福祉事業所向け</div>
-          <span class="tag">PDF</span>
+          <a class="card" href="https://helper-report.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">参</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-helper"/></svg><span>ヘルパー活動報告書</span></div>
+            <div class="desc">訪問支援の記録・PDF出力。福祉事業所向け</div>
+            <span class="tag">PDF</span>
+            <div class="url">helper-report.vercel.app</div>
+          </a>
         </li>
       </ul>
     </div>
@@ -649,22 +866,31 @@
       </div>
       <ul>
         <li>
-          <div class="ttl"><span class="mark">肆</span>行政法 統合ポータル</div>
-          <div class="url"><a href="https://gyoseiho-guide.vercel.app" target="_blank" rel="noopener">gyoseiho-guide.vercel.app</a></div>
-          <div class="desc">行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合</div>
-          <span class="tag">四法統合</span><span class="tag">e-Gov</span>
+          <a class="card" href="https://gyoseiho-guide.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">肆</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-gyosei"/></svg><span>行政法 統合ポータル</span></div>
+            <div class="desc">行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合</div>
+            <span class="tag">四法統合</span><span class="tag">e-Gov</span>
+            <div class="url">gyoseiho-guide.vercel.app</div>
+          </a>
         </li>
         <li>
-          <div class="ttl"><span class="mark">伍</span>民法ガイド</div>
-          <div class="url"><a href="https://minpo-guide.vercel.app" target="_blank" rel="noopener">minpo-guide.vercel.app</a></div>
-          <div class="desc">民法6分野・約200条を三段階解説。行政書士試験対策</div>
-          <span class="tag">200条</span><span class="tag">三段解説</span>
+          <a class="card" href="https://minpo-guide.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">伍</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-minpo"/></svg><span>民法ガイド</span></div>
+            <div class="desc">民法6分野・約200条を三段階解説。行政書士試験対策</div>
+            <span class="tag">200条</span><span class="tag">三段解説</span>
+            <div class="url">minpo-guide.vercel.app</div>
+          </a>
         </li>
         <li>
-          <div class="ttl"><span class="mark">陸</span>健康保険法ガイド</div>
-          <div class="url"><a href="https://kenkou-hoken-guide.vercel.app" target="_blank" rel="noopener">kenkou-hoken-guide.vercel.app</a></div>
-          <div class="desc">健康保険法 全125条 完全解説。社労士試験対策・実務参照</div>
-          <span class="tag">全125条</span><span class="tag">e-Gov</span>
+          <a class="card" href="https://kenkou-hoken-guide.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">陸</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kenkou"/></svg><span>健康保険法ガイド</span></div>
+            <div class="desc">健康保険法 全125条 完全解説。社労士試験対策・実務参照</div>
+            <span class="tag">全125条</span><span class="tag">e-Gov</span>
+            <div class="url">kenkou-hoken-guide.vercel.app</div>
+          </a>
         </li>
       </ul>
     </div>
@@ -678,10 +904,13 @@
       </div>
       <ul>
         <li>
-          <div class="ttl"><span class="mark">漆</span>後見月次報告</div>
-          <div class="url"><a href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">kouken-monthly-report.vercel.app</a></div>
-          <div class="desc">月次報告書の作成・管理。家庭裁判所への提出支援</div>
-          <span class="tag">家裁提出</span><span class="tag">認証要</span>
+          <a class="card" href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">
+            <span class="mark" aria-hidden="true">漆</span>
+            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kouken"/></svg><span>後見月次報告</span></div>
+            <div class="desc">月次報告書の作成・管理。家庭裁判所への提出支援</div>
+            <span class="tag">家裁提出</span><span class="tag">認証要</span>
+            <div class="url">kouken-monthly-report.vercel.app</div>
+          </a>
         </li>
       </ul>
     </div>
@@ -726,7 +955,7 @@
 
   <footer>
     <div>
-      ◇ 凡 例 ：<span class="tag">朱</span> 介護　<span class="tag">藍</span> 法律　<span class="tag">萌黄</span> 後見　<span class="tag">金</span> 共通基盤
+      ◇ 三 柱 七 灯　―　朱 介護 三灯　藍 法律 三灯　萌黄 後見 一灯
     </div>
     <div style="text-align:center">
       <div>令和八年五月三十日 改訂</div>
