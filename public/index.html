@@ -67,6 +67,7 @@
   .fuda.kaigo { border-top-color:var(--shu) }
   .fuda.hou   { border-top-color:var(--ai-light) }
   .fuda.kouken{ border-top-color:var(--moegi) }
+  .fuda.view  { border-top-color:#9FB8D8 }
 
   .fuda .no{
     display:inline-block; width:24px; height:24px; line-height:24px;
@@ -83,6 +84,7 @@
   .fuda.kaigo  .kind{ color:#FF9D7A }
   .fuda.hou    .kind{ color:var(--ai-light) }
   .fuda.kouken .kind{ color:var(--moegi) }
+  .fuda.view   .kind{ color:#9FB8D8 }
   .fuda .desc{
     margin-top:9px; font-size:13.5px; line-height:1.7;
     color:var(--kinari); opacity:0.9;
@@ -150,6 +152,7 @@
   .kaji .dot.kaigo.on::before { background:var(--shu);      box-shadow:0 0 10px var(--shu) }
   .kaji .dot.hou.on::before   { background:var(--ai-light); box-shadow:0 0 10px var(--ai-light) }
   .kaji .dot.kouken.on::before{ background:var(--moegi);    box-shadow:0 0 10px var(--moegi) }
+  .kaji .dot.view.on::before  { background:#9FB8D8;         box-shadow:0 0 10px #9FB8D8 }
 
   .hint{
     position:fixed; left:50%; bottom:66px; z-index:10;
@@ -186,7 +189,7 @@
 <div class="topbar">
   <div>
     <div class="ttl">京 町 屋 を 歩 く</div>
-    <div class="sub">tkrsys ― 七 軒 の 灯 を た ず ね て</div>
+    <div class="sub">tkrsys ― 七 軒 の 灯 を た ず ね て 、 渡 月 橋 ま で</div>
   </div>
   <a href="./ezu.html">一覧（御絵図）へ</a>
 </div>
@@ -199,7 +202,7 @@
   <a class="enter" id="f-enter" href="#" target="_blank" rel="noopener">暖 簾 を く ぐ る</a>
 </div>
 
-<div class="hint">← → で隣の町屋へ　／　町屋をクリックでも選べます</div>
+<div class="hint">← → で通りから渡月橋までめぐる　／　町屋や橋をクリックでも選べます</div>
 
 <div class="kaji">
   <button id="btn-prev" aria-label="前の町屋へ">◀</button>
@@ -262,6 +265,24 @@ const HOUSES = [
     desc:'月次報告書の作成・管理。家庭裁判所への提出支援',
     tags:['家裁提出','認証要'], side:-1, z:-54 }
 ];
+
+/* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色 */
+const SPOTS = [
+  { kanji:'捌', view:true, name:'桂川のほとり',
+    desc:'町並みが尽きると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
+    tags:['桂川','鵜飼の篝火'],
+    pos:[1.7, 1.62, -80.5], tgt:[-3, 1.3, -103] },
+  { kanji:'玖', view:true, name:'渡月橋',
+    desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
+    tags:['渡月橋','月の名の橋'],
+    pos:[0, 2.88, -105], tgt:[-26, 6, -140] },
+  { kanji:'拾', view:true, name:'嵐山',
+    desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
+    tags:['嵐山','宿の灯'],
+    pos:[-2.2, 1.62, -124.8], tgt:[-38, 20, -157] }
+];
+const NH = HOUSES.length;
+const TOUR = HOUSES.concat(SPOTS);
 
 const STREET_X = 5.0;          // 町屋の中心
 const HOUSE_W  = 3.6;          // 間口
@@ -527,42 +548,42 @@ scene.background = TEX.sky;
                                   blending:THREE.AdditiveBlending, depthWrite:false, fog:false })
   );
   g.add(halo, disc, bite);
-  g.position.set(-38, 42, -120);
+  g.position.set(-42, 46, -152);   // 嵐山の頂の上に懸かる（渡月の名の由来の構図）
   scene.add(g);
 })();
 
-// 東山＋五重塔
+// 東山＋五重塔（嵐山の三峰よりさらに奥の遠景へ）
 (function ridge(){
   const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(320, 56),
+    new THREE.PlaneGeometry(440, 77),
     new THREE.MeshBasicMaterial({ map:TEX.ridge, transparent:true, fog:false, depthWrite:false })
   );
-  m.position.set(0, 16, -150);
+  m.position.set(0, 20, -195);
   scene.add(m);
 })();
 
-// 石畳
+// 石畳（川端 z=-78 で尽きる）
 (function ground(){
   const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(60, 180),
+    new THREE.PlaneGeometry(60, 116),
     new THREE.MeshLambertMaterial({ map:TEX.stone })
   );
   m.rotation.x = -Math.PI / 2;
-  m.position.set(0, 0, -55);
+  m.position.set(0, 0, -20);
   scene.add(m);
 })();
 
-// 両脇の側溝（水がゆっくり流れる）
+// 両脇の側溝（水がゆっくり流れる。川端まで）
 const waterStrips = [];
 [-1, 1].forEach(s => {
   const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.38, 150),
+    new THREE.PlaneGeometry(0.38, 98),
     new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.85 })
   );
   m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
-  m.material.map.repeat.set(1, 14);
+  m.material.map.repeat.set(1, 9);
   m.rotation.x = -Math.PI / 2;
-  m.position.set(s * 2.28, 0.015, -55);
+  m.position.set(s * 2.28, 0.015, -29);
   scene.add(m);
   waterStrips.push(m);
 });
@@ -803,6 +824,289 @@ houseGroups.forEach((g, i) => {
 });
 
 /* ============================================================
+   5b. 町並みの先 ― 桂川・渡月橋・嵐山
+   ============================================================ */
+const RIVER_Z0  = -90,  RIVER_Z1  = -120;   // 川の岸から岸
+const BRIDGE_Z0 = -88,  BRIDGE_Z1 = -122;   // 橋の袂から袂
+const BRIDGE_L  = BRIDGE_Z0 - BRIDGE_Z1;
+const deckY = t => 0.72 + 0.46 * Math.sin(Math.PI * t);   // 橋の緩いむくり（中央がわずかに高い）
+
+/* 河原・対岸・山裾（石畳はここで土の色に変わる） */
+const MAT_KAWARA = new THREE.MeshLambertMaterial({ color:0x171c26 });
+[
+  { d:12, z:-84    },      // 町側の河原
+  { d:11, z:-125.5 },      // 対岸の河原
+  { d:49, z:-155.5 }       // 山裾
+].forEach(k => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(240, k.d), MAT_KAWARA);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, -0.01, k.z);
+  scene.add(m);
+});
+/* 橋へ導く石の細道（両袂） */
+[[-84, 12], [-125.5, 11]].forEach(k => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(3.4, k[1]),
+    new THREE.MeshLambertMaterial({ map:TEX.stone }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, 0.005, k[0]);
+  scene.add(m);
+});
+
+/* 桂川の水面 */
+const river = (function(){
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(220, RIVER_Z0 - RIVER_Z1),
+    new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.92 })
+  );
+  m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
+  m.material.map.repeat.set(34, 3);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, -0.22, (RIVER_Z0 + RIVER_Z1) / 2);
+  scene.add(m);
+  return m;
+})();
+
+/* 水面の月の道 */
+const moonPath = (function(){
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.2, 26),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, color:0xcfe0ff, transparent:true, opacity:0.15,
+                                  blending:THREE.AdditiveBlending, depthWrite:false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(-20, -0.19, -105);
+  scene.add(m);
+  return m;
+})();
+
+/* 渡月橋（木の桁と欄干。中央がわずかに高い） */
+const bridgeGroup = (function(){
+  const g = new THREE.Group();
+  const SEG = 7, segL = BRIDGE_L / SEG, W = 3.6;
+  for (let i = 0; i < SEG; i++){
+    const t0 = i / SEG, t1 = (i + 1) / SEG;
+    const zc = BRIDGE_Z0 - (t0 + t1) / 2 * BRIDGE_L;
+    const y0 = deckY(t0), y1 = deckY(t1);
+    const ang = Math.atan2(y1 - y0, segL);
+    // 桁（上面が路面）
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.16, segL + 0.12), MAT.wall);
+    deck.rotation.x = ang;
+    deck.position.set(0, (y0 + y1) / 2, zc);
+    g.add(deck);
+    // 手すり（上段・中段）
+    [[0.78, 0.09], [0.45, 0.06]].forEach(r => {
+      [-1, 1].forEach(s => {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(r[1], r[1], segL + 0.14), MAT.wallDk);
+        rail.rotation.x = ang;
+        rail.position.set(s * (W / 2 - 0.08), (y0 + y1) / 2 + 0.08 + r[0], zc);
+        g.add(rail);
+      });
+    });
+  }
+  // 欄干の束柱
+  const N_POST = 21;
+  for (let i = 0; i <= N_POST; i++){
+    const t = i / N_POST;
+    const y = deckY(t) + 0.08;
+    [-1, 1].forEach(s => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.78, 0.09), MAT.wallDk);
+      p.position.set(s * (W / 2 - 0.08), y + 0.39, BRIDGE_Z0 - t * BRIDGE_L);
+      g.add(p);
+    });
+  }
+  // 親柱（四隅・宝珠付き）
+  [[BRIDGE_Z0 - 0.1, 0], [BRIDGE_Z1 + 0.1, 1]].forEach(e => {
+    [-1, 1].forEach(s => {
+      const y = deckY(e[1]) + 0.08;
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.0, 0.2), MAT.wall);
+      p.position.set(s * (W / 2 - 0.06), y + 0.5, e[0]);
+      g.add(p);
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 7), MAT.wallDk);
+      orb.position.set(s * (W / 2 - 0.06), y + 1.06, e[0]);
+      g.add(orb);
+    });
+  });
+  // 橋脚（三組）
+  [0.25, 0.5, 0.75].forEach(t => {
+    const z = BRIDGE_Z0 - t * BRIDGE_L;
+    const top = deckY(t) - 0.05;
+    [-1, 1].forEach(s => {
+      const h = top + 0.85;
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, h, 7), MAT.wallDk);
+      p.position.set(s * 1.3, (top - 0.85) / 2, z);
+      g.add(p);
+    });
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.09, 0.09), MAT.wallDk);
+    beam.position.set(0, 0.12, z);
+    g.add(beam);
+  });
+  scene.add(g);
+  return g;
+})();
+
+/* 袂の石灯篭（両岸に二基ずつ） */
+const touros = [];
+(function(){
+  const stone = new THREE.MeshLambertMaterial({ color:0x353b47 });
+  [[-2.7, -86.4], [2.7, -86.4], [-2.9, -123.6], [2.9, -123.6]].forEach(k => {
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.22, 0.52), stone);
+    base.position.y = 0.11; g.add(base);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.11, 0.66, 7), stone);
+    pole.position.y = 0.55; g.add(pole);
+    const dai = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.42), stone);
+    dai.position.y = 0.93; g.add(dai);
+    const hib = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.3, 0.28),
+      new THREE.MeshBasicMaterial({ color:0xffcf8a }));
+    hib.position.y = 1.13; g.add(hib);
+    const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.24, 4), stone);
+    kasa.rotation.y = Math.PI / 4;
+    kasa.position.y = 1.4; g.add(kasa);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, transparent:true,
+      opacity:0.34, blending:THREE.AdditiveBlending, depthWrite:false }));
+    halo.scale.set(1.5, 1.5, 1);
+    halo.position.y = 1.13; g.add(halo);
+    g.position.set(k[0], 0, k[1]);
+    scene.add(g);
+    touros.push({ g: g, halo: halo });
+  });
+})();
+
+/* 川舟（上流に鵜飼の篝火舟、下流に屋形舟） */
+const boats = [];
+function buildBoat(opt){
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.3, 0.92), MAT.wallDk);
+  hull.position.y = 0.05; g.add(hull);
+  [-1, 1].forEach(e => {
+    const bow = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.26, 0.7), MAT.wallDk);
+    bow.position.set(e * 1.8, 0.16, 0);
+    bow.rotation.z = e * -0.22;
+    g.add(bow);
+  });
+  if (opt.yakata){
+    for (let i = 0; i < 4; i++){
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8, 5), MAT.bar);
+      p.position.set(i < 2 ? -0.8 : 0.8, 0.6, i % 2 ? 0.32 : -0.32);
+      g.add(p);
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.07, 0.95), MAT.wall);
+    roof.position.y = 1.03; g.add(roof);
+    const cho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color:0xffd28a }));
+    cho.scale.set(0.55, 0.7, 0.55);
+    cho.position.set(1.05, 0.72, 0); g.add(cho);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, transparent:true,
+      opacity:0.4, blending:THREE.AdditiveBlending, depthWrite:false }));
+    halo.scale.set(1.2, 1.2, 1);
+    halo.position.copy(cho.position); g.add(halo);
+    g.userData.flame = halo;
+  } else {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 5), MAT.bar);
+    arm.rotation.z = 0.9;
+    arm.position.set(-1.95, 0.55, 0); g.add(arm);
+    const fire = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 7),
+      new THREE.MeshBasicMaterial({ color:0xff8a3a }));
+    fire.position.set(-2.32, 0.78, 0); g.add(fire);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, color:0xff9a4a,
+      transparent:true, opacity:0.7, blending:THREE.AdditiveBlending, depthWrite:false }));
+    halo.scale.set(2.2, 2.2, 1);
+    halo.position.copy(fire.position); g.add(halo);
+    g.userData.flame = halo;
+  }
+  // 水面の照り返し
+  const pool = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 2.6),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, color: opt.yakata ? 0xffc978 : 0xff9a4a,
+      transparent:true, opacity: opt.yakata ? 0.10 : 0.16,
+      blending:THREE.AdditiveBlending, depthWrite:false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(opt.yakata ? 1.05 : -2.3, -0.14, 0);
+  g.add(pool);
+  return g;
+}
+[{ yakata:false, x:-15, z:-111, rot:0.15 }, { yakata:true, x:16, z:-110, rot:-0.1 }].forEach((o, k) => {
+  const b = buildBoat(o);
+  b.position.set(o.x, -0.07, o.z);
+  b.rotation.y = o.rot;
+  b.userData.baseX = o.x;
+  b.userData.phase = k * 2.4;
+  scene.add(b);
+  boats.push(b);
+});
+
+/* 嵐山（三つの峰。渡月橋の先にどっしり） */
+const MTS = [
+  { cx:-38, cz:-168, r:62, sy:0.50, sz:0.60 },   // 主峰（月がその上に懸かる）
+  { cx:  6, cz:-164, r:30, sy:0.40, sz:0.55 },   // 間の丘
+  { cx: 40, cz:-172, r:48, sy:0.44, sz:0.60 }    // 東の峰
+];
+const mtGroup = (function(){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color:0x131c29 });
+  MTS.forEach(m => {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(m.r, 26, 14, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+    mesh.scale.set(1, m.sy, m.sz);
+    mesh.position.set(m.cx, 0, m.cz);
+    g.add(mesh);
+  });
+  scene.add(g);
+  return g;
+})();
+
+/* 山腹の宿の灯 */
+(function(){
+  const pts = [];
+  let seed = 31;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  [MTS[0], MTS[2]].forEach(m => {
+    for (let i = 0; i < 7; i++){
+      const th = -0.5 + rnd() * 1.4;              // カメラ側の斜面
+      const ph = 0.18 + rnd() * 0.42;
+      const d  = m.r * Math.cos(ph) * 1.02;
+      pts.push(m.cx + Math.sin(th) * d,
+               m.r * m.sy * Math.sin(ph),
+               m.cz + Math.cos(th) * d * m.sz);
+    }
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+  const mat = new THREE.PointsMaterial({ map:TEX.glow, color:0xffc37a, size:0.9,
+    sizeAttenuation:true, transparent:true, opacity:0.9,
+    depthWrite:false, blending:THREE.AdditiveBlending, fog:false });
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+/* 山の霞 */
+[[-38, 24, -160, 64, 15], [30, 15, -158, 42, 10]].forEach(k => {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(k[3], k[4]),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, color:0xa9c4e6, transparent:true, opacity:0.07,
+                                  blending:THREE.AdditiveBlending, depthWrite:false, fog:false }));
+  m.position.set(k[0], k[1], k[2]);
+  scene.add(m);
+});
+
+/* 対岸の竹の群れ（橋の東たもと） */
+(function(){
+  let seed = 555;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const kan = new THREE.MeshLambertMaterial({ color:0x3d5a40 });
+  const ha  = new THREE.MeshLambertMaterial({ color:0x2a4231 });
+  for (let i = 0; i < 12; i++){
+    const x = 5.5 + rnd() * 12, z = -126.5 - rnd() * 10;
+    const h = 3.4 + rnd() * 1.5;
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, h, 5), kan);
+    t.position.set(x, h / 2, z);
+    t.rotation.z = (rnd() - 0.5) * 0.08;
+    scene.add(t);
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 6), ha);
+    leaf.position.set(x, h + 0.45, z);
+    scene.add(leaf);
+  }
+})();
+
+/* ============================================================
    6. 屋根の猫（参の町屋に一匹）
    ============================================================ */
 const cat = (function(){
@@ -836,18 +1140,16 @@ const cat = (function(){
 })();
 
 /* ============================================================
-   7. 蛍（火の粉）
+   7. 蛍（火の粉）― 通りと川辺に二群
    ============================================================ */
-const fireflies = (function(){
-  const N = 130;
+function makeFireflies(N, xSpread, zNear, zFar, seed){
   const pos = new Float32Array(N * 3);
   const phase = new Float32Array(N);
-  let seed = 4242;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < N; i++){
-    pos[i*3]   = (rnd() - 0.5) * 5.2;
+    pos[i*3]   = (rnd() - 0.5) * xSpread;
     pos[i*3+1] = rnd() * 3.4 + 0.25;
-    pos[i*3+2] = -rnd() * 78 + 4;
+    pos[i*3+2] = zNear + rnd() * (zFar - zNear);
     phase[i]   = rnd() * Math.PI * 2;
   }
   const geo = new THREE.BufferGeometry();
@@ -860,7 +1162,9 @@ const fireflies = (function(){
   p.userData = { phase: phase, base: pos.slice() };
   scene.add(p);
   return p;
-})();
+}
+const fireflies = makeFireflies(130, 5.2,   4,  -74, 4242);   // 通り
+const kawaFlies = makeFireflies( 70, 46,  -80, -130,  777);   // 川辺
 
 /* ============================================================
    8. カメラの流れ（自動＋停留）
@@ -868,10 +1172,11 @@ const fireflies = (function(){
 const TRAVEL_S = 2.9;
 const DWELL_S  = 6.2;
 
-const stops = HOUSES.map(h => ({
-  pos: new THREE.Vector3(-h.side * 1.35, 1.62, h.z + 3.2),
-  tgt: new THREE.Vector3(h.side * FACADE_X * 0.82, 1.88, h.z - 0.15)
-}));
+const stops = TOUR.map(h => h.view
+  ? { pos: new THREE.Vector3(h.pos[0], h.pos[1], h.pos[2]),
+      tgt: new THREE.Vector3(h.tgt[0], h.tgt[1], h.tgt[2]) }
+  : { pos: new THREE.Vector3(-h.side * 1.35, 1.62, h.z + 3.2),
+      tgt: new THREE.Vector3(h.side * FACADE_X * 0.82, 1.88, h.z - 0.15) });
 
 let idx     = 0;
 let phase   = 'travel';
@@ -886,7 +1191,7 @@ const ctrl   = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
 
 function goTo(i, byUser){
-  const n = HOUSES.length;
+  const n = TOUR.length;
   idx = ((i % n) + n) % n;
   fromPos.copy(camera.position);
   fromTgt.copy(curTgt);
@@ -901,8 +1206,9 @@ function updateCamera(dt){
   if (phase === 'travel'){
     t = Math.min(1, t + dt / TRAVEL_S);
     const e = smooth(t);
-    // 通りの真ん中をふくらんで進む（ベジェ）
-    ctrl.set(0, 1.6, (fromPos.z + s.pos.z) / 2);
+    // 通りの真ん中をふくらんで進む（ベジェ）。嵐山から通りへの長い戻りは屋根の上を飛んで帰る
+    const span = Math.abs(fromPos.z - s.pos.z);
+    ctrl.set(0, span > 60 ? 12 : 1.6, (fromPos.z + s.pos.z) / 2);
     const u = 1 - e;
     camera.position.set(
       u*u*fromPos.x + 2*u*e*ctrl.x + e*e*s.pos.x,
@@ -935,10 +1241,10 @@ const dotsEl = document.getElementById('dots');
 const autoBtn= document.getElementById('btn-auto');
 
 function showFuda(){
-  const h = HOUSES[idx];
+  const h = TOUR[idx];
   elNo.textContent   = h.kanji;
   elName.textContent = h.name;
-  elKind.textContent = KIND[h.kind].label;
+  elKind.textContent = h.view ? '名 所 散 策' : KIND[h.kind].label;
   elDesc.textContent = h.desc;
   elTags.innerHTML   = '';
   h.tags.forEach(tg => {
@@ -946,15 +1252,21 @@ function showFuda(){
     s.className = 'tag'; s.textContent = tg;
     elTags.appendChild(s);
   });
-  elEnt.href = h.url;
-  fuda.className = 'fuda on ' + h.kind;
+  if (h.view){
+    elEnt.style.display = 'none';
+    fuda.className = 'fuda on view';
+  } else {
+    elEnt.style.display = '';
+    elEnt.href = h.url;
+    fuda.className = 'fuda on ' + h.kind;
+  }
   layoutBottom();
 }
 function hideFuda(){ fuda.className = 'fuda'; }
 
-HOUSES.forEach((h, i) => {
+TOUR.forEach((h, i) => {
   const b = document.createElement('button');
-  b.className = 'dot ' + h.kind;
+  b.className = 'dot ' + (h.view ? 'view' : h.kind);
   b.title = h.kanji + '　' + h.name;
   b.setAttribute('aria-label', h.name);
   b.addEventListener('click', () => goTo(i, true));
@@ -962,7 +1274,7 @@ HOUSES.forEach((h, i) => {
 });
 function paintDots(){
   [].forEach.call(dotsEl.children, (d, i) => {
-    d.className = 'dot ' + HOUSES[i].kind + (i === idx ? ' on' : '');
+    d.className = 'dot ' + (TOUR[i].view ? 'view' : TOUR[i].kind) + (i === idx ? ' on' : '');
   });
 }
 function syncAutoBtn(){
@@ -996,20 +1308,27 @@ window.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') { goTo(idx - 1, true); e.preventDefault(); }
 });
 
-/* 町屋をクリックして選ぶ */
+/* 町屋・川・橋・山をクリックして選ぶ */
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
+const clickRoots = houseGroups.concat([river, bridgeGroup, mtGroup]);
 renderer.domElement.addEventListener('pointerdown', ev => {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.x =  ((ev.clientX - r.left) / r.width)  * 2 - 1;
   ndc.y = -((ev.clientY - r.top)  / r.height) * 2 + 1;
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(houseGroups, true)[0];
+  const hit = ray.intersectObjects(clickRoots, true)[0];
   if (!hit) return;
-  let o = hit.object;
-  while (o && houseGroups.indexOf(o) === -1) o = o.parent;
-  const i = houseGroups.indexOf(o);
-  if (i >= 0 && i !== idx) goTo(i, true);
+  let o = hit.object, target = -1;
+  while (o){
+    const hi = houseGroups.indexOf(o);
+    if (hi >= 0)           { target = hi;     break; }
+    if (o === river)       { target = NH;     break; }
+    if (o === bridgeGroup) { target = NH + 1; break; }
+    if (o === mtGroup)     { target = NH + 2; break; }
+    o = o.parent;
+  }
+  if (target >= 0 && target !== idx) goTo(target, true);
 });
 
 /* ============================================================
@@ -1050,18 +1369,40 @@ function update(dt){
     L.intensity = (o.i === idx ? 1.55 : 1.05) * flick;
   });
 
-  // 蛍がふわふわ漂う
-  const p = fireflies.geometry.attributes.position;
-  const ph = fireflies.userData.phase, base = fireflies.userData.base;
-  for (let i = 0; i < ph.length; i++){
-    p.array[i*3]   = base[i*3]   + Math.sin(elapsed * 0.55 + ph[i]) * 0.55;
-    p.array[i*3+1] = base[i*3+1] + Math.sin(elapsed * 0.42 + ph[i] * 1.7) * 0.32;
-    p.array[i*3+2] = base[i*3+2] + Math.cos(elapsed * 0.38 + ph[i]) * 0.5;
-  }
-  p.needsUpdate = true;
+  // 蛍がふわふわ漂う（通り・川辺の二群）
+  [fireflies, kawaFlies].forEach(f => {
+    const p = f.geometry.attributes.position;
+    const ph = f.userData.phase, base = f.userData.base;
+    for (let i = 0; i < ph.length; i++){
+      p.array[i*3]   = base[i*3]   + Math.sin(elapsed * 0.55 + ph[i]) * 0.55;
+      p.array[i*3+1] = base[i*3+1] + Math.sin(elapsed * 0.42 + ph[i] * 1.7) * 0.32;
+      p.array[i*3+2] = base[i*3+2] + Math.cos(elapsed * 0.38 + ph[i]) * 0.5;
+    }
+    p.needsUpdate = true;
+  });
 
   // 側溝の水が流れる
   waterStrips.forEach(m => { m.material.map.offset.y = (elapsed * 0.045) % 1; });
+
+  // 桂川：水がゆっくり下流へ、月の道がゆらぐ
+  river.material.map.offset.x = (elapsed * 0.006) % 1;
+  moonPath.material.opacity = 0.14 + Math.sin(elapsed * 0.5) * 0.04;
+  moonPath.scale.x = 1 + Math.sin(elapsed * 0.8) * 0.07;
+
+  // 川舟：ゆったり上下、篝火と提灯のまたたき
+  boats.forEach((b, k) => {
+    b.position.y = -0.07 + Math.sin(elapsed * 0.8 + b.userData.phase) * 0.03;
+    b.rotation.z = Math.sin(elapsed * 0.66 + b.userData.phase) * 0.022;
+    b.position.x = b.userData.baseX + Math.sin(elapsed * 0.05 + k * 2) * 1.6;
+    const f = b.userData.flame;
+    f.material.opacity = (k === 0 ? 0.62 : 0.4)
+      * (0.8 + Math.sin(elapsed * 9 + k * 5) * 0.16 + Math.sin(elapsed * 23) * 0.06);
+  });
+
+  // 石灯篭のまたたき
+  touros.forEach((t2, k) => {
+    t2.halo.material.opacity = 0.30 + Math.sin(elapsed * 3.7 + k * 1.9) * 0.07;
+  });
 
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
@@ -1118,6 +1459,8 @@ window.__machiya = {
     scene.traverse(o => { if (o.isMesh || o.isPoints) meshes++; });
     return {
       houses: houseGroups.length,
+      tour: TOUR.length,
+      spot: TOUR[idx].name,
       meshes: meshes,
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
@@ -1126,11 +1469,34 @@ window.__machiya = {
       idx: idx, phase: phase, auto: auto,
       lights: roamLights.map(l => +l.intensity.toFixed(2)),
       fudaOn: fuda.classList.contains('on'),
+      fudaView: fuda.classList.contains('view'),
+      enterShown: elEnt.style.display !== 'none',
       enterHref: elEnt.getAttribute('href')
     };
   },
-  /* 停留中の町屋が本当に画面の中に写っているか（看板・暖簾・提灯を投影して見る） */
+  /* 停留中の対象が本当に画面の中に写っているか（町屋は看板・暖簾・提灯、名所は橋・峰・舟を投影） */
   aim: function(){
+    const v = new THREE.Vector3();
+    const proj = o => {
+      if (o.isVector3) v.copy(o); else o.getWorldPosition(v);
+      const dist = v.distanceTo(camera.position);
+      v.project(camera);
+      return {
+        ndc: [+v.x.toFixed(3), +v.y.toFixed(3)],
+        inFront: v.z < 1,
+        onScreen: Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1,
+        dist: +dist.toFixed(2)
+      };
+    };
+    if (idx >= NH){
+      return {
+        idx: idx, name: TOUR[idx].name,
+        bridge : proj(new THREE.Vector3(0, deckY(0.5), (BRIDGE_Z0 + BRIDGE_Z1) / 2)),
+        peak   : proj(new THREE.Vector3(MTS[0].cx, MTS[0].r * MTS[0].sy, MTS[0].cz + MTS[0].r * MTS[0].sz * 0.5)),
+        kagari : proj(boats[0].position),
+        touro  : proj(touros[2].g.position)
+      };
+    }
     const g = houseGroups[idx];
     g.updateMatrixWorld(true);
     const parts = {
@@ -1139,19 +1505,8 @@ window.__machiya = {
       lantern: g.userData.lantern
     };
     const out = { idx: idx, name: HOUSES[idx].name };
-    const v = new THREE.Vector3();
     Object.keys(parts).forEach(k => {
-      const o = parts[k];
-      if (!o){ out[k] = null; return; }
-      o.getWorldPosition(v);
-      const dist = v.distanceTo(camera.position);
-      v.project(camera);
-      out[k] = {
-        ndc: [+v.x.toFixed(3), +v.y.toFixed(3)],
-        inFront: v.z < 1,
-        onScreen: Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1,
-        dist: +dist.toFixed(2)
-      };
+      out[k] = parts[k] ? proj(parts[k]) : null;
     });
     return out;
   },
