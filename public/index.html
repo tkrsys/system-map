@@ -284,6 +284,23 @@ const SPOTS = [
 const NH = HOUSES.length;
 const TOUR = HOUSES.concat(SPOTS);
 
+/* 川辺の演出の個別開閉（赤入れで気に入らないものだけ false に。__machiya.FX からも切替可） */
+const FX = {
+  kirameki    : true,   // ① 川面のきらめき（月の道の光点）
+  nagare2     : true,   // ② 二層の水流
+  kawagiri    : true,   // ③ 川霧
+  touronagashi: true,   // ④ 灯篭流し
+  mizukagami  : true,   // ⑤ 光の水鏡（篝火・提灯の光が水面に伸びる）
+  hinoko      : true,   // ⑥ 篝火の火の粉
+  hitokage    : true,   // ⑦ 渡月橋を渡る宵の人影
+  kodachi     : true,   // ⑧ 嵐山の稜線の木立
+  yadonoto    : true,   // ⑨ 宿の灯のまたたき
+  kasumi      : true,   // ⑩ 山霞の流れ
+  tsukigasa   : true,   // ⑪ 月暈の呼吸
+  nagareboshi : true,   // ⑫ 流れ星
+  dolly       : true    // ⑬ 名所停留の微ドリー
+};
+
 const STREET_X = 5.0;          // 町屋の中心
 const HOUSE_W  = 3.6;          // 間口
 const HOUSE_D  = 5.0;          // 奥行 → 正面は |x| = 2.5（通り幅 5m の路地）
@@ -457,6 +474,25 @@ function waterTexture(){
   }
   return tex(c, 1, 12);
 }
+/* 嵐山の木立（稜線をぎざぎざに縁取る。fill と seed を変えて二層つくる） */
+function treelineTexture(fill, seed){
+  const c = cv(1024, 256), g = c.getContext('2d');
+  g.clearRect(0, 0, 1024, 256);
+  g.fillStyle = fill;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let base = 150;
+  for (let x = 0; x <= 1024; x += 7){
+    base += (rnd() - 0.5) * 26;
+    base = Math.min(190, Math.max(84, base));
+    const r = 10 + rnd() * 16;
+    g.beginPath(); g.arc(x, base, r, 0, Math.PI * 2); g.fill();
+    g.fillRect(x - 5, base, 10, 256 - base);
+    if (rnd() > 0.72){
+      g.beginPath(); g.arc(x + 2, base - r * 0.85, r * 0.5, 0, Math.PI * 2); g.fill();
+    }
+  }
+  return tex(c);
+}
 /* 遠景：東山と五重塔のシルエット */
 function ridgeTexture(){
   const c = cv(2048, 360), g = c.getContext('2d');
@@ -500,7 +536,9 @@ const TEX = {
   glow   : glowTexture(),
   water  : waterTexture(),
   ridge  : ridgeTexture(),
-  sky    : skyTexture()
+  sky    : skyTexture(),
+  kodachi   : treelineTexture('#0c1420', 424242),
+  kodachiFar: treelineTexture('#1b2836', 98765)
 };
 
 /* ============================================================
@@ -530,8 +568,8 @@ scene.background = TEX.sky;
   scene.add(new THREE.Points(geo, mat));
 })();
 
-// 三日月
-(function moon(){
+// 三日月（⑪月暈の輪をまとって呼吸する）
+const moonFx = (function moon(){
   const g = new THREE.Group();
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(4.2, 40),
@@ -547,9 +585,20 @@ scene.background = TEX.sky;
     new THREE.MeshBasicMaterial({ map:TEX.glow, transparent:true, opacity:0.42,
                                   blending:THREE.AdditiveBlending, depthWrite:false, fog:false })
   );
+  let ring = null;
+  if (FX.tsukigasa){
+    ring = new THREE.Mesh(
+      new THREE.RingGeometry(6.6, 7.2, 48),
+      new THREE.MeshBasicMaterial({ color:0xcfd8ee, transparent:true, opacity:0.05,
+                                    blending:THREE.AdditiveBlending, depthWrite:false, fog:false,
+                                    side:THREE.DoubleSide })
+    );
+    g.add(ring);
+  }
   g.add(halo, disc, bite);
   g.position.set(-42, 46, -152);   // 嵐山の頂の上に懸かる（渡月の名の由来の構図）
   scene.add(g);
+  return { halo: halo, ring: ring };
 })();
 
 // 東山＋五重塔（嵐山の三峰よりさらに奥の遠景へ）
@@ -862,6 +911,8 @@ const river = (function(){
   m.material.map.repeat.set(34, 3);
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, -0.22, (RIVER_Z0 + RIVER_Z1) / 2);
+  // 水面は必ず最初に描く。距離順に任せると、水上の月の道や灯の照りを後から塗り潰してしまう
+  m.renderOrder = -2;
   scene.add(m);
   return m;
 })();
@@ -1054,37 +1105,46 @@ const mtGroup = (function(){
   return g;
 })();
 
-/* 山腹の宿の灯 */
+/* 山腹の宿の灯（⑨二群に分けて、峰ごとに交互またたき） */
+const yadoClouds = [];
 (function(){
-  const pts = [];
   let seed = 31;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  [MTS[0], MTS[2]].forEach(m => {
+  const groups = [[], []];
+  [MTS[0], MTS[2]].forEach((m, gi) => {
     for (let i = 0; i < 7; i++){
       const th = -0.5 + rnd() * 1.4;              // カメラ側の斜面
       const ph = 0.18 + rnd() * 0.42;
       const d  = m.r * Math.cos(ph) * 1.02;
-      pts.push(m.cx + Math.sin(th) * d,
-               m.r * m.sy * Math.sin(ph),
-               m.cz + Math.cos(th) * d * m.sz);
+      groups[gi].push(m.cx + Math.sin(th) * d,
+                      m.r * m.sy * Math.sin(ph),
+                      m.cz + Math.cos(th) * d * m.sz);
     }
   });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
-  const mat = new THREE.PointsMaterial({ map:TEX.glow, color:0xffc37a, size:0.9,
-    sizeAttenuation:true, transparent:true, opacity:0.9,
-    depthWrite:false, blending:THREE.AdditiveBlending, fog:false });
-  scene.add(new THREE.Points(geo, mat));
+  groups.forEach((pts, gi) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+    const mat = new THREE.PointsMaterial({ map:TEX.glow, color:0xffc37a, size:0.9,
+      sizeAttenuation:true, transparent:true, opacity:0.9,
+      depthWrite:false, blending:THREE.AdditiveBlending, fog:false });
+    const p = new THREE.Points(geo, mat);
+    p.userData = { ph: gi * 2.1 };
+    scene.add(p);
+    yadoClouds.push(p);
+  });
 })();
 
-/* 山の霞 */
-[[-38, 24, -160, 64, 15], [30, 15, -158, 42, 10]].forEach(k => {
+/* 山の霞（⑩ゆっくり山肌を流れて呼吸する） */
+const kasumis = [];
+[[-38, 24, -160, 64, 15, 0], [30, 15, -158, 42, 10, 2.6]].forEach(k => {
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(k[3], k[4]),
     new THREE.MeshBasicMaterial({ map:TEX.glow, color:0xa9c4e6, transparent:true, opacity:0.07,
                                   blending:THREE.AdditiveBlending, depthWrite:false, fog:false }));
   m.position.set(k[0], k[1], k[2]);
+  m.userData = { baseX: k[0], baseO: 0.07, ph: k[5] };
   scene.add(m);
+  kasumis.push(m);
 });
 
 /* 対岸の竹の群れ（橋の東たもと） */
@@ -1104,6 +1164,226 @@ const mtGroup = (function(){
     leaf.position.set(x, h + 0.45, z);
     scene.add(leaf);
   }
+})();
+
+/* ============================================================
+   5c. 川辺の演出づくし（十三点盛り。FX で個別に消せる）
+   ============================================================ */
+
+/* ① 川面のきらめき ― 月の道のまわりで明滅する光点。三群を位相ずらしで交互に */
+const glintClouds = [];
+if (FX.kirameki){
+  let seed = 2026;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let gi = 0; gi < 3; gi++){
+    const N = 22, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++){
+      const onPath = rnd() < 0.6;                  // 六割は月の道に沿わせる
+      pos[i*3]   = onPath ? -20 + (rnd() - 0.5) * 9 : (rnd() - 0.5) * 90;
+      pos[i*3+1] = -0.185;
+      pos[i*3+2] = -93 - rnd() * 24;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const p = new THREE.Points(geo, new THREE.PointsMaterial({
+      map:TEX.glow, color:0xcfe0ff, size:0.22, sizeAttenuation:true,
+      transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending }));
+    p.userData = { ph: gi * 2.09 };
+    scene.add(p);
+    glintClouds.push(p);
+  }
+}
+
+/* ② 二層の水流 ― 速さの違う流れを重ねて水に厚みを出す */
+const river2 = (function(){
+  if (!FX.nagare2) return null;
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(220, RIVER_Z0 - RIVER_Z1),
+    new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.22,
+                                  blending:THREE.AdditiveBlending, depthWrite:false })
+  );
+  m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
+  m.material.map.repeat.set(21, 2);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, -0.20, (RIVER_Z0 + RIVER_Z1) / 2);
+  m.renderOrder = -1;         // 一層目の直後・光り物の前
+  scene.add(m);
+  return m;
+})();
+
+/* ③ 川霧 ― 水面すれすれをゆっくり流れる薄い靄 */
+const kawagiris = [];
+if (FX.kawagiri){
+  [[-18,  -98, 30, 5.5, 0.10,  0.0],
+   [ 14, -112, 38, 6.5, 0.085, 1.9],
+   [-40, -116, 26, 4.5, 0.07,  3.7],
+   [ 38,  -96, 24, 4.0, 0.065, 5.1]].forEach(k => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, color:0xaec6e8,
+      transparent:true, opacity:k[4], blending:THREE.AdditiveBlending, depthWrite:false }));
+    s.scale.set(k[2], k[3], 1);
+    s.position.set(k[0], 1.0, k[1]);
+    s.userData = { baseX: k[0], baseO: k[4], ph: k[5] };
+    scene.add(s);
+    kawagiris.push(s);
+  });
+}
+
+/* ④ 灯篭流し ― 灯を点した小さな灯篭が上流から流れ下る（三つの灯の見立て） */
+const nagashiTouro = [];
+const nagashiGlow = (function(){
+  if (!FX.touronagashi) return null;
+  let seed = 808;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bodyGeo = new THREE.BoxGeometry(0.22, 0.16, 0.22);
+  const roofGeo = new THREE.ConeGeometry(0.19, 0.10, 4);
+  const bodyMat = new THREE.MeshBasicMaterial({ color:0xffd9a0 });
+  const roofMat = new THREE.MeshLambertMaterial({ color:0x2a2018 });
+  const N = 10;
+  for (let i = 0; i < N; i++){
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(bodyGeo, bodyMat); b.position.y = 0.08; g.add(b);
+    const r = new THREE.Mesh(roofGeo, roofMat);
+    r.rotation.y = Math.PI / 4; r.position.y = 0.21; g.add(r);
+    g.userData = { off: rnd() * 116, v: 0.5 + rnd() * 0.4,
+                   z: -93.5 - rnd() * 23, ph: rnd() * Math.PI * 2 };
+    scene.add(g);
+    nagashiTouro.push(g);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  const p = new THREE.Points(geo, new THREE.PointsMaterial({
+    map:TEX.glow, color:0xffc37a, size:1.1, sizeAttenuation:true,
+    transparent:true, opacity:0.5, depthWrite:false, blending:THREE.AdditiveBlending }));
+  p.frustumCulled = false;    // 位置は毎フレーム書くため境界球が使えない
+  scene.add(p);
+  return p;
+})();
+
+/* ⑤ 光の水鏡 ― 篝火・屋形の提灯・対岸の灯篭の光が水面に長く伸びる */
+const mirrorStreaks = [];
+function addStreak(color, len, baseO, w){
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w || 1.0, len),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, color:color, transparent:true, opacity:baseO,
+      blending:THREE.AdditiveBlending, depthWrite:false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.userData = { baseO: baseO };
+  scene.add(m);
+  mirrorStreaks.push(m);
+  return m;
+}
+let streakKagari = null, streakYakata = null, streakChochin = null;
+if (FX.mizukagami){
+  streakKagari = addStreak(0xff9a4a, 9, 0.18, 1.2);
+  streakYakata = addStreak(0xffc978, 7, 0.12, 0.9);
+  addStreak(0xffcf8a, 6, 0.09, 0.8).position.set(-2.9, -0.205, -116.5);
+  addStreak(0xffcf8a, 6, 0.09, 0.8).position.set( 2.9, -0.205, -116.5);
+}
+
+/* ⑥ 篝火の火の粉 ― 鵜飼舟の火から舞い上がって消える */
+const hinoko = (function(){
+  if (!FX.hinoko) return null;
+  let seed = 606;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const N = 22, info = [];
+  for (let i = 0; i < N; i++){
+    info.push({ off: rnd() * 1.7, v: 0.5 + rnd() * 0.5, sw: rnd() * Math.PI * 2 });
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  const p = new THREE.Points(geo, new THREE.PointsMaterial({
+    map:TEX.glow, color:0xffa04e, size:0.14, sizeAttenuation:true,
+    transparent:true, opacity:0.8, depthWrite:false, blending:THREE.AdditiveBlending }));
+  p.frustumCulled = false;    // 位置は毎フレーム書くため境界球が使えない
+  p.userData = { info: info };
+  boats[0].add(p);            // 舟の子にして、揺れごと一緒に運ぶ
+  return p;
+})();
+
+/* ⑦ 渡月橋を渡る宵の人影 ― 二人連れと、提灯を提げたひとり */
+const walkers = [];
+if (FX.hitokage){
+  const silk = new THREE.MeshLambertMaterial({ color:0x14161f });
+  const person = px => {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.16, 1.02, 7), silk);
+    body.position.y = 0.51;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), silk);
+    head.position.y = 1.15;
+    g.add(body, head);
+    g.position.x = px;
+    return g;
+  };
+  /* 橋の中央（玖の停留でカメラが立つ場所）は跨がせない。
+     二人連れは町側の半分、提灯のひとりは対岸側の半分を行き来する */
+  const pair = new THREE.Group();
+  pair.add(person(-0.15), person(0.15));
+  pair.userData = { lane:-1.02, t:0.15, dir:1, v:1/38, face:Math.PI, t0:0.03, t1:0.44 };
+  scene.add(pair);
+  walkers.push(pair);
+
+  const solo = new THREE.Group();
+  solo.add(person(0));
+  const cho = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8),
+    new THREE.MeshBasicMaterial({ color:0xffd28a }));
+  cho.scale.y = 1.25;
+  cho.position.set(0.20, 0.62, 0.14);
+  const choHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, transparent:true,
+    opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false }));
+  choHalo.scale.set(0.9, 0.9, 1);
+  choHalo.position.copy(cho.position);
+  solo.add(cho, choHalo);
+  solo.userData = { lane:1.05, t:0.8, dir:-1, v:1/34, face:0, t0:0.62, t1:0.97,
+                    cho: cho, choHalo: choHalo };
+  scene.add(solo);
+  walkers.push(solo);
+  if (FX.mizukagami) streakChochin = addStreak(0xffd28a, 5, 0.08, 0.7);
+}
+
+/* ⑧ 嵐山の稜線の木立 ― 峰の頂を跨いで空との際をぎざぎざに。斜面は帯を傾けて追従 */
+const kodachiPlanes = [];
+if (FX.kodachi){
+  [ // [x, y, z, 幅, 高さ, 傾き, 濃い層か]
+    [-38, 29.6, -154.5, 52, 7,  0,     true ],   // 主峰の頂
+    [-74, 24.0, -163.0, 26, 6,  0.38,  true ],   // 主峰の西肩（下り）
+    [ -6, 24.5, -163.5, 24, 6, -0.35,  true ],   // 主峰の東肩
+    [  6, 11.3, -163.2, 26, 4.5, 0,    true ],   // 中の丘の頂
+    [ 40, 20.0, -162.5, 32, 6,  0,     true ],   // 東峰の頂
+    [ 20, 16.0, -165.0, 20, 5,  0.42,  true ],   // 東峰の西肩
+    [ 61, 15.5, -165.0, 22, 5, -0.42,  true ],   // 東峰の東肩
+    [-38, 15.0, -135.6, 84, 7,  0,     false],   // 主峰の山腹（手前の森）
+    [ 40, 10.0, -146.4, 66, 6,  0,     false]    // 東峰の山腹
+  ].forEach(k => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(k[3], k[4]),
+      new THREE.MeshBasicMaterial({ map: k[6] ? TEX.kodachi : TEX.kodachiFar,
+        transparent:true, depthWrite:false })
+    );
+    m.position.set(k[0], k[1], k[2]);
+    m.rotation.z = k[5];
+    scene.add(m);
+    kodachiPlanes.push(m);
+  });
+}
+
+/* ⑫ 流れ星 ― 東の空をときどき一筋 */
+const meteor = (function(){
+  if (!FX.nagareboshi) return null;
+  const g = new THREE.Group();
+  const head = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX.glow, color:0xeaf2ff,
+    transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, fog:false }));
+  head.scale.set(1.6, 1.6, 1);
+  const tail = new THREE.Mesh(new THREE.PlaneGeometry(14, 0.55),
+    new THREE.MeshBasicMaterial({ map:TEX.glow, color:0xbfd4f2, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false, fog:false, side:THREE.DoubleSide }));
+  tail.position.x = 7.4;                     // 頭のうしろへ尾を引く
+  g.add(head, tail);
+  scene.add(g);
+  let seed = 909;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  return { g: g, head: head, tail: tail, rnd: rnd,
+           wait: 4 + rnd() * 6, life: -1, dur: 1, vx: 0, vy: 0 };
 })();
 
 /* ============================================================
@@ -1187,6 +1467,7 @@ let fromPos = camera.position.clone();
 let fromTgt = new THREE.Vector3(stops[0].tgt.x, stops[0].tgt.y, stops[0].tgt.z + 6);
 const curTgt = fromTgt.clone();
 const ctrl   = new THREE.Vector3();
+const dollyDir = new THREE.Vector3();
 
 const smooth = x => x * x * (3 - 2 * x);
 
@@ -1221,6 +1502,15 @@ function updateCamera(dt){
     dwellT += dt;
     camera.position.x = s.pos.x + Math.sin(dwellT * 0.62) * 0.07;
     camera.position.y = s.pos.y + Math.sin(dwellT * 0.85) * 0.035;
+    camera.position.z = s.pos.z;
+    if (FX.dolly && TOUR[idx].view){
+      // ⑬ 名所では息を合わせるようにゆっくり前へ寄る
+      const d = smooth(Math.min(1, dwellT / DWELL_S)) * 0.6;
+      dollyDir.subVectors(s.tgt, s.pos).normalize();
+      camera.position.x += dollyDir.x * d;
+      camera.position.y += dollyDir.y * d;
+      camera.position.z += dollyDir.z * d;
+    }
     curTgt.copy(s.tgt);
     if (auto && dwellT > DWELL_S) goTo(idx + 1, false);
   }
@@ -1389,20 +1679,155 @@ function update(dt){
   moonPath.material.opacity = 0.14 + Math.sin(elapsed * 0.5) * 0.04;
   moonPath.scale.x = 1 + Math.sin(elapsed * 0.8) * 0.07;
 
-  // 川舟：ゆったり上下、篝火と提灯のまたたき
+  // 川舟：ゆったり上下、篝火と提灯のまたたき（またたき量は水鏡と共有）
   boats.forEach((b, k) => {
     b.position.y = -0.07 + Math.sin(elapsed * 0.8 + b.userData.phase) * 0.03;
     b.rotation.z = Math.sin(elapsed * 0.66 + b.userData.phase) * 0.022;
     b.position.x = b.userData.baseX + Math.sin(elapsed * 0.05 + k * 2) * 1.6;
-    const f = b.userData.flame;
-    f.material.opacity = (k === 0 ? 0.62 : 0.4)
-      * (0.8 + Math.sin(elapsed * 9 + k * 5) * 0.16 + Math.sin(elapsed * 23) * 0.06);
+    const flick = 0.8 + Math.sin(elapsed * 9 + k * 5) * 0.16 + Math.sin(elapsed * 23) * 0.06;
+    b.userData.flick = flick;
+    b.userData.flame.material.opacity = (k === 0 ? 0.62 : 0.4) * flick;
   });
 
   // 石灯篭のまたたき
   touros.forEach((t2, k) => {
     t2.halo.material.opacity = 0.30 + Math.sin(elapsed * 3.7 + k * 1.9) * 0.07;
   });
+
+  /* ―― 川辺の演出十三点（生き死には毎フレーム FX を見る＝赤入れ中に切替できる） ―― */
+  // ① 川面のきらめき：三群が位相をずらして明滅
+  glintClouds.forEach(p => {
+    p.visible = FX.kirameki;
+    const tw = Math.sin(elapsed * 1.9 + p.userData.ph);
+    p.material.opacity = Math.max(0, tw) * 0.55;
+    p.material.size = 0.18 + Math.max(0, tw) * 0.10;
+  });
+  // ② 二層目の水流は少し速く、わずかに斜めへ
+  if (river2){
+    river2.visible = FX.nagare2;
+    river2.material.map.offset.x = (elapsed * 0.013) % 1;
+    river2.material.map.offset.y = (elapsed * 0.0022) % 1;
+  }
+  // ③ 川霧が水面を這って流れる
+  kawagiris.forEach(s => {
+    s.visible = FX.kawagiri;
+    const u = s.userData;
+    s.position.x = u.baseX + Math.sin(elapsed * 0.05 + u.ph) * 7;
+    s.material.opacity = u.baseO * (0.75 + Math.sin(elapsed * 0.18 + u.ph * 2) * 0.25);
+  });
+  // ④ 灯篭流し：西から東へ川面をわたる。灯の照りは Points でまとめて一描画
+  if (nagashiGlow){
+    nagashiGlow.visible = FX.touronagashi;
+    const gp = nagashiGlow.geometry.attributes.position;
+    nagashiTouro.forEach((g, i) => {
+      g.visible = FX.touronagashi;
+      const u = g.userData;
+      const x = -58 + ((u.off + elapsed * u.v) % 116);
+      g.position.set(x, -0.16 + Math.sin(elapsed * 1.1 + u.ph) * 0.02, u.z);
+      g.rotation.y = elapsed * 0.12 + u.ph;
+      gp.array[i*3] = x; gp.array[i*3+1] = g.position.y + 0.12; gp.array[i*3+2] = u.z;
+    });
+    gp.needsUpdate = true;
+    nagashiGlow.material.opacity = 0.42 + Math.sin(elapsed * 2.6) * 0.08;
+  }
+  // ⑤ 水鏡：舟は動くので光の帯を毎フレーム追わせる
+  if (streakKagari){
+    mirrorStreaks.forEach(m => { m.visible = FX.mizukagami; });
+    streakKagari.position.set(boats[0].position.x - 2.29, -0.205, boats[0].position.z + 4.5);
+    streakKagari.material.opacity = 0.16 * (boats[0].userData.flick || 1);
+    streakYakata.position.set(boats[1].position.x + 1.04, -0.205, boats[1].position.z + 3.5);
+    streakYakata.material.opacity = 0.10 * (boats[1].userData.flick || 1);
+  }
+  // ⑥ 篝火の火の粉が舞い上がる
+  if (hinoko){
+    hinoko.visible = FX.hinoko;
+    const hp = hinoko.geometry.attributes.position;
+    hinoko.userData.info.forEach((sp, i) => {
+      const h = (sp.off + elapsed * sp.v) % 1.7;
+      hp.array[i*3]   = -2.32 + Math.sin(elapsed * 1.8 + sp.sw) * 0.08 * h + h * 0.22;
+      hp.array[i*3+1] = 0.80 + h;
+      hp.array[i*3+2] = Math.sin(elapsed * 1.4 + sp.sw * 2) * 0.09 * h;
+    });
+    hp.needsUpdate = true;
+    hinoko.material.opacity = 0.55 + Math.sin(elapsed * 11) * 0.2;
+  }
+  // ⑦ 宵の人影が橋を行き交う（端まで来たら向き直る）
+  walkers.forEach((w, k) => {
+    w.visible = FX.hitokage;
+    if (!FX.hitokage) return;
+    const u = w.userData;
+    u.t += u.dir * u.v * dt;
+    if (u.t >= u.t1){ u.t = u.t1; u.dir = -1; }
+    else if (u.t <= u.t0){ u.t = u.t0; u.dir = 1; }
+    const face = u.dir > 0 ? Math.PI : 0;
+    u.face += (face - u.face) * Math.min(1, dt * 2.5);
+    const step = Math.sin(elapsed * 3.1 + k * 2.4);
+    w.position.set(u.lane, deckY(u.t) + 0.08 + Math.abs(step) * 0.02, BRIDGE_Z0 - u.t * BRIDGE_L);
+    w.rotation.y = u.face;
+    w.rotation.z = step * 0.018;
+    if (u.cho){
+      u.cho.position.z = 0.14 + Math.sin(elapsed * 2.2) * 0.06;
+      u.choHalo.position.copy(u.cho.position);
+      u.choHalo.material.opacity = 0.5 * (0.82 + Math.sin(elapsed * 8.7) * 0.18);
+    }
+  });
+  // 提灯の灯は欄干を越えて東の水面にもこぼれる
+  if (streakChochin && walkers.length > 1){
+    streakChochin.visible = FX.mizukagami && FX.hitokage;
+    streakChochin.position.set(2.4, -0.205, walkers[1].position.z + 2.6);
+    streakChochin.material.opacity = 0.07 * (0.85 + Math.sin(elapsed * 8.7) * 0.15);
+  }
+  // ⑧ 木立は生き死にだけ
+  kodachiPlanes.forEach(m => { m.visible = FX.kodachi; });
+  // ⑨ 宿の灯が峰ごとに交互またたき
+  yadoClouds.forEach(p => {
+    p.material.opacity = FX.yadonoto
+      ? 0.78 + Math.sin(elapsed * 1.15 + p.userData.ph) * 0.18 : 0.9;
+  });
+  // ⑩ 山霞がゆっくり流れて呼吸する
+  kasumis.forEach(m => {
+    if (!FX.kasumi) return;
+    const u = m.userData;
+    m.position.x = u.baseX + Math.sin(elapsed * 0.03 + u.ph) * 6;
+    m.material.opacity = u.baseO * (0.8 + Math.sin(elapsed * 0.11 + u.ph) * 0.3);
+  });
+  // ⑪ 月暈の呼吸
+  if (moonFx.ring){
+    moonFx.ring.visible = FX.tsukigasa;
+    if (FX.tsukigasa){
+      moonFx.ring.material.opacity = 0.045 + Math.sin(elapsed * 0.21) * 0.025;
+      moonFx.halo.material.opacity = 0.40 + Math.sin(elapsed * 0.17) * 0.06;
+    }
+  }
+  // ⑫ 流れ星：待って、流れて、また待つ
+  if (meteor){
+    meteor.g.visible = FX.nagareboshi;
+    if (FX.nagareboshi){
+      if (meteor.life < 0){
+        meteor.wait -= dt;
+        if (meteor.wait <= 0){
+          const r = meteor.rnd;
+          meteor.g.position.set(-5 + r() * 85, 52 + r() * 22, -150 - r() * 25);
+          const ang = 0.5 + r() * 0.5;
+          const spd = 26 + r() * 14;
+          meteor.vx = -Math.cos(ang) * spd;
+          meteor.vy = -Math.sin(ang) * spd;
+          meteor.g.rotation.z = Math.atan2(-meteor.vy, -meteor.vx);
+          meteor.life = 0;
+          meteor.dur = 0.8 + r() * 0.4;
+        }
+      } else {
+        meteor.life += dt;
+        const pr = meteor.life / meteor.dur;
+        meteor.g.position.x += meteor.vx * dt;
+        meteor.g.position.y += meteor.vy * dt;
+        const o = Math.max(0, pr < 0.2 ? pr / 0.2 : (1 - pr) / 0.8);
+        meteor.head.material.opacity = o * 0.9;
+        meteor.tail.material.opacity = o * 0.4;
+        if (pr >= 1){ meteor.life = -1; meteor.wait = 5 + meteor.rnd() * 9; }
+      }
+    }
+  }
 
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
@@ -1422,6 +1847,36 @@ loop();
    11. 目視できない環境向けの検証口
    ============================================================ */
 window.__machiya = {
+  /* pane 非表示で viewport が 0x0 の環境向け：描画寸法を手で決めて一枚描く */
+  size: function(w, h){
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+    renderer.render(scene, camera);
+    return { w: w, h: h };
+  },
+  /* 画面の一部だけ読む（水面の細い光など、全画面平均に埋もれるものの実証用） */
+  rect: function(px, py, w, h){
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(px, gl.drawingBufferHeight - py - h, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let sum = 0, mx = 0;
+    for (let i = 0; i < w * h; i++){
+      const l = (buf[i*4] + buf[i*4+1] + buf[i*4+2]) / 3;
+      sum += l; if (l > mx) mx = l;
+    }
+    return { mean: +(sum / (w * h)).toFixed(2), max: Math.round(mx) };
+  },
+  /* 世界座標 → 画面ピクセル（rect の狙いを付ける用） */
+  proj: function(x, y, z){
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    const gl = renderer.getContext();
+    return { ndc: [+v.x.toFixed(3), +v.y.toFixed(3)],
+             px: [Math.round((v.x + 1) / 2 * gl.drawingBufferWidth),
+                  Math.round((1 - (v.y + 1) / 2) * gl.drawingBufferHeight)],
+             inFront: v.z < 1 };
+  },
   /* 手送りで時間を進める（preview では rAF が止まることがあるため） */
   step: function(frames, dt){
     frames = frames || 1; dt = dt || 1/60;
@@ -1468,6 +1923,11 @@ window.__machiya = {
       target: curTgt.toArray().map(v => +v.toFixed(2)),
       idx: idx, phase: phase, auto: auto,
       lights: roamLights.map(l => +l.intensity.toFixed(2)),
+      fxOn: Object.keys(FX).filter(k => FX[k]).join(','),
+      fxCounts: { glints: glintClouds.length, touro: nagashiTouro.length,
+                  kawagiri: kawagiris.length, streaks: mirrorStreaks.length,
+                  walkers: walkers.length, kodachi: kodachiPlanes.length,
+                  meteorOn: meteor ? meteor.life >= 0 : false },
       fudaOn: fuda.classList.contains('on'),
       fudaView: fuda.classList.contains('view'),
       enterShown: elEnt.style.display !== 'none',
@@ -1494,7 +1954,9 @@ window.__machiya = {
         bridge : proj(new THREE.Vector3(0, deckY(0.5), (BRIDGE_Z0 + BRIDGE_Z1) / 2)),
         peak   : proj(new THREE.Vector3(MTS[0].cx, MTS[0].r * MTS[0].sy, MTS[0].cz + MTS[0].r * MTS[0].sz * 0.5)),
         kagari : proj(boats[0].position),
-        touro  : proj(touros[2].g.position)
+        touro  : proj(touros[2].g.position),
+        nagashi: nagashiTouro.length ? proj(nagashiTouro[0].position) : null,
+        walker : walkers.length ? proj(walkers[0].position) : null
       };
     }
     const g = houseGroups[idx];
@@ -1522,7 +1984,8 @@ window.__machiya = {
     return { hit: i, isCurrent: i === idx, dist: +hits[0].distance.toFixed(2) };
   },
   goTo: function(i){ goTo(i, true); return idx; },
-  setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; }
+  setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; },
+  FX: FX
 };
 
 })();
