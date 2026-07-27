@@ -22,6 +22,7 @@
     --ruri:#3866A0;            /* 瑠璃 */
     --matcha:#8EB060;          /* 抹茶 */
     --moegi:#A8C078;           /* 萌黄 */
+    --fuji:#A08CC8;            /* 藤 ― 道具之灯 */
     --tori:#F5EFE0;            /* 鳥の子色 */
     --kinari:#E8DFC8;          /* 生成り */
   }
@@ -192,10 +193,10 @@
     background:rgba(0,0,0,0.3);
   }
 
-  /* ===== 三本の提灯（章） ===== */
+  /* ===== 柱の提灯（章）。四柱になったので二段組に ===== */
   .three{
     display:grid;
-    grid-template-columns:1fr 1fr 1fr;
+    grid-template-columns:1fr 1fr;
     gap:24px;
     margin-bottom:40px;
   }
@@ -276,6 +277,11 @@
     color:var(--moegi);
     box-shadow:inset 0 0 32px rgba(168,192,120,0.22);
   }
+  .yagura.dougu .noren{
+    background-color:rgba(160,140,200,0.20);
+    color:var(--fuji);
+    box-shadow:inset 0 0 32px rgba(160,140,200,0.22);
+  }
   .noren h2{
     font-size:22px; letter-spacing:8px;
     color:inherit;
@@ -319,6 +325,7 @@
   .yagura.kaigo  li{ border-left-color:var(--shu) }
   .yagura.hou    li{ border-left-color:var(--ai-light) }
   .yagura.kouken li{ border-left-color:var(--moegi) }
+  .yagura.dougu  li{ border-left-color:var(--fuji) }
 
   /* ── 情報の段は 3 段だけ：名前 → 説明 → 補足 ── */
   /* 第1段：名前 */
@@ -340,6 +347,7 @@
   .yagura.kaigo  li .icon{ color:#FF9D7A }
   .yagura.hou    li .icon{ color:var(--ai-light) }
   .yagura.kouken li .icon{ color:var(--moegi) }
+  .yagura.dougu  li .icon{ color:var(--fuji) }
   /* 通し番号は隅の小印に退避（名前と競わせない） */
   .yagura li .mark{
     position:absolute; top:7px; right:8px;
@@ -549,6 +557,7 @@
   .legend .s-kaigo { color:var(--shu) }
   .legend .s-hou   { color:var(--ai-light) }
   .legend .s-kouken{ color:var(--moegi) }
+  .legend .s-dougu { color:var(--fuji) }
   .legend .s-gold  { color:var(--kogane) }
 
   @media print{
@@ -642,6 +651,19 @@
       <path d="M3.2 9.2 L12 4 L20.8 9.2"/>
       <path d="M6 10.4 v7.6 M10 10.4 v7.6 M14 10.4 v7.6 M18 10.4 v7.6"/>
       <path d="M3.8 18.4 h16.4 M2.8 20.4 h18.4"/>
+    </symbol>
+    <symbol id="ic-tools" viewBox="0 0 24 24"><!-- 道具箱 -->
+      <path d="M3.5 9.5 h17 v10 h-17 z"/>
+      <path d="M3.5 13.5 h17"/>
+      <path d="M9.5 9.5 V7 a2.5 2.5 0 0 1 5 0 v2.5"/>
+      <path d="M10.6 12.4 h2.8 v2.4 h-2.8 z"/>
+    </symbol>
+    <symbol id="ic-myscreen" viewBox="0 0 24 24"><!-- スマホの一枚 -->
+      <rect x="7" y="2.8" width="10" height="18.4" rx="2"/>
+      <path d="M10 5.4 h4"/>
+      <circle cx="12" cy="10" r="2.6"/>
+      <path d="M12 8.4 V10 l1.2 1"/>
+      <path d="M9.4 15.4 h5.2 M9.4 18 h3.4"/>
     </symbol>
   </defs>
 </svg>
@@ -756,83 +778,19 @@
 
 <div class="scroll">
 
+  <!-- 中身は systems.json から流し込む（単一の出典）。ここは骨組みだけ -->
   <header>
-    <div class="stamp">令和八<br>皐月<br>三十日</div>
-    <div class="era">令 和 八 年 皐 月</div>
+    <div class="stamp" id="j-stamp"></div>
+    <div class="era" id="j-era"></div>
     <h1>と く り <span class="gold">堂</span> 御 絵 図</h1>
-    <div class="sub">tkrsys ― 京 の 夜 に 灯 る 七 つ の 灯</div>
-    <div class="pillar">
-      <span>七 灯</span>
-      <span>三 柱</span>
-      <span>令 和 八 年 皐 月 三 十 日 改 訂</span>
-    </div>
+    <div class="sub" id="j-sub">tkrsys</div>
+    <div class="pillar" id="j-pillar"></div>
   </header>
 
-  <!-- ===== 一目之図：七つの灯の関係を一枚で ===== -->
+  <!-- ===== 一目之図：灯の関係を一枚で ===== -->
   <section class="zukai" aria-label="全体の俯瞰図">
-    <p class="lead">
-      tkrsys が運用する七つの Web システムの所在図。<br>
-      三つの柱 ―― <b>介護実務・法律学習・後見制度</b> ―― が、ひとつの共通の礎の上に建っています。
-    </p>
-    <div class="canvas">
-      <svg viewBox="0 0 1000 262" role="img"
-           aria-label="介護実務3件・法律学習3件・後見制度1件の計7システムが、Next.js / Vercel / Neon PostgreSQL という共通の礎の上に建つ構成図。ももケアプランは居宅サービス計画書システムからの派生。">
-
-        <!-- 手描きの線（文字はフィルタ外に置いて可読性を保つ） -->
-        <g filter="url(#fude)" fill="none" stroke-width="1.6" stroke-linecap="round">
-          <!-- 柱から礎へ下ろす脚 -->
-          <path d="M160 176 V205" stroke="#E04A47" stroke-width="2"/>
-          <path d="M500 176 V205" stroke="#6BA0CC" stroke-width="2"/>
-          <path d="M840 88  V205" stroke="#A8C078" stroke-width="2"/>
-
-          <!-- 介護之灯 -->
-          <rect x="20" y="8" width="280" height="36" rx="5" stroke="#E04A47" fill="rgba(224,74,71,0.13)"/>
-          <rect x="36" y="56"  width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="36" y="100" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="36" y="144" width="248" height="32" rx="4" stroke="rgba(224,74,71,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 法律之灯 -->
-          <rect x="360" y="8" width="280" height="36" rx="5" stroke="#6BA0CC" fill="rgba(107,160,204,0.13)"/>
-          <rect x="376" y="56"  width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="376" y="100" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-          <rect x="376" y="144" width="248" height="32" rx="4" stroke="rgba(107,160,204,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 後見之灯 -->
-          <rect x="700" y="8" width="280" height="36" rx="5" stroke="#A8C078" fill="rgba(168,192,120,0.13)"/>
-          <rect x="716" y="56" width="248" height="32" rx="4" stroke="rgba(168,192,120,0.6)" fill="rgba(15,22,40,0.8)"/>
-
-          <!-- 礎 -->
-          <rect x="20" y="205" width="960" height="44" rx="6" stroke="#E8B95B" fill="rgba(232,185,91,0.10)"/>
-
-          <!-- 派生（居宅サービス計画書 → ももケアプラン） -->
-          <path d="M284 72 C324 76, 324 112, 290 116" stroke="#FF9D7A" stroke-width="1.6" stroke-dasharray="5 4"/>
-          <path d="M290 116 l9 -5.5 M290 116 l6.5 7.5" stroke="#FF9D7A" stroke-width="1.6"/>
-        </g>
-
-        <!-- 見出し -->
-        <text x="160" y="32" text-anchor="middle" font-size="15" fill="#FF9D7A" letter-spacing="4">介 護 実 務</text>
-        <text x="500" y="32" text-anchor="middle" font-size="15" fill="#6BA0CC" letter-spacing="4">法 律 学 習</text>
-        <text x="840" y="32" text-anchor="middle" font-size="15" fill="#A8C078" letter-spacing="4">後 見 制 度</text>
-
-        <!-- 各システム -->
-        <text x="160" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">居宅サービス計画書システム</text>
-        <text x="160" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ももケアプラン</text>
-        <text x="160" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">ヘルパー活動報告書</text>
-
-        <text x="500" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">行政法 統合ポータル</text>
-        <text x="500" y="121" text-anchor="middle" font-size="13.5" fill="#E8DFC8">民法ガイド</text>
-        <text x="500" y="165" text-anchor="middle" font-size="13.5" fill="#E8DFC8">健康保険法ガイド</text>
-
-        <text x="840" y="77"  text-anchor="middle" font-size="13.5" fill="#E8DFC8">後見月次報告</text>
-
-        <!-- 派生ラベル -->
-        <text x="330" y="98" font-size="11.5" fill="#FF9D7A" letter-spacing="1">派生</text>
-
-        <!-- 礎 -->
-        <text x="500" y="226" text-anchor="middle" font-size="14" fill="#E8B95B" letter-spacing="3">礎 ― 共 通 之 技 ―</text>
-        <text x="500" y="242" text-anchor="middle" font-size="11.5" fill="#E8DFC8" opacity="0.8">Next.js / App Router ・ Vercel ・ Neon PostgreSQL ・ Anthropic API</text>
-      </svg>
-    </div>
+    <p class="lead" id="j-lead"></p>
+    <div class="canvas" id="j-canvas"></div>
   </section>
 
   <!-- ===== 京町屋への入口 ===== -->
@@ -845,126 +803,13 @@
   </div>
 
   <!-- ===== 凡例（一覧を読む前に色の意味を渡す）===== -->
-  <div class="legend">
-    <span class="item"><span class="swatch s-kaigo"></span>朱 ― 介護実務</span>
-    <span class="item"><span class="swatch s-hou"></span>藍 ― 法律学習</span>
-    <span class="item"><span class="swatch s-kouken"></span>萌黄 ― 後見制度</span>
-    <span class="item"><span class="swatch s-gold"></span>金 ― 共通基盤</span>
-  </div>
+  <div class="legend" id="j-legend"></div>
 
-  <section class="three">
-
-    <!-- 介護之灯 -->
-    <div class="yagura kaigo">
-      <div class="roof"><span class="roof-line">介 護 実 務</span></div>
-      <div class="noren">
-        <h2>介 護 之 灯</h2>
-        <div class="en">― CARE PRACTICE ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://tkrsys-careplan.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">壱</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-careplan"/></svg><span>居宅サービス計画書システム</span></div>
-            <div class="desc">居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核</div>
-            <span class="tag">主軸</span><span class="tag">PIN</span><span class="tag">Neon</span>
-            <div class="url">tkrsys-careplan.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://tkrsys-momocare.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">弐</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-momo"/></svg><span>ももケアプラン</span></div>
-            <div class="desc">ケアプラン関連の派生システム</div>
-            <span class="tag">派生</span>
-            <div class="url">tkrsys-momocare.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://helper-report.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">参</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-helper"/></svg><span>ヘルパー活動報告書</span></div>
-            <div class="desc">訪問支援の記録・PDF出力。福祉事業所向け</div>
-            <span class="tag">PDF</span>
-            <div class="url">helper-report.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-    <!-- 法律之灯 -->
-    <div class="yagura hou">
-      <div class="roof"><span class="roof-line">法 律 学 習</span></div>
-      <div class="noren">
-        <h2>法 律 之 灯</h2>
-        <div class="en">― LAW & GUIDE ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://gyoseiho-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">肆</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-gyosei"/></svg><span>行政法 統合ポータル</span></div>
-            <div class="desc">行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合</div>
-            <span class="tag">四法統合</span><span class="tag">e-Gov</span>
-            <div class="url">gyoseiho-guide.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://minpo-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">伍</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-minpo"/></svg><span>民法ガイド</span></div>
-            <div class="desc">民法6分野・約200条を三段階解説。行政書士試験対策</div>
-            <span class="tag">200条</span><span class="tag">三段解説</span>
-            <div class="url">minpo-guide.vercel.app</div>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://kenkou-hoken-guide.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">陸</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kenkou"/></svg><span>健康保険法ガイド</span></div>
-            <div class="desc">健康保険法 全125条 完全解説。社労士試験対策・実務参照</div>
-            <span class="tag">全125条</span><span class="tag">e-Gov</span>
-            <div class="url">kenkou-hoken-guide.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-    <!-- 後見之灯 -->
-    <div class="yagura kouken">
-      <div class="roof"><span class="roof-line">後 見 制 度</span></div>
-      <div class="noren">
-        <h2>後 見 之 灯</h2>
-        <div class="en">― GUARDIANSHIP ―</div>
-      </div>
-      <ul>
-        <li>
-          <a class="card" href="https://kouken-monthly-report.vercel.app" target="_blank" rel="noopener">
-            <span class="mark" aria-hidden="true">漆</span>
-            <div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-kouken"/></svg><span>後見月次報告</span></div>
-            <div class="desc">月次報告書の作成・管理。家庭裁判所への提出支援</div>
-            <span class="tag">家裁提出</span><span class="tag">認証要</span>
-            <div class="url">kouken-monthly-report.vercel.app</div>
-          </a>
-        </li>
-      </ul>
-    </div>
-
-  </section>
+  <section class="three" id="j-three"></section>
 
   <section class="ishizue">
     <h3>礎 ― 共 通 之 技 ―</h3>
-    <div class="row">
-      <span class="chip ai">Next.js</span>
-      <span class="chip ai">App Router</span>
-      <span class="chip shu">Vercel</span>
-      <span class="chip match">Neon PostgreSQL</span>
-      <span class="chip gold">Anthropic API</span>
-      <span class="chip gold">claude-sonnet-4-6</span>
-      <span class="chip">React</span>
-      <span class="chip">Tailwind CSS</span>
-      <span class="chip">e-Gov API</span>
-    </div>
+    <div class="row" id="j-ishizue"></div>
   </section>
 
   <section class="kankyo">
@@ -989,16 +834,153 @@
   </section>
 
   <footer>
-    <div>
-      ◇ 三 柱 七 灯　―　朱 介護 三灯　藍 法律 三灯　萌黄 後見 一灯
-    </div>
+    <div id="j-foot-tou"></div>
     <div style="text-align:center">
-      <div>令和八年五月三十日 改訂</div>
+      <div id="j-foot-kaitei"></div>
       <div style="margin-top:4px;font-size:10px;opacity:0.75">tkrsys/system-map ― 京 夜 景 御 絵 図</div>
     </div>
     <div class="seal">徳</div>
   </footer>
 
 </div>
+
+<script>
+/* ============================================================
+   systems.json から全ページを組み立てる（単一の出典）。
+   ここでは「描き方」だけを持ち、「何があるか」は JSON に任せる
+   ============================================================ */
+(async function(){
+  const $ = id => document.getElementById(id);
+  let D = null;
+  try {
+    const r = await fetch('./systems.json', { cache: 'no-store' });
+    if (r.ok) D = await r.json();
+  } catch (e) {}
+  if (!D || !D.systems){
+    $('j-three').innerHTML =
+      '<p style="grid-column:1/-1;text-align:center;padding:30px 0;opacity:0.8">' +
+      '一覧（systems.json）の読み込みに失敗しました。再読み込みしてください。</p>';
+    return;
+  }
+
+  const KANJI = ['壱','弐','参','肆','伍','陸','漆','捌','玖','拾','拾壱','拾弐','拾参','拾肆','拾伍'];
+  const NUM   = ['〇','一','二','三','四','五','六','七','八','九','十'];
+  const kanjiNum = n => n <= 10 ? NUM[n] : (n < 20 ? '十' + (n % 10 ? NUM[n % 10] : '') : String(n));
+  const spaceOut = s => s.split('').join(' ');
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const sys = D.systems;
+  sys.forEach((s, i) => { s.no = KANJI[i] || String(i + 1); });
+  const kinds = D.kinds.filter(k => sys.some(s => s.kind === k.id));
+  const byKind = {};
+  kinds.forEach(k => { byKind[k.id] = sys.filter(s => s.kind === k.id); });
+  const total = sys.length;
+
+  /* ── 題字まわり ── */
+  $('j-stamp').innerHTML = D.meta.stamp.map(esc).join('<br>');
+  $('j-era').textContent = D.meta.era;
+  $('j-sub').textContent = 'tkrsys ― ' + spaceOut('京の夜に灯る' + kanjiNum(total) + 'つの灯');
+  $('j-pillar').innerHTML =
+    '<span>' + spaceOut(kanjiNum(total) + '灯') + '</span>' +
+    '<span>' + spaceOut(kanjiNum(kinds.length) + '柱') + '</span>' +
+    '<span>' + spaceOut(D.meta.kaitei + '改訂') + '</span>';
+  $('j-lead').innerHTML =
+    'tkrsys が運用する' + esc(kanjiNum(total)) + 'つの Web システムの所在図。<br>' +
+    esc(kanjiNum(kinds.length)) + 'つの柱 ―― <b>' + kinds.map(k => esc(k.label)).join('・') +
+    '</b> ―― が、ひとつの共通の礎の上に建っています。';
+
+  /* ── 凡例 ── */
+  $('j-legend').innerHTML = kinds.map(k =>
+    '<span class="item"><span class="swatch s-' + esc(k.id) + '"></span>' +
+    esc(k.iro) + ' ― ' + esc(k.label) + '</span>'
+  ).join('') + '<span class="item"><span class="swatch s-gold"></span>金 ― 共通基盤</span>';
+
+  /* ── 柱の提灯とカード ── */
+  $('j-three').innerHTML = kinds.map(k => {
+    const cards = byKind[k.id].map(s =>
+      '<li><a class="card" href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
+        '<span class="mark" aria-hidden="true">' + esc(s.no) + '</span>' +
+        '<div class="ttl"><svg class="icon" aria-hidden="true"><use href="#ic-' + esc(s.icon) + '"/></svg>' +
+        '<span>' + esc(s.name) + '</span></div>' +
+        '<div class="desc">' + esc(s.desc) + '</div>' +
+        s.tags.map(t => '<span class="tag">' + esc(t) + '</span>').join('') +
+        '<div class="url">' + esc(s.url.replace(/^https?:\/\//, '')) + '</div>' +
+      '</a></li>'
+    ).join('');
+    return '<div class="yagura ' + esc(k.id) + '">' +
+      '<div class="roof"><span class="roof-line">' + spaceOut(esc(k.label)) + '</span></div>' +
+      '<div class="noren"><h2>' + spaceOut(esc(k.tou)) + '</h2>' +
+      '<div class="en">― ' + esc(k.en) + ' ―</div></div>' +
+      '<ul>' + cards + '</ul></div>';
+  }).join('');
+
+  /* ── 礎の札 ── */
+  $('j-ishizue').innerHTML = D.meta.ishizue.map(c =>
+    '<span class="chip' + (c.tone ? ' ' + esc(c.tone) : '') + '">' + esc(c.label) + '</span>'
+  ).join('');
+
+  /* ── 奥付 ── */
+  $('j-foot-tou').textContent =
+    '◇ ' + spaceOut(kanjiNum(kinds.length) + '柱' + kanjiNum(total) + '灯') + '　―　' +
+    kinds.map(k => k.iro + ' ' + k.tan + ' ' + kanjiNum(byKind[k.id].length) + '灯').join('　');
+  $('j-foot-kaitei').textContent = D.meta.kaitei + ' 改訂';
+
+  /* ── 一目之図（グラフィックレコード風の俯瞰を JSON から描く） ── */
+  const PAL = {
+    kaigo : { line: '#E04A47', head: '#FF9D7A', fill: 'rgba(224,74,71,0.13)',   item: 'rgba(224,74,71,0.6)'   },
+    hou   : { line: '#6BA0CC', head: '#6BA0CC', fill: 'rgba(107,160,204,0.13)', item: 'rgba(107,160,204,0.6)' },
+    kouken: { line: '#A8C078', head: '#A8C078', fill: 'rgba(168,192,120,0.13)', item: 'rgba(168,192,120,0.6)' },
+    dougu : { line: '#A08CC8', head: '#B8A6DC', fill: 'rgba(160,140,200,0.13)', item: 'rgba(160,140,200,0.6)' }
+  };
+  (function buildZukai(){
+    const W = 1000, M = 20, GAP = 20;
+    const n = kinds.length;
+    const colW = (W - M * 2 - GAP * (n - 1)) / n;
+    const rowY = r => 56 + r * 44;
+    const maxRows = Math.max.apply(null, kinds.map(k => byKind[k.id].length));
+    const sokoY = Math.max(205, rowY(maxRows - 1) + 32 + 29);
+    const H = sokoY + 57;
+    const lines = [], texts = [];
+
+    kinds.forEach((k, ci) => {
+      const x = M + ci * (colW + GAP);
+      const cx = x + colW / 2;
+      const p = PAL[k.id] || PAL.kaigo;
+      const items = byKind[k.id];
+      // 柱の見出しと脚
+      lines.push('<rect x="' + x + '" y="8" width="' + colW + '" height="36" rx="5" stroke="' + p.line + '" fill="' + p.fill + '"/>');
+      lines.push('<path d="M' + cx + ' ' + (rowY(items.length - 1) + 32) + ' V' + sokoY + '" stroke="' + p.line + '" stroke-width="2"/>');
+      texts.push('<text x="' + cx + '" y="32" text-anchor="middle" font-size="15" fill="' + p.head + '" letter-spacing="4">' + spaceOut(esc(k.label)) + '</text>');
+      // 各システム
+      items.forEach((s, ri) => {
+        lines.push('<rect x="' + (x + 16) + '" y="' + rowY(ri) + '" width="' + (colW - 32) + '" height="32" rx="4" stroke="' + p.item + '" fill="rgba(15,22,40,0.8)"/>');
+        texts.push('<text x="' + cx + '" y="' + (rowY(ri) + 21) + '" text-anchor="middle" font-size="13" fill="#E8DFC8">' + esc(s.name) + '</text>');
+      });
+      // 派生の矢印（同じ柱の中だけ描く）
+      items.forEach((s, ri) => {
+        if (!s.haseiFrom) return;
+        const fi = items.findIndex(o => o.id === s.haseiFrom);
+        if (fi < 0) return;
+        const re = x + colW - 16;
+        const y1 = rowY(fi) + 16, y2 = rowY(ri) + 16;
+        lines.push('<path d="M' + re + ' ' + y1 + ' C' + (re + 40) + ' ' + (y1 + 4) + ', ' + (re + 40) + ' ' + (y2 - 4) + ', ' + (re + 6) + ' ' + y2 + '" stroke="#FF9D7A" stroke-width="1.6" stroke-dasharray="5 4"/>');
+        lines.push('<path d="M' + (re + 6) + ' ' + y2 + ' l9 -5.5 M' + (re + 6) + ' ' + y2 + ' l6.5 7.5" stroke="#FF9D7A" stroke-width="1.6"/>');
+        texts.push('<text x="' + (re + 46) + '" y="' + ((y1 + y2) / 2 + 4) + '" font-size="11.5" fill="#FF9D7A" letter-spacing="1">派生</text>');
+      });
+    });
+    // 礎
+    lines.push('<rect x="' + M + '" y="' + sokoY + '" width="' + (W - M * 2) + '" height="44" rx="6" stroke="#E8B95B" fill="rgba(232,185,91,0.10)"/>');
+    texts.push('<text x="' + (W / 2) + '" y="' + (sokoY + 21) + '" text-anchor="middle" font-size="14" fill="#E8B95B" letter-spacing="3">礎 ― 共 通 之 技 ―</text>');
+    texts.push('<text x="' + (W / 2) + '" y="' + (sokoY + 37) + '" text-anchor="middle" font-size="11.5" fill="#E8DFC8" opacity="0.8">' + esc(D.meta.sokoLine) + '</text>');
+
+    const aria = kinds.map(k => k.label + kanjiNum(byKind[k.id].length) + '件').join('・') +
+      ' の計' + kanjiNum(total) + 'システムが共通の礎の上に建つ構成図';
+    $('j-canvas').innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(aria) + '">' +
+      '<g filter="url(#fude)" fill="none" stroke-width="1.6" stroke-linecap="round">' + lines.join('') + '</g>' +
+      texts.join('') + '</svg>';
+  })();
+})();
+</script>
 </body>
 </html>

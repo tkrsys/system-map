@@ -126,6 +126,7 @@
   .fuda.kaigo { border-top-color:var(--shu) }
   .fuda.hou   { border-top-color:var(--ai-light) }
   .fuda.kouken{ border-top-color:var(--moegi) }
+  .fuda.dougu { border-top-color:#A08CC8 }
   .fuda.view  { border-top-color:#9FB8D8 }
 
   .fuda .no{
@@ -211,6 +212,7 @@
   .kaji .dot.kaigo.on::before { background:var(--shu);      box-shadow:0 0 10px var(--shu) }
   .kaji .dot.hou.on::before   { background:var(--ai-light); box-shadow:0 0 10px var(--ai-light) }
   .kaji .dot.kouken.on::before{ background:var(--moegi);    box-shadow:0 0 10px var(--moegi) }
+  .kaji .dot.dougu.on::before { background:#A08CC8;         box-shadow:0 0 10px #A08CC8 }
   .kaji .dot.view.on::before  { background:#9FB8D8;         box-shadow:0 0 10px #9FB8D8 }
 
   .hint{
@@ -320,7 +322,7 @@
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-(function(){
+(async function(){
 'use strict';
 
 if (typeof THREE === 'undefined') {
@@ -329,44 +331,34 @@ if (typeof THREE === 'undefined') {
 }
 
 /* ============================================================
-   1. 七軒の町屋（通りに並ぶ順＝朱三軒 → 藍三軒 → 萌黄一軒）
+   1. 七軒の町屋 ― 中身は systems.json から（御絵図と同じ単一の出典）
+   machiya:true の先頭七件が、並び順のまま通りに建つ
    ============================================================ */
 const KIND = {
   kaigo : { hex:0xE04A47, soft:0xFF9D7A, label:'介 護 実 務' },
   hou   : { hex:0x6BA0CC, soft:0x8FBEE0, label:'法 律 学 習' },
-  kouken: { hex:0xA8C078, soft:0xC2D89A, label:'後 見 制 度' }
+  kouken: { hex:0xA8C078, soft:0xC2D89A, label:'後 見 制 度' },
+  dougu : { hex:0xA08CC8, soft:0xC3B3E4, label:'道 具' }
 };
 
-const HOUSES = [
-  { kanji:'壱', name:'居宅サービス計画書システム', kind:'kaigo',
-    url:'https://tkrsys-careplan.vercel.app',
-    desc:'居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核',
-    tags:['主軸','PIN','Neon'], side:-1, z:-6 },
-  { kanji:'弐', name:'ももケアプラン', kind:'kaigo',
-    url:'https://tkrsys-momocare.vercel.app',
-    desc:'ケアプラン関連の派生システム',
-    tags:['派生'], side:1, z:-14 },
-  { kanji:'参', name:'ヘルパー活動報告書', kind:'kaigo',
-    url:'https://helper-report.vercel.app',
-    desc:'訪問支援の記録・PDF出力。福祉事業所向け',
-    tags:['PDF'], side:-1, z:-22 },
-  { kanji:'肆', name:'行政法 統合ポータル', kind:'hou',
-    url:'https://gyoseiho-guide.vercel.app',
-    desc:'行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合',
-    tags:['四法統合','e-Gov'], side:1, z:-30 },
-  { kanji:'伍', name:'民法ガイド', kind:'hou',
-    url:'https://minpo-guide.vercel.app',
-    desc:'民法6分野・約200条を三段階解説。行政書士試験対策',
-    tags:['200条','三段解説'], side:-1, z:-38 },
-  { kanji:'陸', name:'健康保険法ガイド', kind:'hou',
-    url:'https://kenkou-hoken-guide.vercel.app',
-    desc:'健康保険法 全125条 完全解説。社労士試験対策・実務参照',
-    tags:['全125条','e-Gov'], side:1, z:-46 },
-  { kanji:'漆', name:'後見月次報告', kind:'kouken',
-    url:'https://kouken-monthly-report.vercel.app',
-    desc:'月次報告書の作成・管理。家庭裁判所への提出支援',
-    tags:['家裁提出','認証要'], side:-1, z:-54 }
-];
+let DATA = null;
+try {
+  const res = await fetch('./systems.json', { cache: 'no-store' });
+  if (res.ok) DATA = await res.json();
+} catch (e) {}
+if (!DATA || !DATA.systems || !DATA.systems.length){
+  // 出典が読めなければ通りは組めない。御絵図への案内に落とす
+  document.getElementById('fallback').style.display = 'flex';
+  return;
+}
+
+const KANJI7 = ['壱','弐','参','肆','伍','陸','漆'];
+const HOUSES = DATA.systems.filter(s => s.machiya).slice(0, 7).map((s, i) => ({
+  kanji: KANJI7[i], name: s.name, kind: KIND[s.kind] ? s.kind : 'kaigo',
+  url: s.url, desc: s.desc, tags: s.tags || [],
+  side: i % 2 === 0 ? -1 : 1,     // 左右交互（壱は左）
+  z: -6 - i * 8                   // 八間おきに奥へ
+}));
 
 /* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色 */
 const SPOTS = [
@@ -1852,8 +1844,8 @@ const cat = (function(){
   tail.rotation.z = 0.6;
   g.add(body, head, earL, earR, eyeL, eyeR, tail);
   g.userData.tail = tail;
-  // 参の町屋（index 2・左側）の棟の上へ
-  const h = HOUSES[2];
+  // 参の町屋（index 2・左側）の棟の上へ（軒数が減っても先頭に退避）
+  const h = HOUSES[2] || HOUSES[0];
   g.position.set(h.side * STREET_X + 0.5, 2.40 + 1.50 + 0.95, h.z + 0.7);
   g.rotation.y = h.side < 0 ? Math.PI / 2 : -Math.PI / 2;
   scene.add(g);
@@ -2516,7 +2508,7 @@ function update(dt){
 
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
-  cat.rotation.y = (HOUSES[2].side < 0 ? Math.PI / 2 : -Math.PI / 2)
+  cat.rotation.y = ((HOUSES[2] || HOUSES[0]).side < 0 ? Math.PI / 2 : -Math.PI / 2)
                  + Math.sin(elapsed * 0.31) * 0.22;
 }
 

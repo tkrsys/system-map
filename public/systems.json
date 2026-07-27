@@ -1,0 +1,118 @@
+{
+  "_comment": "とくり堂の単一の出典。ここを直せば 御絵図(ezu.html) と 京町屋3D(index.html) の両方に反映される。machiya:true の先頭七件が通りの七軒。順番＝通し番号（壱弐参…）",
+  "meta": {
+    "kaitei": "令和八年文月二十七日",
+    "stamp": ["令和八", "文月", "二十七日"],
+    "era": "令 和 八 年 文 月",
+    "sokoLine": "Next.js / App Router ・ Vercel ・ Neon PostgreSQL ・ Anthropic API ・ Claude Code",
+    "ishizue": [
+      { "label": "Next.js", "tone": "ai" },
+      { "label": "App Router", "tone": "ai" },
+      { "label": "Vercel", "tone": "shu" },
+      { "label": "Neon PostgreSQL", "tone": "match" },
+      { "label": "Anthropic API", "tone": "gold" },
+      { "label": "Claude Code", "tone": "gold" },
+      { "label": "claude-fable-5", "tone": "gold" },
+      { "label": "React", "tone": "" },
+      { "label": "Tailwind CSS", "tone": "" },
+      { "label": "e-Gov API", "tone": "" }
+    ]
+  },
+  "kinds": [
+    { "id": "kaigo",  "label": "介護実務", "tan": "介護", "tou": "介護之灯", "en": "CARE PRACTICE", "iro": "朱" },
+    { "id": "hou",    "label": "法律学習", "tan": "法律", "tou": "法律之灯", "en": "LAW & GUIDE",   "iro": "藍" },
+    { "id": "kouken", "label": "後見制度", "tan": "後見", "tou": "後見之灯", "en": "GUARDIANSHIP",  "iro": "萌黄" },
+    { "id": "dougu",  "label": "道具",     "tan": "道具", "tou": "道具之灯", "en": "TOOLS",         "iro": "藤" }
+  ],
+  "systems": [
+    {
+      "id": "careplan",
+      "name": "居宅サービス計画書システム",
+      "kind": "kaigo",
+      "url": "https://tkrsys-careplan.vercel.app",
+      "desc": "居宅サービス計画書（第1〜3表）の作成・管理。ケアマネジャー業務の中核",
+      "tags": ["主軸", "PIN", "Neon"],
+      "icon": "careplan",
+      "machiya": true
+    },
+    {
+      "id": "momocare",
+      "name": "ももケアプラン",
+      "kind": "kaigo",
+      "url": "https://tkrsys-momocare.vercel.app",
+      "desc": "ケアプラン関連の派生システム",
+      "tags": ["派生"],
+      "icon": "momo",
+      "machiya": true,
+      "haseiFrom": "careplan"
+    },
+    {
+      "id": "helper-report",
+      "name": "ヘルパー活動報告書",
+      "kind": "kaigo",
+      "url": "https://helper-report.vercel.app",
+      "desc": "訪問支援の記録・PDF出力。福祉事業所向け",
+      "tags": ["PDF"],
+      "icon": "helper",
+      "machiya": true
+    },
+    {
+      "id": "gyoseiho",
+      "name": "行政法 統合ポータル",
+      "kind": "hou",
+      "url": "https://gyoseiho-guide.vercel.app",
+      "desc": "行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合",
+      "tags": ["四法統合", "e-Gov"],
+      "icon": "gyosei",
+      "machiya": true
+    },
+    {
+      "id": "minpo",
+      "name": "民法ガイド",
+      "kind": "hou",
+      "url": "https://minpo-guide.vercel.app",
+      "desc": "民法6分野・約200条を三段階解説。行政書士試験対策",
+      "tags": ["200条", "三段解説"],
+      "icon": "minpo",
+      "machiya": true
+    },
+    {
+      "id": "kenkou-hoken",
+      "name": "健康保険法ガイド",
+      "kind": "hou",
+      "url": "https://kenkou-hoken-guide.vercel.app",
+      "desc": "健康保険法 全125条 完全解説。社労士試験対策・実務参照",
+      "tags": ["全125条", "e-Gov"],
+      "icon": "kenkou",
+      "machiya": true
+    },
+    {
+      "id": "guardian",
+      "name": "後見月次報告",
+      "kind": "kouken",
+      "url": "https://tkrsys-guardian.vercel.app",
+      "desc": "月次報告書の作成・管理と学びの教材。家庭裁判所への提出支援",
+      "tags": ["家裁提出", "認証要"],
+      "icon": "kouken",
+      "machiya": true
+    },
+    {
+      "id": "tools",
+      "name": "よろず道具箱",
+      "kind": "dougu",
+      "url": "https://tkrsys-tools.vercel.app",
+      "desc": "心因性発熱をしずめる体験型3Dと、やさしい読み物。ひとり立ちの小さな道具の置き場",
+      "tags": ["3D体験", "読み物"],
+      "icon": "tools"
+    },
+    {
+      "id": "my-screen",
+      "name": "マイ画面",
+      "kind": "dougu",
+      "url": "https://my-screen-theta.vercel.app",
+      "desc": "時計・阪急嵐山線の次発・天気・リンク集を、スマホの一枚に",
+      "tags": ["スマホ", "個人用"],
+      "icon": "myscreen"
+    }
+  ]
+}
