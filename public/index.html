@@ -2049,7 +2049,8 @@ function setWalk(on){
   }
   syncWalkBtn();
 }
-/* 歩いて近づいたら札が灯る（家5.2m・名所6m、離れは少し粘る） */
+/* 歩いて近づいた家・名所を控える（点列と提灯の明るさが歩きに追随する）。
+   札は出さない ―― 散歩中は景色が主役、画面の真ん中を塞がない */
 let walkShownPoi = -2;
 function updateWalkPoi(){
   let poi = -1, margin = 0;
@@ -2069,8 +2070,7 @@ function updateWalkPoi(){
   else if (bsd < 6.0 + margin) poi = bs;
   if (poi === walkShownPoi) return;
   walkShownPoi = poi;
-  if (poi < 0){ hideFuda(); return; }
-  idx = poi; paintDots(); showFuda();
+  if (poi >= 0){ idx = poi; paintDots(); }
 }
 function updateWalk(dt){
   const K = WALK.keys;
