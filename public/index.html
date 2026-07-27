@@ -402,8 +402,14 @@ const FX = {
   nagareboshi : true,   // ⑫ 流れ星
   dolly       : true,   // ⑬ 名所停留の微ドリー
   chikurin    : true,   // ⑭ 竹林の小径（町並みの先、川端まで）
-  tsukimore   : true    // ⑮ 竹の間から漏れる月あかり
+  tsukimore   : true,   // ⑮ 竹の間から漏れる月あかり
+  kawadoko    : true,   // ⑯ 対岸の納涼床（提灯の灯が水面に映る）
+  hokora      : true,   // ⑰ お地蔵さんの祠（赤前掛け・蝋燭）
+  andon       : true,   // ⑱ 辻行灯
+  okuribi     : false   // ⑲ 五山送り火「大」。葉月十六日の宵にだけ自動点灯（下で日付判定）
 };
+// 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
+if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
 
 const STREET_X = 5.0;          // 町屋の中心
 const HOUSE_W  = 3.6;          // 間口
@@ -1546,7 +1552,7 @@ const meteor = (function(){
 })();
 
 /* ============================================================
-   5c. 竹林の小径 ― 町並みが尽きてから川端まで（z -56.5〜-77.5）
+   5d. 竹林の小径 ― 町並みが尽きてから川端まで（z -56.5〜-77.5）
    ============================================================ */
 const chikurin = (function(){
   const group     = new THREE.Group();   // 稈と葉むら
@@ -1632,6 +1638,193 @@ const chikurin = (function(){
 
   scene.add(group, moonGroup);
   return { group: group, moonGroup: moonGroup, canopy: canopy, shafts: shafts, dapples: dapples, N: N };
+})();
+
+/* ============================================================
+   5e. 景の小物 ― 納涼床・地蔵の祠・辻行灯・送り火
+   ============================================================ */
+
+/* ⑯ 対岸の納涼床：西のたもと、提灯の灯が水面に伸びる */
+const kawadoko = (function(){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
+  const CX = -21, CZ = -121.8;   // 対岸の河原（z-120〜-131）の水際
+  // 床板
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.1, 3.2), wood);
+  deck.position.set(0, 0.55, 0); g.add(deck);
+  // 足（水際側の二本は川へ下りる）
+  [[-2.3, -1.4], [0, -1.4], [2.3, -1.4], [-2.3, 1.4], [0, 1.4], [2.3, 1.4]].forEach(p => {
+    const tall = p[1] < 0;   // 川側
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, tall ? 0.8 : 0.58, 6), wood);
+    leg.position.set(p[0], tall ? 0.15 : 0.26, p[1]); g.add(leg);
+  });
+  // 低い欄干（両端と山側。川側は眺めのため開ける）
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x2a1d12 });
+  [[-2.45, 0, 0.02, 3.1], [2.45, 0, 0.02, 3.1]].forEach(r => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, r[3]), railMat);
+    m.position.set(r[0], 0.92, r[2]); g.add(m);
+  });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.05, 0.05), railMat);
+  back.position.set(0, 0.92, 1.55); g.add(back);
+  [-2.45, -0.8, 0.8, 2.45].forEach(x => {
+    [[x, 1.55], [x, -1.55]].forEach(p => {
+      if (p[1] < 0 && x !== -2.45 && x !== 2.45) return;   // 川側は隅の柱だけ
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.34, 0.045), railMat);
+      post.position.set(p[0], 0.77, p[1]); g.add(post);
+    });
+  });
+  // 低い膳
+  const zen = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.24, 0.65), railMat);
+  zen.position.set(-0.4, 0.72, 0.2); g.add(zen);
+  // 提灯竿と綱、提灯二張り
+  const halos = [];
+  [[-2.3, 1.5], [2.3, 1.5]].forEach(p => {
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.06), railMat);
+    pole.position.set(p[0], 1.5, p[1]); g.add(pole);
+  });
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 4.6, 4), railMat);
+  rope.rotation.z = Math.PI / 2;
+  rope.position.set(0, 2.02, 1.5); g.add(rope);
+  [-1.3, 1.3].forEach(x => {
+    const ln = new THREE.Mesh(GEO.lantern,
+      new THREE.MeshBasicMaterial({ color: 0xffc9a0, fog: false }));
+    ln.scale.set(1, 1.3, 1);
+    ln.position.set(x, 1.78, 1.5); g.add(ln);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+      transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending,
+      depthWrite: false, fog: false }));
+    halo.scale.set(1.6, 1.6, 1);
+    halo.position.copy(ln.position); g.add(halo);
+    halos.push(halo);
+  });
+  g.position.set(CX, 0, CZ);
+  scene.add(g);
+  // 提灯の灯が水面に伸びる（床の前の川面。生き死には kawadoko と運命共同）
+  const streak = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.4, 7),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xffb87a, transparent: true,
+      opacity: 0.10, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  streak.rotation.x = -Math.PI / 2;
+  streak.position.set(0, -0.205, -116.2 - CZ);   // group 内座標（世界では床の前の川面）
+  g.add(streak);
+  return { group: g, halos: halos, streak: streak };
+})();
+
+/* ⑰ お地蔵さんの祠：肆のかたわら、東側の道ばた */
+const hokora = (function(){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({ color: 0x3b4048 });
+  const dai = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.4), stone);
+  dai.position.y = 0.09; g.add(dai);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.5, 0.36), MAT.wallDk);
+  body.position.y = 0.43; g.add(body);
+  const kuchi = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.38), MAT.dark);
+  kuchi.position.set(0, 0.44, 0.181); g.add(kuchi);
+  // お地蔵さん（赤い前掛け）
+  const jizoMat = new THREE.MeshLambertMaterial({ color: 0x9aa0ac });
+  const mi = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.22, 8), jizoMat);
+  mi.position.set(0, 0.37, 0.10); g.add(mi);
+  const atama = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), jizoMat);
+  atama.position.set(0, 0.53, 0.10); g.add(atama);
+  const maekake = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.11),
+    new THREE.MeshBasicMaterial({ color: 0xc23b30 }));
+  maekake.position.set(0, 0.41, 0.175); g.add(maekake);
+  // 二段の小屋根
+  const yane1 = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.07, 0.46), MAT.roof);
+  yane1.position.y = 0.72; g.add(yane1);
+  const yane2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.34), MAT.roofEdge);
+  yane2.position.y = 0.78; g.add(yane2);
+  // 蝋燭のあかり
+  const candle = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+    transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false }));
+  candle.scale.set(0.55, 0.55, 1);
+  candle.position.set(0, 0.42, 0.16); g.add(candle);
+  g.position.set(2.95, 0, -33.8);   // 肆の隣。停留の視線がちょうど抜ける道ばた
+  g.rotation.y = -Math.PI / 2;      // 通りへ向ける
+  scene.add(g);
+  return { group: g, candle: candle };
+})();
+
+/* ⑱ 辻行灯：伍と陸のあいだ、西側の道ばた */
+const andon = (function(){
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.05, 0.09), MAT.wallDk);
+  post.position.y = 0.52; g.add(post);
+  const hibukuro = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.34, 0.3), MAT.inner);
+  hibukuro.position.y = 1.22; g.add(hibukuro);
+  const kasa = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.38), MAT.roof);
+  kasa.position.y = 1.42; g.add(kasa);
+  const koshi = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.34), MAT.wallDk);
+  koshi.position.y = 1.03; g.add(koshi);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+    transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.set(1.3, 1.3, 1);
+  halo.position.y = 1.22; g.add(halo);
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0.11,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.02; g.add(pool);
+  g.position.set(-2.95, 0, -42);
+  scene.add(g);
+  return { group: g, halo: halo, pool: pool };
+})();
+
+/* ⑲ 五山送り火「大」：東山の中腹に火床を点で描く。葉月十六日の宵の景 */
+const okuribi = (function(){
+  const g = new THREE.Group();
+  const W = 9, H = 9.5;
+  const pts = [];
+  let seed = 816;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const jig = () => (rnd() - 0.5) * 0.3;
+  for (let i = 0; i < 12; i++){   // 一の画
+    const t = i / 11;
+    pts.push([(-0.42 + t * 0.84) * W + jig(), 0.28 * H + jig()]);
+  }
+  for (let i = 0; i < 14; i++){   // 左はらい
+    const t = i / 13;
+    pts.push([(-t * 0.5 - t * t * 0.06) * W + jig(), (0.5 - t) * H + jig()]);
+  }
+  for (let i = 0; i < 12; i++){   // 右はらい
+    const t = i / 11;
+    pts.push([(t * 0.5 + t * t * 0.04) * W + jig(), (0.08 - t * 0.58) * H + jig()]);
+  }
+  // 交互に二群へ分け、位相違いでまたたかせる
+  const A = [], B = [];
+  pts.forEach((p, i) => (i % 2 ? A : B).push(p));
+  const mk = arr => {
+    const pos = new Float32Array(arr.length * 3);
+    arr.forEach((p, i) => {
+      pos[i*3] = p[0]; pos[i*3+1] = p[1]; pos[i*3+2] = 0;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ map: TEX.glow, color: 0xff8f3e, size: 1.5,
+      sizeAttenuation: true, transparent: true, opacity: 0.75,
+      depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const p = new THREE.Points(geo, mat);
+    // 横へ42ずれているぶん重心距離が稜線板より遠くなり、距離ソートだと
+    // 火→稜線の順に描かれて山の黒に塗り潰される。必ず稜線の後に描く
+    p.renderOrder = 2;
+    g.add(p);
+    return mat;
+  };
+  const matA = mk(A), matB = mk(B);
+  // 山肌のほのかな照り
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xff7c30,
+    transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending,
+    depthWrite: false, fog: false }));
+  glow.scale.set(16, 12, 1);
+  glow.renderOrder = 2;   // 火床と同じく稜線の後に
+  g.add(glow);
+  // 東の峰（中心 x+40, z-172 の山体）の川向きの山腹に置く。如意ヶ嶽の見立て。
+  // 遠景の稜線板(z-195)は西の高峰にも東の峰にも遮られるため、
+  // いちばん手前で深度を書くこの峰の斜面そのものをキャンバスにする（表面から1.5手前）
+  g.position.set(24.5, 7.5, -144.5);
+  scene.add(g);
+  return { group: g, matA: matA, matB: matB, glow: glow, count: pts.length };
 })();
 
 /* ============================================================
@@ -2292,6 +2485,32 @@ function update(dt){
     });
   }
 
+  // ⑯ 納涼床の提灯／⑰ 祠の蝋燭／⑱ 辻行灯：それぞれ小さくまたたく
+  kawadoko.group.visible = FX.kawadoko;
+  if (FX.kawadoko){
+    kawadoko.halos.forEach((h, k) => {
+      h.material.opacity = 0.30 + Math.sin(elapsed * 3.1 + k * 2.2) * 0.08;
+    });
+    kawadoko.streak.material.opacity = 0.10 + Math.sin(elapsed * 2.5) * 0.025;
+  }
+  hokora.group.visible = FX.hokora;
+  if (FX.hokora){
+    hokora.candle.material.opacity = 0.20 + Math.sin(elapsed * 8.1) * 0.05
+                                          + Math.sin(elapsed * 3.3) * 0.03;
+  }
+  andon.group.visible = FX.andon;
+  if (FX.andon){
+    andon.halo.material.opacity = 0.30 + Math.sin(elapsed * 3.9) * 0.07;
+    andon.pool.material.opacity = 0.11 + Math.sin(elapsed * 3.9 + 0.7) * 0.03;
+  }
+  // ⑲ 送り火：葉月十六日の宵にだけ「大」が燃える（試灯は __machiya.FX.okuribi）
+  okuribi.group.visible = FX.okuribi;
+  if (FX.okuribi){
+    okuribi.matA.opacity = 0.72 + Math.sin(elapsed * 6.7) * 0.18 + Math.sin(elapsed * 13.1) * 0.06;
+    okuribi.matB.opacity = 0.72 + Math.sin(elapsed * 7.9 + 2.1) * 0.18 + Math.sin(elapsed * 11.3 + 1) * 0.06;
+    okuribi.glow.material.opacity = 0.07 + Math.sin(elapsed * 1.7) * 0.02;
+  }
+
   // 宵の音：場所に合わせて聞こえ方を寄せていく
   updateSoundMix();
 
@@ -2395,6 +2614,7 @@ window.__machiya = {
                   walkers: walkers.length, kodachi: kodachiPlanes.length,
                   take: chikurin.N, sasa: chikurin.canopy.length,
                   shafts: chikurin.shafts.length,
+                  okuribiHi: okuribi.count,
                   meteorOn: meteor ? meteor.life >= 0 : false },
       fudaOn: fuda.classList.contains('on'),
       fudaView: fuda.classList.contains('view'),
@@ -2454,6 +2674,7 @@ window.__machiya = {
   goTo: function(i){ goTo(i, true); return idx; },
   setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; },
   FX: FX,
+  okuribi: okuribi,   // 試灯と赤入れ用（FX.okuribi=true と合わせて使う）
   /* 宵の音の計測口：state で混合値、level で出力RMS、kane で鐘を即打ち */
   snd: {
     SND: SND,
