@@ -285,6 +285,7 @@
   <div class="dots" id="dots"></div>
   <button id="btn-next" aria-label="次の町屋へ">▶</button>
   <button id="btn-auto" aria-pressed="true">自動で流す</button>
+  <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
 </div>
 
 <div id="fallback">
@@ -1869,6 +1870,202 @@ renderer.domElement.addEventListener('pointerdown', ev => {
 });
 
 /* ============================================================
+   9b. 宵の音 ― Web Audio 合成（音源ファイル無し）
+   川のせせらぎ・鈴虫とこおろぎ・笹の葉ずれ・遠くの鐘。
+   ブラウザの自動再生制限があるため、初回は必ず「♪ 音を灯す」から。
+   ============================================================ */
+const SND = {
+  on   : false,   // 全体（ボタンで灯す・消す）
+  kawa : true,    // 川のせせらぎ（側溝の水音が基調。川端に近づくほど満ちる）
+  mushi: true,    // 鈴虫・こおろぎ（通り側）
+  sasa : true,    // 笹の葉ずれ（竹林の小径だけ）
+  kane : true     // 遠くの鐘（50〜110秒にひとつ）
+};
+let AC = null;                // AudioContext。初回の操作で作る
+const sndNodes = {};
+const sndBtn = document.getElementById('btn-snd');
+
+/* 梵鐘：不整数倍音の重ね合わせ。低い唸りが長く残ると「遠くの鐘」になる */
+function strikeKane(){
+  if (!AC || !SND.on || !SND.kane || AC.state !== 'running') return false;
+  const t = AC.currentTime;
+  const f0 = 106 + Math.random() * 8;
+  // [倍率, 強さ, 減衰秒]
+  [[1, 1, 10], [2.0, 0.5, 7], [2.67, 0.3, 5], [3.01, 0.2, 4], [4.07, 0.12, 2.6], [5.43, 0.06, 1.8]]
+  .forEach(p => {
+    const o = AC.createOscillator();
+    o.frequency.value = f0 * p[0] * (1 + (Math.random() - 0.5) * 0.004);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.16 * p[1], t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+    o.connect(g); g.connect(sndNodes.kaneBus);
+    o.start(t); o.stop(t + p[2] + 0.1);
+  });
+  return true;
+}
+
+/* 出力の実効値（RMS）。耳で確かめられない環境向けの計測口 */
+function sndLevel(){
+  if (!AC) return null;
+  const a = sndNodes.analyser;
+  const buf = new Float32Array(a.fftSize);
+  if (a.getFloatTimeDomainData){
+    a.getFloatTimeDomainData(buf);
+  } else {
+    const b8 = new Uint8Array(a.fftSize);
+    a.getByteTimeDomainData(b8);
+    for (let i = 0; i < b8.length; i++) buf[i] = (b8[i] - 128) / 128;
+  }
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.sqrt(s / buf.length);
+}
+
+function buildSound(){
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  const master = AC.createGain(); master.gain.value = 0.55;
+  const analyser = AC.createAnalyser(); analyser.fftSize = 2048;
+  master.connect(analyser); analyser.connect(AC.destination);
+  sndNodes.master = master; sndNodes.analyser = analyser;
+
+  // ノイズの種（2秒ループ）。川・笹はここから濾して作る
+  const nbuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+  const nd = nbuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const noiseSrc = () => {
+    const s = AC.createBufferSource();
+    s.buffer = nbuf; s.loop = true;
+    return s;
+  };
+
+  // ── 川のせせらぎ：低いゴウ＋高めのサラサラを LFO でゆらす ──
+  const kawaBus = AC.createGain(); kawaBus.gain.value = 0; kawaBus.connect(master);
+  sndNodes.kawaBus = kawaBus;
+  const low = AC.createBiquadFilter(); low.type = 'lowpass'; low.frequency.value = 620; low.Q.value = 0.7;
+  const lowG = AC.createGain(); lowG.gain.value = 0.5;
+  const n1 = noiseSrc(); n1.connect(low); low.connect(lowG); lowG.connect(kawaBus); n1.start();
+  const band = AC.createBiquadFilter(); band.type = 'bandpass'; band.frequency.value = 1900; band.Q.value = 0.9;
+  const burG = AC.createGain(); burG.gain.value = 0.28;
+  const n2 = noiseSrc(); n2.connect(band); band.connect(burG); burG.connect(kawaBus); n2.start(0, 0.7);
+  const lfo1 = AC.createOscillator(); lfo1.frequency.value = 0.22;
+  const lfo1G = AC.createGain(); lfo1G.gain.value = 0.16;
+  lfo1.connect(lfo1G); lfo1G.connect(burG.gain); lfo1.start();
+
+  // ── 笹の葉ずれ：竹林の小径でだけ、風がまとまって通る ──
+  const sasaG = AC.createGain(); sasaG.gain.value = 0; sasaG.connect(master);
+  sndNodes.sasaG = sasaG;
+  const sasaF = AC.createBiquadFilter(); sasaF.type = 'bandpass'; sasaF.frequency.value = 2700; sasaF.Q.value = 0.5;
+  const windG = AC.createGain(); windG.gain.value = 0.6;
+  const n3 = noiseSrc(); n3.connect(sasaF); sasaF.connect(windG); windG.connect(sasaG); n3.start(0, 1.3);
+  const lfo2 = AC.createOscillator(); lfo2.frequency.value = 0.13;
+  const lfo2G = AC.createGain(); lfo2G.gain.value = 0.4;
+  lfo2.connect(lfo2G); lfo2G.connect(windG.gain); lfo2.start();
+
+  // ── 鈴虫二匹とこおろぎ一匹 ──
+  const mushiBus = AC.createGain(); mushiBus.gain.value = 0; mushiBus.connect(master);
+  sndNodes.mushiBus = mushiBus;
+  const voices = [
+    { f: 4300, trem: 32, pan: -0.4, amp: 0.05, kind: 'suzu' },
+    { f: 4800, trem: 27, pan:  0.5, amp: 0.04, kind: 'suzu' },
+    { f: 2150, trem:  0, pan:  0.15, amp: 0.06, kind: 'koro' }
+  ];
+  voices.forEach(v => {
+    const o = AC.createOscillator(); o.frequency.value = v.f;
+    const trm = AC.createGain(); trm.gain.value = v.trem ? 0.55 : 1.0;
+    if (v.trem){
+      const to = AC.createOscillator(); to.frequency.value = v.trem;
+      const tg = AC.createGain(); tg.gain.value = 0.45;
+      to.connect(tg); tg.connect(trm.gain); to.start();
+    }
+    const env = AC.createGain(); env.gain.value = 0;
+    o.connect(trm); trm.connect(env); o.start();
+    let tail = env;
+    if (AC.createStereoPanner){
+      const pan = AC.createStereoPanner(); pan.pan.value = v.pan;
+      env.connect(pan); tail = pan;
+    }
+    tail.connect(mushiBus);
+    v.env = env;
+    // 鳴いて、休んで、また鳴く（フラグが消えている間は待つだけ）
+    const chirp = () => {
+      let next;
+      if (SND.on && SND.mushi && AC.state === 'running'){
+        const t = AC.currentTime, e = v.env.gain;
+        e.cancelScheduledValues(t);
+        e.setValueAtTime(0, t);
+        if (v.kind === 'suzu'){
+          const dur = 0.6 + Math.random() * 0.7;
+          e.linearRampToValueAtTime(v.amp, t + 0.06);
+          e.setValueAtTime(v.amp, t + dur - 0.12);
+          e.linearRampToValueAtTime(0, t + dur);
+          next = dur + 0.4 + Math.random() * 1.6;
+        } else {
+          const n = 3 + Math.floor(Math.random() * 3);   // コロコロ…と三〜五連
+          for (let k = 0; k < n; k++){
+            const s = t + k * 0.14;
+            e.linearRampToValueAtTime(v.amp, s + 0.02);
+            e.linearRampToValueAtTime(0, s + 0.10);
+          }
+          next = n * 0.14 + 0.8 + Math.random() * 1.8;
+        }
+      } else next = 0.8;
+      setTimeout(chirp, next * 1000);
+    };
+    chirp();
+  });
+
+  // ── 遠くの鐘：低域を残して、短い残響をひとさじ ──
+  const kaneBus = AC.createGain(); kaneBus.gain.value = 1;
+  sndNodes.kaneBus = kaneBus;
+  const kaneLp = AC.createBiquadFilter(); kaneLp.type = 'lowpass'; kaneLp.frequency.value = 950;
+  kaneBus.connect(kaneLp); kaneLp.connect(master);
+  const dly = AC.createDelay(1.0); dly.delayTime.value = 0.23;
+  const fb = AC.createGain(); fb.gain.value = 0.32;
+  const wet = AC.createGain(); wet.gain.value = 0.22;
+  kaneLp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master);
+  const kaneLoop = () => {
+    strikeKane();
+    setTimeout(kaneLoop, (50 + Math.random() * 60) * 1000);
+  };
+  setTimeout(kaneLoop, (12 + Math.random() * 8) * 1000);   // 最初のひとつは灯して十数秒後
+}
+
+/* 場所で聞こえ方が変わる（毎フレーム。灯していない間は何もしない） */
+function updateSoundMix(){
+  if (!AC || !SND.on) return;
+  const z = camera.position.z;
+  // 川：通りでは側溝の水音がかすかに、z-30 から川の気配、川端 z-78 で満ちる
+  const rv = Math.min(1, Math.max(0, (-z - 30) / 48));
+  const kawaT = SND.kawa ? 0.05 + 0.20 * rv * rv : 0;
+  // 虫：通りで満ち、川端では控えめに
+  const mushiT = SND.mushi ? 1 - 0.75 * Math.min(1, Math.max(0, (-z - 48) / 32)) : 0;
+  // 笹：竹林（z-56〜-78）でだけ山なりに
+  const sasaT = SND.sasa ? 0.14 * Math.max(0, 1 - Math.abs(-z - 67) / 13) : 0;
+  const k = 0.06;
+  sndNodes.kawaBus.gain.value  += (kawaT  - sndNodes.kawaBus.gain.value)  * k;
+  sndNodes.mushiBus.gain.value += (mushiT - sndNodes.mushiBus.gain.value) * k;
+  sndNodes.sasaG.gain.value    += (sasaT  - sndNodes.sasaG.gain.value)    * k;
+}
+
+function syncSndBtn(){
+  sndBtn.textContent = SND.on ? '♪ 音を消す' : '♪ 音を灯す';
+  sndBtn.setAttribute('aria-pressed', String(SND.on));
+}
+sndBtn.addEventListener('click', () => {
+  if (!AC) buildSound();
+  SND.on = !SND.on;
+  if (SND.on) AC.resume(); else AC.suspend();
+  syncSndBtn();
+  layoutBottom();   // ボタン幅が変わって段組みが動くことがある
+});
+// 画面を離れている間は鳴らさない
+document.addEventListener('visibilitychange', () => {
+  if (!AC || !SND.on) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============================================================
    10. 毎フレーム
    ============================================================ */
 const clock = new THREE.Clock();
@@ -2095,6 +2292,9 @@ function update(dt){
     });
   }
 
+  // 宵の音：場所に合わせて聞こえ方を寄せていく
+  updateSoundMix();
+
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
   cat.rotation.y = (HOUSES[2].side < 0 ? Math.PI / 2 : -Math.PI / 2)
@@ -2253,7 +2453,25 @@ window.__machiya = {
   },
   goTo: function(i){ goTo(i, true); return idx; },
   setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; },
-  FX: FX
+  FX: FX,
+  /* 宵の音の計測口：state で混合値、level で出力RMS、kane で鐘を即打ち */
+  snd: {
+    SND: SND,
+    state: function(){
+      return {
+        created: !!AC,
+        ctx: AC ? AC.state : null,
+        on: SND.on,
+        mix: AC ? {
+          kawa : +sndNodes.kawaBus.gain.value.toFixed(4),
+          mushi: +sndNodes.mushiBus.gain.value.toFixed(4),
+          sasa : +sndNodes.sasaG.gain.value.toFixed(4)
+        } : null
+      };
+    },
+    level: sndLevel,
+    kane: function(){ return strikeKane(); }
+  }
 };
 
 })();
