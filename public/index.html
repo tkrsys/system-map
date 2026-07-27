@@ -375,7 +375,11 @@ const SPOTS = [
   { kanji:'拾', view:true, name:'嵐山',
     desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
     tags:['嵐山','宿の灯'],
-    pos:[-2.2, 1.62, -124.8], tgt:[-38, 20, -157] }
+    pos:[-2.2, 1.62, -124.8], tgt:[-38, 20, -157] },
+  { kanji:'拾壱', view:true, name:'塔の舞台',
+    desc:'石段をのぼると、塔のたもとの見晴らし台。渡月橋と月の道、来た道の提灯の列が眼下にひらける',
+    tags:['法輪寺の見立て','見晴らし'],
+    pos:[-13, 6.82, -134.5], tgt:[2, 0.5, -104] }
 ];
 const NH = HOUSES.length;
 const TOUR = HOUSES.concat(SPOTS);
@@ -1038,6 +1042,12 @@ const RIVER_Z0  = -90,  RIVER_Z1  = -120;   // 川の岸から岸
 const BRIDGE_Z0 = -88,  BRIDGE_Z1 = -122;   // 橋の袂から袂
 const BRIDGE_L  = BRIDGE_Z0 - BRIDGE_Z1;
 const deckY = t => 0.72 + 0.46 * Math.sin(Math.PI * t);   // 橋の緩いむくり（中央がわずかに高い）
+/* 参道の勾配（石段 z-127→-133.5 で床 0→5.2）。塔の舞台(5f)と歩き(8b)の両方が使う */
+const SANDO = { z0: -127, z1: -133.5, rise: 5.2 };
+function sandoFloor(z){
+  const t = Math.min(1, Math.max(0, (SANDO.z0 - z) / (SANDO.z0 - SANDO.z1)));
+  return t * SANDO.rise;
+}
 
 /* 河原・対岸・山裾（石畳はここで土の色に変わる） */
 const MAT_KAWARA = new THREE.MeshLambertMaterial({ color:0x171c26 });
@@ -1822,6 +1832,160 @@ const okuribi = (function(){
 })();
 
 /* ============================================================
+   5f. 塔の舞台 ― 物見の丘・参道の石段・懸造の舞台・三重塔
+   （法輪寺の見立て。丘は三峰と同じ作法の半球で、山裾に馴染ませる）
+   ============================================================ */
+const butai = (function(){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({ color: 0x2e333d });
+  const hillMat = new THREE.MeshLambertMaterial({ color: 0x131c29 });
+
+  // ── 物見の丘（頂 4.95。舞台と塔の土台になる） ──
+  const knoll = new THREE.Mesh(
+    new THREE.SphereGeometry(11, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), hillMat);
+  knoll.scale.set(1, 0.45, 0.75);
+  knoll.position.set(-19, 0, -140);
+  g.add(knoll);
+
+  // ── 参道の石段（18段を一描画に） ──
+  const STEPS = 18;
+  const stepGeo = new THREE.BoxGeometry(3.0, 0.32, 0.42);
+  const steps = new THREE.InstancedMesh(stepGeo, stone, STEPS);
+  steps.frustumCulled = false;
+  const m4 = new THREE.Matrix4();
+  for (let k = 0; k < STEPS; k++){
+    const z = SANDO.z0 - (k + 0.5) * ((SANDO.z0 - SANDO.z1) / STEPS);
+    const top = (k + 1) * (SANDO.rise / STEPS);
+    m4.makeTranslation(-10.3, top - 0.16, z);
+    steps.setMatrixAt(k, m4);
+  }
+  steps.instanceMatrix.needsUpdate = true;
+  g.add(steps);
+  // 石段の下の斜面埋めと、両脇の石垣
+  const slopeLen = Math.hypot(SANDO.z0 - SANDO.z1, SANDO.rise) + 1.4;
+  const slopeAng = Math.atan2(SANDO.rise, SANDO.z0 - SANDO.z1);
+  const under = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.45, slopeLen), hillMat);
+  under.rotation.x = -slopeAng;
+  under.position.set(-10.3, SANDO.rise / 2 - 0.35, (SANDO.z0 + SANDO.z1) / 2);
+  g.add(under);
+  [-11.95, -8.65].forEach(x => {
+    const w = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.7, slopeLen), stone);
+    w.rotation.x = -slopeAng;
+    w.position.set(x, SANDO.rise / 2 + 0.1, (SANDO.z0 + SANDO.z1) / 2);
+    g.add(w);
+  });
+
+  // ── 舞台（懸造）。床 5.2・北向きに渡月橋と通りを見晴らす ──
+  const FLOOR = SANDO.rise;
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.22, 4.2), MAT.wallDk);
+  deck.position.set(-15, FLOOR - 0.11, -135.5);
+  g.add(deck);
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x2a1d12 });
+  // 欄干（北・東・西。南は丘と塔につながる）
+  [[[-15, -133.55], 12.2, 0],
+   [[-9.05, -135.5], 4.2, 1],
+   [[-20.95, -135.5], 4.2, 1]].forEach(r => {
+    [0.42, 0.78].forEach(h => {
+      const b = new THREE.Mesh(
+        new THREE.BoxGeometry(r[2] ? 0.06 : r[1], 0.06, r[2] ? r[1] : 0.06), railMat);
+      b.position.set(r[0][0], FLOOR + h, r[0][1]);
+      g.add(b);
+    });
+  });
+  for (let i = 0; i < 7; i++){
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.84, 0.07), railMat);
+    p.position.set(-20.9 + i * (11.8 / 6), FLOOR + 0.42, -133.56);
+    g.add(p);
+  }
+  [[-9.05, -134.4], [-9.05, -136.6], [-20.95, -134.4], [-20.95, -136.6]].forEach(p => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.84, 0.07), railMat);
+    b.position.set(p[0], FLOOR + 0.42, p[1]);
+    g.add(b);
+  });
+  // 懸造の柱と貫（前縁から地面へ）
+  for (let i = 0; i < 5; i++){
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.16, FLOOR, 0.16), railMat);
+    p.position.set(-20 + i * 2.5, FLOOR / 2 - 0.1, -133.8);
+    g.add(p);
+  }
+  const nuki = new THREE.Mesh(new THREE.BoxGeometry(11, 0.12, 0.1), railMat);
+  nuki.position.set(-15, FLOOR * 0.45, -133.78);
+  g.add(nuki);
+  // 床下の闇（丘とのすき間を見せない）
+  const dark = new THREE.Mesh(new THREE.BoxGeometry(11.8, FLOOR, 3.6), MAT.dark);
+  dark.position.set(-15, FLOOR / 2 - 0.12, -135.7);
+  g.add(dark);
+
+  // ── 三重塔（舞台の南・丘の頂に建つ） ──
+  const TX = -16.5, TZ = -139.8;
+  const tou = new THREE.Group();
+  const kame = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.5, 4.4), stone);
+  kame.position.y = 5.25; tou.add(kame);
+  // [幅, 高さ, 屋根半径, 屋根高]（下から）
+  const tiers = [[3.1, 1.75, 2.85, 0.95], [2.5, 1.4, 2.35, 0.85], [2.0, 1.3, 2.0, 0.9]];
+  let baseY = 6.0;
+  tiers.forEach((t, i) => {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(t[0], t[1], t[0]), MAT.wallDk);
+    body.position.y = baseY + t[1] / 2; tou.add(body);
+    if (i === 0){
+      const en = new THREE.Mesh(new THREE.BoxGeometry(t[0] + 0.6, 0.12, t[0] + 0.6), railMat);
+      en.position.y = baseY + 0.16; tou.add(en);
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(t[2], t[3], 4), MAT.roof);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = baseY + t[1] - 0.1 + t[3] / 2; tou.add(roof);
+    baseY += t[1] + t[3] * 0.55;
+  });
+  // 相輪（先で小さく光る）
+  const sorinMat = new THREE.MeshLambertMaterial({ color: 0x6a5a30 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.3, 6), sorinMat);
+  pole.position.y = baseY + 1.0; tou.add(pole);
+  for (let i = 0; i < 5; i++){
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.27 - i * 0.035, 0.27 - i * 0.035, 0.05, 8), sorinMat);
+    ring.position.y = baseY + 0.55 + i * 0.26; tou.add(ring);
+  }
+  const hoju = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), sorinMat);
+  hoju.position.y = baseY + 2.1; tou.add(hoju);
+  const hojuGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+    transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending,
+    depthWrite: false, fog: false }));
+  hojuGlow.scale.set(0.9, 0.9, 1);
+  hojuGlow.position.y = baseY + 2.1; tou.add(hojuGlow);
+  // 初層のあかり（北面＝舞台側に扉と連子窓の灯）
+  const tobira = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.15), MAT.dark);
+  tobira.position.set(0, 6.65, tiers[0][0] / 2 + 0.01); tou.add(tobira);
+  [-0.95, 0.95].forEach(x => {
+    const mado = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.55), MAT.inner);
+    mado.position.set(x, 6.75, tiers[0][0] / 2 + 0.01); tou.add(mado);
+  });
+  const toGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+    transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false }));
+  toGlow.scale.set(2.4, 1.7, 1);
+  toGlow.position.set(0, 6.8, tiers[0][0] / 2 + 0.3); tou.add(toGlow);
+  tou.position.set(TX, 0, TZ);
+  g.add(tou);
+
+  // ── 舞台の両隅の灯篭 ──
+  const halos = [];
+  [[-10.2, -134.2], [-19.8, -134.2]].forEach(p => {
+    const sao = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), stone);
+    sao.position.set(p[0], FLOOR + 0.26, p[1]); g.add(sao);
+    const hib = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.26, 0.3), MAT.inner);
+    hib.position.set(p[0], FLOOR + 0.65, p[1]); g.add(hib);
+    const kasa = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.42), stone);
+    kasa.position.set(p[0], FLOOR + 0.83, p[1]); g.add(kasa);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+      transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.set(1.2, 1.2, 1);
+    halo.position.set(p[0], FLOOR + 0.66, p[1]); g.add(halo);
+    halos.push(halo);
+  });
+
+  scene.add(g);
+  return { group: g, halos: halos, glowSprites: [hojuGlow, toGlow], topY: baseY + 2.1 };
+})();
+
+/* ============================================================
    6. 屋根の猫（参の町屋に一匹）
    ============================================================ */
 const cat = (function(){
@@ -1926,9 +2090,11 @@ function updateCamera(dt){
   if (phase === 'travel'){
     t = Math.min(1, t + dt / TRAVEL_S);
     const e = smooth(t);
-    // 通りの真ん中をふくらんで進む（ベジェ）。嵐山から通りへの長い戻りは屋根の上を飛んで帰る
+    // 通りの真ん中をふくらんで進む（ベジェ）。長い戻りは屋根の上、
+    // 塔の舞台（高所）への出入りは石段の上を高めに飛んで、丘に潜らない
     const span = Math.abs(fromPos.z - s.pos.z);
-    ctrl.set(0, span > 60 ? 12 : 1.6, (fromPos.z + s.pos.z) / 2);
+    const hi = Math.max(fromPos.y, s.pos.y) > 5;
+    ctrl.set(0, span > 60 ? 12 : (hi ? 11 : 1.6), (fromPos.z + s.pos.z) / 2);
     const u = 1 - e;
     camera.position.set(
       u*u*fromPos.x + 2*u*e*ctrl.x + e*e*s.pos.x,
@@ -1974,8 +2140,11 @@ const WALK_ZONES = [
   { x0: -1.85, x1: 1.85, z0:   3.4, z1:  -77.8 },   // 通りと竹林の小径
   { x0: -26,   x1: 26,   z0: -77.8, z1:  -88.4 },   // 川端の河原
   { x0: -1.15, x1: 1.15, z0: -88.4, z1: -121.6 },   // 渡月橋の上
-  { x0: -17,   x1: 10,   z0: -121.6, z1: -127  }    // 対岸（納涼床の手前まで）
+  { x0: -17,   x1: 10,   z0: -121.6, z1: -127  },   // 対岸（納涼床の手前まで）
+  { x0: -11.8, x1: -8.8, z0: -127,  z1: -133.5 },   // 参道の石段（物見の丘へ）
+  { x0: -21,   x1: -9,   z0: -133.5, z1: -137.5 }   // 塔の舞台
 ];
+/* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
   return WALK_ZONES.some(r => x >= r.x0 && x <= r.x1 && z <= r.z0 && z >= r.z1);
 }
@@ -1989,11 +2158,17 @@ function clampToWalkable(x, z){
   });
   return best;
 }
-/* 立ち位置の目の高さ（橋の上はむくりに沿う） */
+/* 立ち位置の目の高さ（橋の上はむくり、参道は石段の勾配、舞台は高所に沿う） */
 function walkEyeY(x, z){
   if (z <= BRIDGE_Z0 - 0.4 && z >= BRIDGE_Z1 + 0.4 && Math.abs(x) < 2.2){
     const t = Math.min(1, Math.max(0, (BRIDGE_Z0 - z) / BRIDGE_L));
     return deckY(t) + 1.5;
+  }
+  if (z <= SANDO.z0 && z >= SANDO.z1 && x >= -11.8 && x <= -8.8){
+    return 1.62 + sandoFloor(z);                    // 参道の石段
+  }
+  if (z < SANDO.z1 && z >= -137.5 && x >= -21 && x <= -9){
+    return 1.62 + SANDO.rise;                       // 塔の舞台
   }
   return 1.62;
 }
@@ -2007,6 +2182,10 @@ function groundPointFromRay(){
     let gy = 0;
     if (pz <= BRIDGE_Z0 && pz >= BRIDGE_Z1 && Math.abs(px) < 2.2){
       gy = deckY(Math.min(1, Math.max(0, (BRIDGE_Z0 - pz) / BRIDGE_L)));
+    } else if (pz <= SANDO.z0 && pz >= SANDO.z1 && px >= -11.8 && px <= -8.8){
+      gy = sandoFloor(pz);                          // 石段の面
+    } else if (pz < SANDO.z1 && pz >= -137.5 && px >= -21 && px <= -9){
+      gy = SANDO.rise;                              // 舞台の床
     }
     if (py <= gy + 0.03) return { x: px, z: pz };
     s += 0.4;
@@ -2747,6 +2926,11 @@ function update(dt){
     andon.halo.material.opacity = 0.30 + Math.sin(elapsed * 3.9) * 0.07;
     andon.pool.material.opacity = 0.11 + Math.sin(elapsed * 3.9 + 0.7) * 0.03;
   }
+  // 塔の舞台：灯篭と初層の灯がまたたく
+  butai.halos.forEach((h, k) => {
+    h.material.opacity = 0.30 + Math.sin(elapsed * 3.5 + k * 2.6) * 0.07;
+  });
+  butai.glowSprites[1].material.opacity = 0.24 + Math.sin(elapsed * 2.9) * 0.05;
   // ⑲ 送り火：葉月十六日の宵にだけ「大」が燃える（試灯は __machiya.FX.okuribi）
   okuribi.group.visible = FX.okuribi;
   if (FX.okuribi){
