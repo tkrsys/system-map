@@ -21,22 +21,13 @@
   #stage{position:fixed; inset:0}
   #stage canvas{display:block; width:100%; height:100%}
 
-  /* ===== 見出し（上） ===== */
+  /* ===== 上：御絵図への渡し ===== */
   .topbar{
     position:fixed; top:0; left:0; right:0; z-index:10;
-    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    display:flex; justify-content:flex-end;
     padding:18px 22px;
     background:linear-gradient(180deg, rgba(4,8,18,0.82) 0%, rgba(4,8,18,0) 100%);
     pointer-events:none;
-  }
-  .topbar .ttl{
-    font-size:19px; letter-spacing:7px;
-    color:var(--akari-strong);
-    text-shadow:0 0 16px rgba(255,215,138,0.5);
-  }
-  .topbar .sub{
-    margin-top:5px; font-size:11.5px; letter-spacing:3px;
-    color:var(--kogane); opacity:0.85;
   }
   .topbar a{
     pointer-events:auto;
@@ -49,20 +40,88 @@
   }
   .topbar a:hover{ color:var(--akari-strong); border-color:var(--akari-strong) }
 
-  /* ===== 町屋の札（下） ===== */
+  /* ===== 題字（縦書きの掛け軸＋落款） ===== */
+  .tate{
+    position:fixed; top:16px; left:18px; z-index:10;
+    display:flex; flex-direction:row-reverse; align-items:flex-start; gap:10px;
+    pointer-events:none;
+  }
+  .tate .t-main, .tate .t-sub, .tate .t-toki{ writing-mode:vertical-rl }
+  .tate .t-main{
+    font-size:21px; font-weight:600; letter-spacing:10px;
+    color:var(--akari-strong);
+    text-shadow:0 0 16px rgba(255,215,138,0.5), 0 1px 3px rgba(0,0,0,0.9);
+  }
+  .tate .t-sub{
+    padding-top:30px;
+    font-size:12px; letter-spacing:5px;
+    color:var(--kogane); opacity:0.9;
+    text-shadow:0 1px 3px rgba(0,0,0,0.9);
+  }
+  .tate .t-toki{
+    padding-top:58px;
+    font-size:10.5px; letter-spacing:4px;
+    color:#9FB8D8; opacity:0.85;
+    text-shadow:0 1px 3px rgba(0,0,0,0.9);
+  }
+  .tate .t-brand{
+    align-self:flex-end;
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+  }
+  .tate .stamp{
+    width:34px; height:34px;
+    display:grid; grid-template-columns:1fr 1fr; place-items:center;
+    background:linear-gradient(135deg, #C2402F, #A32E22);
+    color:#F7ECD9; font-size:12.5px; font-weight:700; line-height:1;
+    border-radius:4px 6px 3px 7px;
+    transform:rotate(-2.5deg);
+    box-shadow:inset 0 0 0 1.5px rgba(58,12,8,0.35), 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .tate .stamp i{ font-style:normal }
+  .tate .t-en{ font-size:8.5px; letter-spacing:2px; color:var(--kogane); opacity:0.55 }
+
+  /* ===== 迎え言葉（開幕にふわりと出て消える） ===== */
+  .okoshi{
+    position:fixed; left:50%; top:36%; z-index:12;
+    transform:translate(-50%,-50%);
+    font-size:26px; letter-spacing:14px; text-indent:14px;
+    color:var(--akari-strong);
+    text-shadow:0 0 22px rgba(255,215,138,0.65), 0 0 4px rgba(0,0,0,0.8);
+    opacity:0; pointer-events:none; white-space:nowrap;
+    animation:okoshi 4.6s ease 0.5s forwards;
+  }
+  @keyframes okoshi{
+    0%  { opacity:0; letter-spacing:8px;  text-indent:8px }
+    22% { opacity:0.96 }
+    64% { opacity:0.9 }
+    100%{ opacity:0; letter-spacing:15px; text-indent:15px }
+  }
+
+  /* ===== 町屋の札（下・木札仕立て） ===== */
   .fuda{
     position:fixed; left:50%; bottom:92px; z-index:10;
     transform:translateX(-50%) translateY(14px);
     width:min(520px, calc(100vw - 32px));
     padding:18px 22px 20px;
-    background:linear-gradient(180deg, rgba(16,26,46,0.94), rgba(8,14,28,0.96));
-    border:1px solid rgba(232,185,91,0.4);
+    background:
+      repeating-linear-gradient(92deg, rgba(255,214,150,0.03) 0 2px, rgba(0,0,0,0) 2px 7px),
+      repeating-linear-gradient(88deg, rgba(0,0,0,0.14) 0 1px, rgba(0,0,0,0) 1px 11px),
+      linear-gradient(180deg, rgba(44,32,18,0.94), rgba(24,16,9,0.96));
+    border:1px solid rgba(176,136,78,0.5);
     border-top:3px solid var(--kogane);
     border-radius:3px;
-    box-shadow:0 0 44px rgba(0,0,0,0.75), 0 0 22px rgba(232,185,91,0.12);
+    box-shadow:0 0 44px rgba(0,0,0,0.75), 0 0 22px rgba(232,185,91,0.12), inset 0 0 36px rgba(0,0,0,0.45);
     opacity:0; transition:opacity .5s ease, transform .5s ease;
     pointer-events:none;
   }
+  /* 木札の鋲（かざり釘） */
+  .fuda::before, .fuda::after{
+    content:""; position:absolute; top:10px; width:7px; height:7px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #F2DCA2, #7d5d28 72%);
+    box-shadow:0 1px 2px rgba(0,0,0,0.7);
+  }
+  .fuda::before{ left:10px }
+  .fuda::after{ right:10px }
   .fuda.on{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto }
   .fuda.kaigo { border-top-color:var(--shu) }
   .fuda.hou   { border-top-color:var(--ai-light) }
@@ -169,8 +228,12 @@
 
   @media (max-width:560px){
     .topbar{ padding:12px 14px }
-    .topbar .ttl{ font-size:15px; letter-spacing:4px }
-    .topbar .sub{ font-size:10.5px; letter-spacing:1.5px }
+    .tate{ top:12px; left:12px; gap:7px }
+    .tate .t-main{ font-size:15px; letter-spacing:6px }
+    .tate .t-sub{ font-size:10.5px; letter-spacing:3px; padding-top:22px }
+    .tate .t-toki{ font-size:9.5px; letter-spacing:3px; padding-top:40px }
+    .tate .stamp{ width:28px; height:28px; font-size:10.5px }
+    .okoshi{ font-size:19px; letter-spacing:9px; text-indent:9px }
     .fuda{ bottom:84px; padding:15px 16px 17px }
     .fuda h2{ font-size:16.5px }
     .fuda .desc{ font-size:13px }
@@ -180,6 +243,10 @@
     .kaji .dots{ order:9; width:100%; justify-content:center }
     .hint{ display:none }
   }
+  /* 背の低い画面（横持ちの電話など）では題字の列を畳む */
+  @media (max-height:480px){
+    .tate .t-sub, .tate .t-toki, .tate .t-brand{ display:none }
+  }
 </style>
 </head>
 <body>
@@ -187,12 +254,21 @@
 <div id="stage"></div>
 
 <div class="topbar">
-  <div>
-    <div class="ttl">京 町 屋 を 歩 く</div>
-    <div class="sub">tkrsys ― 七 軒 の 灯 を た ず ね て 、 渡 月 橋 ま で</div>
-  </div>
   <a href="./ezu.html">一覧（御絵図）へ</a>
 </div>
+
+<!-- 題字は掛け軸ふうの縦書きに。落款（朱印）が屋号を担う -->
+<div class="tate">
+  <h1 class="t-main">京町屋を歩く</h1>
+  <div class="t-sub">七軒の灯をたずねて、渡月橋まで</div>
+  <div class="t-toki" id="t-toki"></div>
+  <div class="t-brand" aria-hidden="true">
+    <span class="stamp"><i>り</i><i>と</i><i>堂</i><i>く</i></span>
+    <span class="t-en">tkrsys</span>
+  </div>
+</div>
+
+<div class="okoshi" id="okoshi" aria-hidden="true">おこしやす</div>
 
 <div class="fuda" id="fuda" aria-live="polite">
   <div><span class="no" id="f-no">壱</span><h2 id="f-name">―</h2></div>
@@ -216,6 +292,31 @@
   <a href="./ezu.html" style="color:#FFE5A8">御絵図（一覧）へ</a>
 </div>
 
+<script>
+/* 額縁の小物（3D の可否によらず動かす）：二十四節気の表示と迎え言葉の後片付け */
+(function(){
+  // 節入りの日は年により1日前後するが、「のころ」表記なので固定日で足りる
+  var SEKKI = [
+    [1,5,'小寒'],[1,20,'大寒'],[2,4,'立春'],[2,19,'雨水'],[3,5,'啓蟄'],[3,20,'春分'],
+    [4,4,'清明'],[4,20,'穀雨'],[5,5,'立夏'],[5,21,'小満'],[6,5,'芒種'],[6,21,'夏至'],
+    [7,7,'小暑'],[7,22,'大暑'],[8,7,'立秋'],[8,23,'処暑'],[9,7,'白露'],[9,23,'秋分'],
+    [10,8,'寒露'],[10,23,'霜降'],[11,7,'立冬'],[11,22,'小雪'],[12,7,'大雪'],[12,21,'冬至']
+  ];
+  var TSUKI = ['睦月','如月','弥生','卯月','皐月','水無月','文月','葉月','長月','神無月','霜月','師走'];
+  var d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+  var name = '冬至';   // 一月上旬はまだ冬至のうち
+  for (var i = 0; i < SEKKI.length; i++){
+    var s = SEKKI[i];
+    if (m > s[0] || (m === s[0] && day >= s[1])) name = s[2];
+  }
+  document.getElementById('t-toki').textContent = TSUKI[d.getMonth()] + '・' + name + 'のころ';
+
+  var ok = document.getElementById('okoshi');
+  ok.addEventListener('animationend', function(){ ok.remove(); });
+  // 描画が止まる環境では animationend が飛ばないことがあるので時限でも畳む
+  setTimeout(function(){ if (ok.parentNode) ok.remove(); }, 6500);
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -269,8 +370,8 @@ const HOUSES = [
 /* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色 */
 const SPOTS = [
   { kanji:'捌', view:true, name:'桂川のほとり',
-    desc:'町並みが尽きると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
-    tags:['桂川','鵜飼の篝火'],
+    desc:'町並みが尽き、竹の小径を抜けると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
+    tags:['竹林の小径','桂川','鵜飼の篝火'],
     pos:[1.7, 1.62, -80.5], tgt:[-3, 1.3, -103] },
   { kanji:'玖', view:true, name:'渡月橋',
     desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
@@ -298,7 +399,9 @@ const FX = {
   kasumi      : true,   // ⑩ 山霞の流れ
   tsukigasa   : true,   // ⑪ 月暈の呼吸
   nagareboshi : true,   // ⑫ 流れ星
-  dolly       : true    // ⑬ 名所停留の微ドリー
+  dolly       : true,   // ⑬ 名所停留の微ドリー
+  chikurin    : true,   // ⑭ 竹林の小径（町並みの先、川端まで）
+  tsukimore   : true    // ⑮ 竹の間から漏れる月あかり
 };
 
 const STREET_X = 5.0;          // 町屋の中心
@@ -474,6 +577,59 @@ function waterTexture(){
   }
   return tex(c, 1, 12);
 }
+/* 竹の稈（月あかりの緑・節入り。縦 512 が一本ぶんに伸びる） */
+function takeTexture(){
+  const c = cv(64, 512), g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 64, 0);
+  grd.addColorStop(0,    '#22342a');
+  grd.addColorStop(0.35, '#4c7050');
+  grd.addColorStop(0.55, '#6a9264');
+  grd.addColorStop(0.8,  '#3a5640');
+  grd.addColorStop(1,    '#1e2e26');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 512);
+  // 節（稈の高さ 7〜10m に対しおよそ 1m 間隔になる）
+  for (let y = 26; y < 512; y += 62){
+    g.fillStyle = 'rgba(16,26,20,0.85)';
+    g.fillRect(0, y, 64, 3.5);
+    g.fillStyle = 'rgba(205,228,196,0.30)';
+    g.fillRect(0, y - 2, 64, 2);
+  }
+  // 縦の繊維
+  for (let i = 0; i < 14; i++){
+    g.strokeStyle = 'rgba(0,0,0,' + (0.05 + (i % 3) * 0.04) + ')';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo((i * 9) % 64, 0); g.lineTo((i * 9) % 64, 512); g.stroke();
+  }
+  return tex(c);
+}
+/* 笹の葉むら（透過。中央に濃く、外縁は疎らに散らす） */
+function sasaTexture(seed){
+  const c = cv(256, 256), g = c.getContext('2d');
+  g.clearRect(0, 0, 256, 256);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++){
+    const a = rnd() * Math.PI * 2, r = Math.pow(rnd(), 0.6) * 118;
+    const x = 128 + Math.cos(a) * r, y = 128 + Math.sin(a) * r * 0.8;
+    const len = 9 + rnd() * 15, wdt = 2 + rnd() * 2.6;
+    const v = 28 + Math.floor(rnd() * 34);
+    g.save();
+    g.translate(x, y); g.rotate(rnd() * Math.PI);
+    g.fillStyle = 'rgba(' + Math.floor(v * 0.72) + ',' + v + ',' + Math.floor(v * 0.8) + ',' + (0.55 + rnd() * 0.4) + ')';
+    g.beginPath(); g.ellipse(0, 0, len, wdt, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+  return tex(c);
+}
+/* 冷たい光の円（月漏れの光条と地面の斑用。glow の月光版） */
+function glowCoolTexture(){
+  const c = cv(128, 128), g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0,   'rgba(220,235,255,1)');
+  grd.addColorStop(0.3, 'rgba(185,210,245,0.5)');
+  grd.addColorStop(1,   'rgba(160,190,235,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return tex(c);
+}
 /* 嵐山の木立（稜線をぎざぎざに縁取る。fill と seed を変えて二層つくる） */
 function treelineTexture(fill, seed){
   const c = cv(1024, 256), g = c.getContext('2d');
@@ -538,7 +694,10 @@ const TEX = {
   ridge  : ridgeTexture(),
   sky    : skyTexture(),
   kodachi   : treelineTexture('#0c1420', 424242),
-  kodachiFar: treelineTexture('#1b2836', 98765)
+  kodachiFar: treelineTexture('#1b2836', 98765),
+  take     : takeTexture(),
+  sasa     : sasaTexture(31415),
+  glowCool : glowCoolTexture()
 };
 
 /* ============================================================
@@ -853,12 +1012,11 @@ const houseGroups = HOUSES.map(h => buildMachiya({
   x: h.side * STREET_X, z: h.z, side: h.side
 }));
 
-/* 通りを埋める端役（看板なし・簡素） */
+/* 通りを埋める端役（看板なし・簡素）。z-62〜-70 にいた四軒は竹林の小径に譲った */
 const FILLERS = [
   { side:-1, z:  2 }, { side: 1, z: -2 }, { side: 1, z:-22 },
   { side:-1, z:-30 }, { side: 1, z:-38 }, { side:-1, z:-46 },
-  { side: 1, z:-54 }, { side:-1, z:-62 }, { side: 1, z:-62 },
-  { side:-1, z:-70 }, { side: 1, z:-70 }
+  { side: 1, z:-54 }
 ];
 FILLERS.forEach((f, i) => buildMachiya({
   name:'', kanji:'', hex:0x6d5636, simple:true,
@@ -1387,6 +1545,95 @@ const meteor = (function(){
 })();
 
 /* ============================================================
+   5c. 竹林の小径 ― 町並みが尽きてから川端まで（z -56.5〜-77.5）
+   ============================================================ */
+const chikurin = (function(){
+  const group     = new THREE.Group();   // 稈と葉むら
+  const moonGroup = new THREE.Group();   // 月漏れ（光条と地面の斑）
+  let seed = 20260727;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const Z0 = -56.5, Z1 = -77.5;
+
+  // 稈は一描画にまとめる（インスタンス描画）。位置が散るので境界球カリングは切る
+  const N = 128;
+  const geo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
+  geo.translate(0, 0.5, 0);   // 根元を原点に置き、高さは行列の scale で決める
+  const stalks = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map: TEX.take }), N);
+  stalks.frustumCulled = false;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler(),
+        v3 = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+  for (let i = 0; i < N; i++){
+    const side = i % 2 === 0 ? -1 : 1;
+    const x = side * (2.7 + Math.pow(rnd(), 1.4) * 3.6);   // 小径の際に濃く、外へ疎らに
+    const z = Z0 + rnd() * (Z1 - Z0);
+    const h = 6.8 + rnd() * 3.0;
+    const r = 0.8 + rnd() * 0.5;
+    eu.set((rnd() - 0.5) * 0.06, rnd() * Math.PI, -side * (0.015 + rnd() * 0.045)); // 先端はやや小径の上へ
+    q.setFromEuler(eu);
+    m4.compose(v3.set(x, 0, z), q, sc.set(r, h, r));
+    stalks.setMatrixAt(i, m4);
+    if (stalks.setColorAt) stalks.setColorAt(i, col.setHSL(0.30 + rnd() * 0.05, 0.24, 0.42 + rnd() * 0.22));
+  }
+  stalks.instanceMatrix.needsUpdate = true;
+  if (stalks.instanceColor) stalks.instanceColor.needsUpdate = true;
+  group.add(stalks);
+
+  // 葉むら：11枚は頭上の天井、5枚は脇の中段の茂み
+  const sasaMat = new THREE.MeshBasicMaterial({
+    map: TEX.sasa, transparent: true, opacity: 0.92,
+    depthWrite: false, side: THREE.DoubleSide
+  });
+  const canopy = [];
+  for (let i = 0; i < 16; i++){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 5.5), sasaMat);
+    if (i < 11){
+      p.position.set((rnd() - 0.5) * 6.5, 6.4 + rnd() * 2.2, Z0 + (i / 10) * (Z1 - Z0));
+      p.rotation.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI);
+    } else {
+      const side = i % 2 === 0 ? -1 : 1;
+      p.position.set(side * (3.4 + rnd() * 1.6), 3.4 + rnd() * 2.2, Z0 + rnd() * (Z1 - Z0));
+      p.rotation.set((rnd() - 0.5) * 0.4, rnd() * Math.PI, (rnd() - 0.5) * 0.4);
+      p.scale.setScalar(0.62);
+    }
+    p.userData = { baseZ: p.rotation.z, baseX: p.position.x, ph: rnd() * Math.PI * 2 };
+    canopy.push(p); group.add(p);
+  }
+
+  // 月漏れの光条：月光の向きに軸を合わせ、自身の軸まわりだけばらす
+  const moonDir = new THREE.Vector3(-8, 16, 6).normalize();
+  const shafts = [];
+  for (let i = 0; i < 7; i++){
+    const mat = new THREE.MeshBasicMaterial({
+      map: TEX.glowCool, transparent: true, opacity: 0.06,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide
+    });
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 7.6), mat);
+    s.position.set((rnd() - 0.5) * 4.4, 3.6, Z0 + ((i + 0.5) / 7) * (Z1 - Z0) + (rnd() - 0.5) * 1.6);
+    s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), moonDir);
+    s.rotateY(rnd() * Math.PI);
+    s.userData = { baseO: 0.05 + rnd() * 0.05, ph: rnd() * Math.PI * 2 };
+    shafts.push(s); moonGroup.add(s);
+  }
+  // 地面の木漏れ月の斑
+  const dapples = [];
+  for (let i = 0; i < 9; i++){
+    const mat = new THREE.MeshBasicMaterial({
+      map: TEX.glowCool, transparent: true, opacity: 0.07,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+    });
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.1), mat);
+    d.rotation.x = -Math.PI / 2;
+    d.rotation.z = rnd() * Math.PI;
+    d.position.set((rnd() - 0.5) * 3.6, 0.02, Z0 + rnd() * (Z1 - Z0));
+    d.userData = { baseO: 0.05 + rnd() * 0.05, ph: rnd() * Math.PI * 2 };
+    dapples.push(d); moonGroup.add(d);
+  }
+
+  scene.add(group, moonGroup);
+  return { group: group, moonGroup: moonGroup, canopy: canopy, shafts: shafts, dapples: dapples, N: N };
+})();
+
+/* ============================================================
    6. 屋根の猫（参の町屋に一匹）
    ============================================================ */
 const cat = (function(){
@@ -1829,6 +2076,25 @@ function update(dt){
     }
   }
 
+  // ⑭ 竹林の小径：葉むらがそよぐ／⑮ 月漏れがまたたく
+  chikurin.group.visible = FX.chikurin;
+  if (FX.chikurin){
+    chikurin.canopy.forEach(p => {
+      const u = p.userData;
+      p.rotation.z = u.baseZ + Math.sin(elapsed * 0.5 + u.ph) * 0.03;
+      p.position.x = u.baseX + Math.sin(elapsed * 0.33 + u.ph * 1.7) * 0.07;
+    });
+  }
+  chikurin.moonGroup.visible = FX.chikurin && FX.tsukimore;
+  if (chikurin.moonGroup.visible){
+    chikurin.shafts.forEach(s => {
+      s.material.opacity = s.userData.baseO * (0.62 + 0.38 * Math.sin(elapsed * 0.45 + s.userData.ph));
+    });
+    chikurin.dapples.forEach(d => {
+      d.material.opacity = d.userData.baseO * (0.66 + 0.34 * Math.sin(elapsed * 0.45 + d.userData.ph + 1.3));
+    });
+  }
+
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
   cat.rotation.y = (HOUSES[2].side < 0 ? Math.PI / 2 : -Math.PI / 2)
@@ -1927,6 +2193,8 @@ window.__machiya = {
       fxCounts: { glints: glintClouds.length, touro: nagashiTouro.length,
                   kawagiri: kawagiris.length, streaks: mirrorStreaks.length,
                   walkers: walkers.length, kodachi: kodachiPlanes.length,
+                  take: chikurin.N, sasa: chikurin.canopy.length,
+                  shafts: chikurin.shafts.length,
                   meteorOn: meteor ? meteor.life >= 0 : false },
       fudaOn: fuda.classList.contains('on'),
       fudaView: fuda.classList.contains('view'),
