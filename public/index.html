@@ -19,7 +19,8 @@
     overflow:hidden;
   }
   #stage{position:fixed; inset:0}
-  #stage canvas{display:block; width:100%; height:100%}
+  /* touch-action:none はそぞろ歩きの「なぞって見回す」に必須（ブラウザのジェスチャを奪われない） */
+  #stage canvas{display:block; width:100%; height:100%; touch-action:none}
 
   /* ===== 上：御絵図への渡し ===== */
   .topbar{
@@ -287,6 +288,7 @@
   <div class="dots" id="dots"></div>
   <button id="btn-next" aria-label="次の町屋へ">▶</button>
   <button id="btn-auto" aria-pressed="true">自動で流す</button>
+  <button id="btn-walk" aria-pressed="false">そぞろ歩き</button>
   <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
 </div>
 
@@ -1905,6 +1907,10 @@ const dollyDir = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
 
 function goTo(i, byUser){
+  if (walkMode){                 // 点列などから直接呼ばれたら散歩を畳んでレールへ
+    walkMode = false; syncWalkBtn();
+    hintEl.textContent = HINT_RAIL;
+  }
   const n = TOUR.length;
   idx = ((i % n) + n) % n;
   fromPos.copy(camera.position);
@@ -1948,6 +1954,182 @@ function updateCamera(dt){
     if (auto && dwellT > DWELL_S) goTo(idx + 1, false);
   }
   camera.lookAt(curTgt);
+}
+
+/* ============================================================
+   8b. そぞろ歩き ― 自由散歩モード
+   タップした場所へ歩き、なぞって見回す。矢印キーでも歩ける。
+   可動域＝通り→竹林→川端の河原→渡月橋（むくりに沿って上下）→対岸
+   ============================================================ */
+let walkMode = false;
+const WALK = {
+  target: null,                 // 歩いて向かう先 {x,z}
+  yaw: 0, pitch: 0,             // 視線（yaw0 = 通りの奥 -Z 向き）
+  eyeY: 1.62, bob: 0, bobPh: 0,
+  manualUntil: -1,              // なぞり見回し直後は自動で向き直さない
+  keys: { f: false, b: false, l: false, r: false },
+  moving: false
+};
+const WALK_ZONES = [
+  { x0: -1.85, x1: 1.85, z0:   3.4, z1:  -77.8 },   // 通りと竹林の小径
+  { x0: -26,   x1: 26,   z0: -77.8, z1:  -88.4 },   // 川端の河原
+  { x0: -1.15, x1: 1.15, z0: -88.4, z1: -121.6 },   // 渡月橋の上
+  { x0: -17,   x1: 10,   z0: -121.6, z1: -127  }    // 対岸（納涼床の手前まで）
+];
+function inWalkable(x, z){
+  return WALK_ZONES.some(r => x >= r.x0 && x <= r.x1 && z <= r.z0 && z >= r.z1);
+}
+function clampToWalkable(x, z){
+  let best = null, bd = Infinity;
+  WALK_ZONES.forEach(r => {
+    const cx = Math.min(r.x1, Math.max(r.x0, x));
+    const cz = Math.min(r.z0, Math.max(r.z1, z));
+    const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
+    if (d < bd){ bd = d; best = { x: cx, z: cz }; }
+  });
+  return best;
+}
+/* 立ち位置の目の高さ（橋の上はむくりに沿う） */
+function walkEyeY(x, z){
+  if (z <= BRIDGE_Z0 - 0.4 && z >= BRIDGE_Z1 + 0.4 && Math.abs(x) < 2.2){
+    const t = Math.min(1, Math.max(0, (BRIDGE_Z0 - z) / BRIDGE_L));
+    return deckY(t) + 1.5;
+  }
+  return 1.62;
+}
+/* 画面の一点から地面（or 橋板）を求める。メッシュを持ち回らずレイを刻んで解く */
+function groundPointFromRay(){
+  const o = ray.ray.origin, d = ray.ray.direction;
+  if (d.y > -0.02) return null;                  // ほぼ空を向いている
+  let s = 0.6;
+  for (let i = 0; i < 240 && s < 90; i++){
+    const px = o.x + d.x * s, py = o.y + d.y * s, pz = o.z + d.z * s;
+    let gy = 0;
+    if (pz <= BRIDGE_Z0 && pz >= BRIDGE_Z1 && Math.abs(px) < 2.2){
+      gy = deckY(Math.min(1, Math.max(0, (BRIDGE_Z0 - pz) / BRIDGE_L)));
+    }
+    if (py <= gy + 0.03) return { x: px, z: pz };
+    s += 0.4;
+  }
+  return null;
+}
+function nearestStopIdx(){
+  let best = 0, bd = Infinity;
+  stops.forEach((s, i) => {
+    const d = s.pos.distanceTo(camera.position);
+    if (d < bd){ bd = d; best = i; }
+  });
+  return best;
+}
+function syncWalkBtn(){
+  const b = document.getElementById('btn-walk');
+  b.textContent = walkMode ? '巡りに戻る' : 'そぞろ歩き';
+  b.setAttribute('aria-pressed', String(walkMode));
+}
+function setWalk(on){
+  if (on === walkMode) return;
+  if (on){
+    walkMode = true;
+    auto = false; syncAutoBtn();
+    phase = 'dwell';                             // 近くの提灯が明るくなる判定を生かす
+    // いまの視線から歩き出す
+    const v = new THREE.Vector3().subVectors(curTgt, camera.position);
+    WALK.yaw = Math.atan2(v.x, -v.z);
+    WALK.pitch = Math.asin(Math.max(-1, Math.min(1, v.y / (v.length() || 1))));
+    const p = clampToWalkable(camera.position.x, camera.position.z);
+    camera.position.x = p.x; camera.position.z = p.z;
+    WALK.eyeY = walkEyeY(p.x, p.z);
+    WALK.target = null; WALK.bob = 0;
+    hideFuda(); walkShownPoi = -2;
+    hintEl.textContent = '地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き';
+  } else {
+    walkMode = false;
+    hintEl.textContent = HINT_RAIL;
+    goTo(nearestStopIdx(), false);               // いちばん近い停留へ戻る
+  }
+  syncWalkBtn();
+}
+/* 歩いて近づいたら札が灯る（家5.2m・名所6m、離れは少し粘る） */
+let walkShownPoi = -2;
+function updateWalkPoi(){
+  let poi = -1, margin = 0;
+  let bh = -1, bhd = Infinity;
+  HOUSES.forEach((h, i) => {
+    const d = Math.hypot(camera.position.x - h.side * 2.5, camera.position.z - h.z);
+    if (d < bhd){ bhd = d; bh = i; }
+  });
+  let bs = -1, bsd = Infinity;
+  for (let i = NH; i < TOUR.length; i++){
+    const p = stops[i].pos;
+    const d = Math.hypot(camera.position.x - p.x, camera.position.z - p.z);
+    if (d < bsd){ bsd = d; bs = i; }
+  }
+  margin = (walkShownPoi === bh || walkShownPoi === bs) ? 0.9 : 0;
+  if (bhd < 5.2 + margin) poi = bh;
+  else if (bsd < 6.0 + margin) poi = bs;
+  if (poi === walkShownPoi) return;
+  walkShownPoi = poi;
+  if (poi < 0){ hideFuda(); return; }
+  idx = poi; paintDots(); showFuda();
+}
+function updateWalk(dt){
+  const K = WALK.keys;
+  let vx = 0, vz = 0;
+  const SPEED = 2.6;
+  if (K.l) WALK.yaw += 1.9 * dt;
+  if (K.r) WALK.yaw -= 1.9 * dt;
+  if (K.f || K.b){
+    const s = (K.f ? 1 : -0.62) * SPEED * dt;
+    vx = Math.sin(WALK.yaw) * s;
+    vz = -Math.cos(WALK.yaw) * s;
+    WALK.target = null;                          // 手動歩行はタップ先を打ち消す
+  } else if (WALK.target){
+    const dx = WALK.target.x - camera.position.x;
+    const dz = WALK.target.z - camera.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.15){ WALK.target = null; }
+    else {
+      const s = Math.min(d, SPEED * dt);
+      vx = dx / d * s; vz = dz / d * s;
+      // なぞっていない間は、進む向きへゆっくり向き直す
+      if (elapsed > WALK.manualUntil){
+        const want = Math.atan2(dx, -dz);
+        let diff = want - WALK.yaw;
+        while (diff >  Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        WALK.yaw += diff * Math.min(1, dt * 3.2);
+      }
+    }
+  }
+  // 壁ぎわは滑らせる（軸を分けて当てる）。両軸とも塞がれたときだけ足を止める
+  WALK.moving = (vx !== 0 || vz !== 0);
+  if (WALK.moving){
+    let moved = false;
+    const nx = camera.position.x + vx;
+    if (vx !== 0 && inWalkable(nx, camera.position.z)){ camera.position.x = nx; moved = true; }
+    const nz = camera.position.z + vz;
+    if (vz !== 0 && inWalkable(camera.position.x, nz)){ camera.position.z = nz; moved = true; }
+    if (!moved) WALK.target = null;
+  }
+  // 高さと歩の上下
+  const ty = walkEyeY(camera.position.x, camera.position.z);
+  WALK.eyeY += (ty - WALK.eyeY) * Math.min(1, dt * 6);
+  if (WALK.moving){
+    WALK.bobPh += dt * 7.4;
+    WALK.bob += (Math.sin(WALK.bobPh) * 0.032 - WALK.bob) * Math.min(1, dt * 12);
+  } else {
+    WALK.bob += (0 - WALK.bob) * Math.min(1, dt * 6);
+  }
+  camera.position.y = WALK.eyeY + WALK.bob;
+  // 視線
+  const cp = Math.cos(WALK.pitch);
+  curTgt.set(
+    camera.position.x + Math.sin(WALK.yaw) * cp,
+    camera.position.y + Math.sin(WALK.pitch),
+    camera.position.z - Math.cos(WALK.yaw) * cp
+  );
+  camera.lookAt(curTgt);
+  updateWalkPoi();
 }
 
 /* ============================================================
@@ -2007,6 +2189,7 @@ function syncAutoBtn(){
 /* 操作バーの高さは段組みで変わるので、札と手引きを毎回その上に置き直す */
 const kajiEl = document.querySelector('.kaji');
 const hintEl = document.querySelector('.hint');
+const HINT_RAIL = hintEl.textContent;   // 散歩から戻るときに元の手引きへ
 function layoutBottom(){
   const base = 18 + kajiEl.offsetHeight;
   const hintShown = getComputedStyle(hintEl).display !== 'none';
@@ -2023,25 +2206,48 @@ paintDots(); syncAutoBtn(); layoutBottom();
 document.getElementById('btn-prev').addEventListener('click', () => goTo(idx - 1, true));
 document.getElementById('btn-next').addEventListener('click', () => goTo(idx + 1, true));
 autoBtn.addEventListener('click', () => {
+  if (walkMode){
+    // 散歩から「自動で流す」＝いちばん近い停留へ戻って巡りを再開
+    walkMode = false; syncWalkBtn();
+    hintEl.textContent = HINT_RAIL;
+    auto = true; syncAutoBtn();
+    goTo(nearestStopIdx(), false);
+    return;
+  }
   auto = !auto; syncAutoBtn();
   if (auto && phase === 'dwell') dwellT = 0;
 });
+document.getElementById('btn-walk').addEventListener('click', () => setWalk(!walkMode));
 window.addEventListener('keydown', e => {
+  if (walkMode){
+    if (e.key === 'ArrowUp')   { WALK.keys.f = true; e.preventDefault(); }
+    if (e.key === 'ArrowDown') { WALK.keys.b = true; e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { WALK.keys.l = true; e.preventDefault(); }
+    if (e.key === 'ArrowRight'){ WALK.keys.r = true; e.preventDefault(); }
+    return;
+  }
   if (e.key === 'ArrowRight'){ goTo(idx + 1, true); e.preventDefault(); }
   if (e.key === 'ArrowLeft') { goTo(idx - 1, true); e.preventDefault(); }
 });
+window.addEventListener('keyup', e => {
+  if (e.key === 'ArrowUp')    WALK.keys.f = false;
+  if (e.key === 'ArrowDown')  WALK.keys.b = false;
+  if (e.key === 'ArrowLeft')  WALK.keys.l = false;
+  if (e.key === 'ArrowRight') WALK.keys.r = false;
+});
 
-/* 町屋・川・橋・山をクリックして選ぶ */
+/* 町屋・川・橋・山をクリックして選ぶ（レール時）／タップで歩き・なぞって見回す（散歩時） */
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 const clickRoots = houseGroups.concat([river, bridgeGroup, mtGroup]);
-renderer.domElement.addEventListener('pointerdown', ev => {
+function setNdc(cx, cy){
   const r = renderer.domElement.getBoundingClientRect();
-  ndc.x =  ((ev.clientX - r.left) / r.width)  * 2 - 1;
-  ndc.y = -((ev.clientY - r.top)  / r.height) * 2 + 1;
-  ray.setFromCamera(ndc, camera);
+  ndc.x =  ((cx - r.left) / r.width)  * 2 - 1;
+  ndc.y = -((cy - r.top)  / r.height) * 2 + 1;
+}
+function railPick(){
   const hit = ray.intersectObjects(clickRoots, true)[0];
-  if (!hit) return;
+  if (!hit) return -1;
   let o = hit.object, target = -1;
   while (o){
     const hi = houseGroups.indexOf(o);
@@ -2051,7 +2257,52 @@ renderer.domElement.addEventListener('pointerdown', ev => {
     if (o === mtGroup)     { target = NH + 2; break; }
     o = o.parent;
   }
-  if (target >= 0 && target !== idx) goTo(target, true);
+  return target;
+}
+let pDown = null, pDrag = false;
+renderer.domElement.addEventListener('pointerdown', ev => {
+  if (!walkMode){
+    setNdc(ev.clientX, ev.clientY);
+    ray.setFromCamera(ndc, camera);
+    const t = railPick();
+    if (t >= 0 && t !== idx) goTo(t, true);
+    return;
+  }
+  pDown = { x: ev.clientX, y: ev.clientY };
+  pDrag = false;
+});
+window.addEventListener('pointermove', ev => {
+  if (!walkMode || !pDown) return;
+  const dx = ev.clientX - pDown.x, dy = ev.clientY - pDown.y;
+  if (!pDrag && Math.hypot(dx, dy) > 7) pDrag = true;
+  if (pDrag){
+    WALK.yaw  -= dx * 0.0042;
+    WALK.pitch = Math.max(-0.55, Math.min(0.5, WALK.pitch - dy * 0.0032));
+    WALK.manualUntil = elapsed + 2.0;
+    pDown = { x: ev.clientX, y: ev.clientY };
+  }
+});
+window.addEventListener('pointerup', ev => {
+  if (!walkMode || !pDown) return;
+  const wasDrag = pDrag;
+  pDown = null; pDrag = false;
+  if (wasDrag) return;
+  // タップ＝歩く。町屋なら店先へ、それ以外は地面（or 橋板）の一点へ
+  setNdc(ev.clientX, ev.clientY);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(houseGroups, true)[0];
+  if (hit){
+    let o = hit.object;
+    while (o && houseGroups.indexOf(o) === -1) o = o.parent;
+    const hi = houseGroups.indexOf(o);
+    if (hi >= 0){
+      const h = HOUSES[hi];
+      WALK.target = { x: h.side * 1.55, z: h.z };
+      return;
+    }
+  }
+  const g = groundPointFromRay();
+  if (g) WALK.target = clampToWalkable(g.x, g.z);
 });
 
 /* ============================================================
@@ -2258,7 +2509,8 @@ let elapsed = 0;
 
 function update(dt){
   elapsed += dt;
-  updateCamera(dt);
+  if (walkMode) updateWalk(dt);
+  else updateCamera(dt);
 
   // 提灯：ゆらぐ灯り。停留中の一軒だけ明るく
   houseGroups.forEach((g, i) => {
@@ -2665,6 +2917,26 @@ window.__machiya = {
   },
   goTo: function(i){ goTo(i, true); return idx; },
   setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; },
+  /* そぞろ歩きの検証口：set で入切、to で歩き先、state で現況 */
+  walk: {
+    set: function(v){ setWalk(!!v); return walkMode; },
+    to: function(x, z){ WALK.target = clampToWalkable(x, z); return WALK.target; },
+    look: function(yaw, pitch){
+      if (yaw !== undefined) WALK.yaw = yaw;
+      if (pitch !== undefined) WALK.pitch = pitch;
+    },
+    state: function(){
+      return {
+        on: walkMode,
+        pos: camera.position.toArray().map(v => +v.toFixed(2)),
+        target: WALK.target,
+        yaw: +WALK.yaw.toFixed(3), pitch: +WALK.pitch.toFixed(3),
+        poi: walkShownPoi, moving: WALK.moving,
+        btn: document.getElementById('btn-walk').textContent
+      };
+    },
+    zones: WALK_ZONES
+  },
   FX: FX,
   okuribi: okuribi,   // 試灯と赤入れ用（FX.okuribi=true と合わせて使う）
   /* 宵の音の計測口：state で混合値、level で出力RMS、kane で鐘を即打ち */
