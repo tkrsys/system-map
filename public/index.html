@@ -3078,10 +3078,10 @@ const enzan = (function(){
     [ -66,   38, 30, 0.35, 0.60],   // 間の丘（西の裾へ繋ぐ）
     [  70,   55, 40, 0.30, 0.60],   // 北東の低い稜線（市街の方へ低く）
     [ -72,  -88, 40, 0.48, 0.85],   // 保津峡の北の山（川がこの間へ消える）
-    [ -80, -132, 44, 0.52, 0.85],   // 保津峡の南の山
-    [  82,  -96, 36, 0.34, 0.90],   // 川下の北の山
-    [  88, -136, 40, 0.38, 0.90]    // 川下の南の山
+    [ -80, -132, 44, 0.52, 0.85]    // 保津峡の南の山
   ];
+  // 川下（東）には山を置かない＝実際の桂川と同じく盆地へ開ける。
+  // 遠い東山の低い霞（下の稜線板）と市街の灯だけが水平線に並ぶ
   const mine = new THREE.InstancedMesh(
     new THREE.SphereGeometry(1, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat, MINE.length);
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(),
@@ -3099,12 +3099,12 @@ const enzan = (function(){
   joya.scale.set(2.8, 2.8, 1);
   joya.position.set(-34, 58 * 0.60 + 0.6, 74 - 5);
   g.add(joya);
-  // 川下の町の灯（東の山あいに点々と。宿の灯と同じ作法）
+  // 川下の町の灯（東は盆地へ開ける＝市街の灯が水平線に点々と。宿の灯と同じ作法）
   const MB = [];
   let seed = 4747;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 10; i++){
-    MB.push(54 + rnd() * 38, 0.5 + rnd() * 2.6, -104 - rnd() * 26);
+  for (let i = 0; i < 16; i++){
+    MB.push(50 + rnd() * 52, 0.4 + rnd() * 2.2, -96 - rnd() * 38);
   }
   // 保津峡の山腹の杣の灯（西の宵にぽつり。曹源池の入口構図の右手に懸かる）
   [[-58, 9.5, -104], [-66, 13, -112], [-71, 8, -122]].forEach(p => MB.push(p[0], p[1], p[2]));
@@ -3114,28 +3114,29 @@ const enzan = (function(){
     color: 0xffbe82, size: 0.85, sizeAttenuation: true, transparent: true, opacity: 0.7,
     depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
   g.add(machibi);
-  // 奥の稜線（霧の向こうでも消えない遠景の層。東山の板と同じ思想で北・西・東も囲み、盆地にする）
-  function tooyamaTex(seed2){
+  // 奥の稜線（霧の向こうでも消えない遠景の層。東山の板と同じ思想で北・西・東も囲み、盆地にする。
+  //   base=山頂の上限・amp=起伏。東は盆地の対岸の遠山なので低く緩く）
+  function tooyamaTex(seed2, base, amp){
     const c2 = cv(1024, 240), g2 = c2.getContext('2d');
     let s2 = seed2;
     const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
     g2.clearRect(0, 0, 1024, 240);
     g2.fillStyle = '#070a13';
     g2.beginPath(); g2.moveTo(0, 240);
-    g2.lineTo(0, 150 + r2() * 40);
+    g2.lineTo(0, base + amp * 0.6 + r2() * amp * 0.4);
     for (let px = 90; px < 1100; px += 70 + r2() * 60){
-      g2.lineTo(Math.min(px, 1024), 95 + r2() * 90);
+      g2.lineTo(Math.min(px, 1024), base + r2() * amp);
     }
     g2.lineTo(1024, 240); g2.closePath(); g2.fill();
     return tex(c2);
   }
   [
-    [460, 62,    0, 17,  120,  Math.PI,     111],   // 北（愛宕の奥の北山）
-    [400, 56, -145, 15,  -40,  Math.PI / 2, 222],   // 西（保津峡の奥の西山）
-    [400, 56,  145, 15,  -40, -Math.PI / 2, 333]    // 東（川下の奥、市街の際の山）
+    [460, 62,    0, 17,  120,  Math.PI,     111,  95, 90],   // 北（愛宕の奥の北山）
+    [400, 56, -145, 15,  -40,  Math.PI / 2, 222,  95, 90],   // 西（保津峡の奥の西山）
+    [400, 38,  145,  9,  -40, -Math.PI / 2, 333, 150, 45]    // 東（盆地の対岸の東山＝低く霞む）
   ].forEach(k => {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(k[0], k[1]),
-      new THREE.MeshBasicMaterial({ map: tooyamaTex(k[6]), transparent: true,
+      new THREE.MeshBasicMaterial({ map: tooyamaTex(k[6], k[7], k[8]), transparent: true,
         fog: false, depthWrite: false }));
     p.position.set(k[2], k[3], k[4]);
     p.rotation.y = k[5];
