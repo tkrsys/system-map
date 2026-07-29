@@ -504,7 +504,8 @@ const FX = {
   iwaba       : true,   // ㉜ 上流の岩場と早瀬（保津峡の入口の見立て）
   garan       : true,   // ㉝ 塀ごしの伽藍（庫裏の大屋根と鐘楼の影）
   ienami      : true,   // ㉞ 木戸の先の家並み（続きの町の影と提灯の点列が霧に溶ける）
-  amanogawa   : true    // ㉟ 天の川と夜雲（月のそばをゆっくり流れる）
+  amanogawa   : true,   // ㉟ 天の川と夜雲（月のそばをゆっくり流れる）
+  adashino    : true    // ㊱ 化野の石仏の野（通りの東の隠れ道の先。青白い供え灯と鬼火）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -1763,6 +1764,10 @@ const chikurin = (function(){
     if (side > 0 && z < -64.4 && z > -72.0){
       z = z > -66.5 ? z + 4.6 : Math.max(z - 6.2, -77.3);
     }
+    // 東側（x負）は化野への隠れ道（z-60.4〜-63.4）を空ける
+    if (side < 0 && z < -59.9 && z > -63.9){
+      z = z > -61.9 ? z + 4.1 : z - 4.1;
+    }
     const h = 9.2 + rnd() * 4.2;                           // 梢が視野の外へ抜ける丈
     const r = 0.8 + rnd() * 0.5;
     eu.set((rnd() - 0.5) * 0.06, rnd() * Math.PI, -side * (0.015 + rnd() * 0.045)); // 先端はやや小径の上へ
@@ -1881,6 +1886,8 @@ const yabu = (function(){
       const z = Z0 - SEG * (i + 0.5);
       // 西側（x正）は天龍寺の参道口（歩ける切れ目 z-64.9〜-68.1）を見通せるだけ空ける
       if (side > 0 && z < -64.4 && z > -69.4) continue;
+      // 東側（x負）は化野への隠れ道（z-60.4〜-63.4）を空ける
+      if (side < 0 && z < -59.6 && z > -64.2) continue;
       segs.push({ side: side, z: z });
     }
   });
@@ -3452,6 +3459,191 @@ const sora = (function(){
 })();
 
 /* ============================================================
+   5m. 化野の石仏の野（FX ㊱）― 通りの東の隠れ道の先
+   嵯峨野の化野念仏寺・西院の河原の見立て。停留にも札にもせず、
+   そぞろ歩きで竹の切れ目を東へ折れた人だけが辿り着く。
+   誰とも知れぬ石仏の群れに、青白い供え灯と鬼火。奥の祠に
+   ひとつだけ暖かい灯（千灯供養の見立て）。
+   野 x-26.5〜-8.6 / z-57.5〜-77・小道 z-60.4〜-63.4
+   ============================================================ */
+const adashino = (function(){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({ color: 0x3b4048 });
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+  let seed = 6464;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // ── 土の面（石畳の広場を土に返す。藪の道と同じ作法） ──
+  const tsuchiMat = new THREE.MeshLambertMaterial({ color: 0x191b15 });
+  const no = new THREE.Mesh(new THREE.PlaneGeometry(19.6, 20.6), tsuchiMat);
+  no.rotation.x = -Math.PI / 2;
+  no.position.set(-17.4, 0.012, -67.2);
+  g.add(no);
+  const komichi = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 3.0), tsuchiMat);
+  komichi.rotation.x = -Math.PI / 2;
+  komichi.position.set(-5.3, 0.012, -61.9);
+  g.add(komichi);
+
+  // ── 古い門（小道の入りに、少し傾いた柱と笠木だけ残る） ──
+  [[-8.9, -60.6, 0.05], [-8.9, -63.2, -0.07]].forEach(p => {
+    const hashira = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.9, 0.18), MAT.wallDk);
+    hashira.position.set(p[0], 0.95, p[1]);
+    hashira.rotation.x = p[2];
+    g.add(hashira);
+  });
+  const kasagi = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 3.1), MAT.wallDk);
+  kasagi.position.set(-8.9, 1.86, -61.9);
+  kasagi.rotation.x = 0.03;
+  g.add(kasagi);
+
+  // ── 石仏の群れ（胴と頭の二描画。傾き・丈・色の個体差で「誰とも知れぬ」数に） ──
+  const N_SEKI = 110;
+  const SEKI = [];
+  for (let i = 0; i < N_SEKI; i++){
+    const x = -10.2 - rnd() * 15.8;
+    let z = -58.4 - rnd() * 17.8;
+    if (z < -66.2 && z > -67.8) z += (z > -67 ? 1.9 : -1.9);   // 参道の帯を空ける
+    SEKI.push([x, z, 0.4 + rnd() * 0.22, rnd()]);
+  }
+  const douGeo = new THREE.CylinderGeometry(0.125, 0.16, 1, 6);
+  douGeo.translate(0, 0.5, 0);
+  const dou = new THREE.InstancedMesh(douGeo, stone, N_SEKI);
+  const atama = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 7, 6), stone, N_SEKI);
+  dou.frustumCulled = atama.frustumCulled = false;   // 位置が散るので境界球カリングは切る
+  SEKI.forEach((p, i) => {
+    eu.set((rnd() - 0.5) * 0.14, rnd() * Math.PI, (rnd() - 0.5) * 0.14);
+    q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 0, p[1]), q0, sc.set(1, p[2], 1));
+    dou.setMatrixAt(i, m4);
+    // 頭は胴の傾きなりに上端へ
+    vv.set(0, p[2], 0).applyQuaternion(q0);
+    m4.compose(vv.set(p[0] + vv.x, vv.y, p[1] + vv.z), q0, sc.set(1, 1, 1));
+    atama.setMatrixAt(i, m4);
+    // 灰のなかに苔をまとった一体を混ぜる
+    const moss = rnd() < 0.35;
+    col.setHSL(moss ? 0.32 : 0.6, moss ? 0.14 : 0.04, 0.32 + rnd() * 0.16);
+    if (dou.setColorAt){ dou.setColorAt(i, col); atama.setColorAt(i, col); }
+  });
+  dou.instanceMatrix.needsUpdate = true;
+  atama.instanceMatrix.needsUpdate = true;
+  if (dou.instanceColor) dou.instanceColor.needsUpdate = true;
+  if (atama.instanceColor) atama.instanceColor.needsUpdate = true;
+  g.add(dou, atama);
+
+  // ── 五輪塔二基（地・水・火・風空の見立てを四部品で） ──
+  [[-24.6, -59.8], [-25.2, -73.8]].forEach(p => {
+    const dai = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.34, 0.52), stone);
+    dai.position.set(p[0], 0.17, p[1]); g.add(dai);
+    const sui = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 7), stone);
+    sui.position.set(p[0], 0.52, p[1]); g.add(sui);
+    const ka = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.22, 4), stone);
+    ka.rotation.y = Math.PI / 4;
+    ka.position.set(p[0], 0.82, p[1]); g.add(ka);
+    const hou = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 6), stone);
+    hou.position.set(p[0], 0.99, p[1]); g.add(hou);
+  });
+
+  // ── 卒塔婆の列（野の奥の際に、まちまちに傾いて） ──
+  const toba = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 1.15, 0.02), MAT.wallDk, 7);
+  toba.frustumCulled = false;
+  for (let i = 0; i < 7; i++){
+    eu.set((rnd() - 0.5) * 0.1, 0.2 + rnd() * 0.3, (rnd() - 0.5) * 0.16);
+    q0.setFromEuler(eu);
+    m4.compose(vv.set(-26.1 + rnd() * 0.5, 0.55, -60.5 - i * 2.3 - rnd()), q0, sc.set(1, 1, 1));
+    toba.setMatrixAt(i, m4);
+  }
+  toba.instanceMatrix.needsUpdate = true;
+  g.add(toba);
+
+  // ── 低い石積みの囲い（野の奥と北の際。歩ける限界がそのまま景色になる） ──
+  [[-27.0, -67.2, 0.4, 20.2, 1], [-17.6, -57.2, 0.4, 18.6, 0]].forEach(k => {
+    const tsumi = new THREE.Mesh(new THREE.BoxGeometry(k[4] ? 0.5 : k[3], k[2], k[4] ? k[3] : 0.5),
+      new THREE.MeshLambertMaterial({ color: 0x2c313c }));
+    tsumi.position.set(k[0], k[2] / 2, k[1]);
+    g.add(tsumi);
+  });
+
+  // ── 石灯篭二基（青白い灯。参道の入りと中ほど） ──
+  const rouHalos = [];
+  [[-10.6, -67.9], [-18.2, -67.85]].forEach(p => {
+    const sao = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), stone);
+    sao.position.set(p[0], 0.25, p[1]); g.add(sao);
+    const hib = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.24, 0.28),
+      new THREE.MeshLambertMaterial({ color: 0x9fb0c8, emissive: 0x1c2836 }));
+    hib.position.set(p[0], 0.62, p[1]); g.add(hib);
+    const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.2, 4), stone);
+    kasa.rotation.y = Math.PI / 4;
+    kasa.position.set(p[0], 0.84, p[1]); g.add(kasa);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glowCool, color: 0xbcd4ec,
+      transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.set(1.2, 1.2, 1);
+    halo.position.set(p[0], 0.62, p[1]);
+    g.add(halo); rouHalos.push(halo);
+  });
+
+  // ── 供えの灯（千灯供養の見立て。石仏の足元に青白い点々） ──
+  const TOMO = [];
+  for (let i = 0; i < 26; i++){
+    const s = SEKI[Math.floor(rnd() * N_SEKI)];
+    TOMO.push(s[0] + (rnd() - 0.5) * 0.5, 0.1, s[1] + 0.25);
+  }
+  const tomoGeo = new THREE.BufferGeometry();
+  tomoGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TOMO), 3));
+  const tomoshi = new THREE.Points(tomoGeo, new THREE.PointsMaterial({ map: TEX.glowCool,
+    color: 0xcfe0f2, size: 0.42, sizeAttenuation: true, transparent: true, opacity: 0.45,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  tomoshi.frustumCulled = false;
+  g.add(tomoshi);
+
+  // ── 鬼火（青白い光がゆらゆら漂い、ふっと消えてはまた灯る） ──
+  const onibi = [];
+  for (let i = 0; i < 5; i++){
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glowCool, color: 0xa9d6ea,
+      transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.scale.set(1.25, 1.25, 1);
+    s.userData = {
+      cx: -12 - rnd() * 13, cz: -59.5 - rnd() * 15.5,
+      rx: 1.2 + rnd() * 1.8, rz: 1.0 + rnd() * 1.6,
+      spd: 0.16 + rnd() * 0.12, fade: 0.10 + rnd() * 0.10, ph: rnd() * Math.PI * 2
+    };
+    g.add(s); onibi.push(s);
+  }
+
+  // ── 奥の祠（参道の突き当たり。ここだけ暖かい灯がひとつ） ──
+  const hokoraDai = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.2, 0.44), stone);
+  hokoraDai.position.set(-25.9, 0.1, -67.0); g.add(hokoraDai);
+  const hokoraMi = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.55, 0.4), MAT.wallDk);
+  hokoraMi.position.set(-25.9, 0.48, -67.0); g.add(hokoraMi);
+  const hokoraYane = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.3, 4), MAT.roof);
+  hokoraYane.rotation.y = Math.PI / 4;
+  hokoraYane.position.set(-25.9, 0.9, -67.0); g.add(hokoraYane);
+  const hokoraHi = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
+    transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+  hokoraHi.scale.set(1.0, 1.0, 1);
+  hokoraHi.position.set(-25.72, 0.5, -66.98);
+  g.add(hokoraHi);
+
+  // ── 苔むした古木（野の北の隅に一本、葉のない影） ──
+  const kokuMat = new THREE.MeshLambertMaterial({ color: 0x1d1a14 });
+  const kan = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, 8.4, 6), kokuMat);
+  kan.position.set(-22.6, 4.2, -58.9);
+  kan.rotation.z = 0.05;
+  g.add(kan);
+  [[0.45, 5.8, 0.7, 2.6], [-0.5, 6.6, -0.4, 2.2], [0.15, 7.3, -0.7, 1.9]].forEach(b => {
+    const eda = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.075, b[3], 5), kokuMat);
+    eda.position.set(-22.6 + b[0], b[1], -58.9 + b[2]);
+    eda.rotation.z = b[0] > 0 ? -0.9 : 0.85;
+    eda.rotation.x = b[2] > 0 ? 0.35 : -0.4;
+    g.add(eda);
+  });
+
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, onibi: onibi, tomoshi: tomoshi.material, rouHalos: rouHalos, hokoraHi: hokoraHi };
+})();
+
+/* ============================================================
    6. 屋根の猫（参の町屋に一匹）
    ============================================================ */
 const cat = (function(){
@@ -3622,7 +3814,9 @@ const WALK_ZONES = [
   { x0: 7.9,   x1: 23.7,  z0: -73.4, z1: -76.1 },   // 曹源池の南縁
   { x0: 21.9,  x1: 23.7,  z0: -65.9, z1: -73.4 },   // 曹源池の奥の縁（龍門瀑のほとり）
   { x0: 4.95,  x1: 6.25,  z0: -88.4, z1: -92.6 },   // 舟の桟橋
-  { x0: 4.1,   x1: 6.3,   z0: -68.05, z1: -71.0 }   // 法堂の堂内（雲龍図を見上げる）
+  { x0: 4.1,   x1: 6.3,   z0: -68.05, z1: -71.0 },  // 法堂の堂内（雲龍図を見上げる）
+  { x0: -8.6,  x1: -1.85, z0: -60.4, z1: -63.4 },   // 化野への隠れ道（通りの東の竹の切れ目）
+  { x0: -26.5, x1: -8.6,  z0: -57.5, z1: -77.0 }    // 化野の石仏の野（奥まで歩ける）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -4795,6 +4989,26 @@ function update(dt){
   if (FX.amanogawa){
     sora.milky.material.opacity = 0.14 + Math.sin(elapsed * 0.23) * 0.035;
   }
+  // ㊱ 化野：鬼火の漂いとふっと消える息・供え灯と青白い灯篭のまたたき・祠の灯
+  adashino.group.visible = FX.adashino;
+  if (FX.adashino){
+    adashino.onibi.forEach(s => {
+      const u = s.userData;
+      const t = elapsed * u.spd + u.ph;
+      s.position.set(
+        u.cx + Math.sin(t) * u.rx,
+        1.05 + Math.sin(t * 0.7 + 1.3) * 0.5,
+        u.cz + Math.sin(t * 0.83 + 2.1) * u.rz
+      );
+      const w = 0.5 + 0.5 * Math.sin(elapsed * u.fade + u.ph * 2);
+      s.material.opacity = 0.34 * Math.max(0, w * 1.3 - 0.3);
+    });
+    adashino.tomoshi.opacity = 0.42 + Math.sin(elapsed * 1.7) * 0.08;
+    adashino.rouHalos.forEach((h, k) => {
+      h.material.opacity = 0.20 + Math.sin(elapsed * 2.3 + k * 2.7) * 0.05;
+    });
+    adashino.hokoraHi.material.opacity = 0.28 + Math.sin(elapsed * 3.4 + 0.6) * 0.06;
+  }
   sora.clouds.forEach(cl => {
     cl.visible = FX.amanogawa;
     if (!FX.amanogawa) return;
@@ -4838,8 +5052,9 @@ function update(dt){
    10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
    ?tour=1 を付ければ従来どおり壱の町屋から自動で巡る（案内用に残す）
    ============================================================ */
-/* 池の北東の角（東西を正した実地理では x正側）に立ち、灯篭ごしに曹源池と借景の嵐山を見る（月は左上に懸かる） */
-const ENTRY = { pos:[10.3, 1.62, -64.1], tgt:[22.2, 3.4, -82.6] };
+/* 池の北東の角（東西を正した実地理では x正側）に立ち、竹の際から南をのぞむ。
+   塔の舞台がほぼ正面、月が右上、川端の茶店の傘が中央下にひと目で収まる構図 */
+const ENTRY = { pos:[10.3, 1.62, -64.1], tgt:[-0.5, 6.5, -113] };
 if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
