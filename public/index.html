@@ -242,8 +242,9 @@
     .fuda .desc{ font-size:13px }
     .kaji{ gap:6px; padding:7px 9px }
     .kaji button{ padding:0 10px; font-size:12px }
-    /* 狭い画面では点列を二段目へ回す */
-    .kaji .dots{ order:9; width:100%; justify-content:center }
+    /* 狭い画面では点列を二段目へ回す。十二停留は 26px 点で一段に収める */
+    .kaji .dots{ order:9; width:100%; justify-content:center; gap:1px }
+    .kaji .dot{ width:26px; height:26px }
     .hint{ display:none }
   }
   /* 背の低い画面（横持ちの電話など）では題字の列を畳む */
@@ -362,21 +363,26 @@ const HOUSES = DATA.systems.filter(s => s.machiya).slice(0, 7).map((s, i) => ({
   z: -6 - i * 8                   // 八間おきに奥へ
 }));
 
-/* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色 */
+/* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色。
+   道順どおり、竹の小径の途中に天龍寺 → 川端 → 橋 → 山 → 塔の十二停留 */
 const SPOTS = [
-  { kanji:'捌', view:true, name:'桂川のほとり',
+  { kanji:'捌', view:true, name:'天龍寺',
+    desc:'竹の小径のなかほど、山門をくぐると曹源池のほとり。池面に月と方丈の灯がゆれ、庭は川向こうの嵐山を借りて静かに暮れている',
+    tags:['曹源池庭園','借景の嵐山','夢窓疎石'],
+    pos:[-9.3, 1.62, -63.0], tgt:[-26, 4.2, -85] },
+  { kanji:'玖', view:true, name:'桂川のほとり',
     desc:'町並みが尽き、竹の小径を抜けると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
     tags:['竹林の小径','桂川','鵜飼の篝火'],
     pos:[1.7, 1.62, -80.5], tgt:[-3, 1.3, -103] },
-  { kanji:'玖', view:true, name:'渡月橋',
+  { kanji:'拾', view:true, name:'渡月橋',
     desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
     tags:['渡月橋','月の名の橋'],
     pos:[0, 2.88, -105], tgt:[-26, 6, -140] },
-  { kanji:'拾', view:true, name:'嵐山',
+  { kanji:'拾壱', view:true, name:'嵐山',
     desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
     tags:['嵐山','宿の灯'],
     pos:[-2.2, 1.62, -124.8], tgt:[-38, 20, -157] },
-  { kanji:'拾壱', view:true, name:'塔の舞台',
+  { kanji:'拾弐', view:true, name:'塔の舞台',
     desc:'石段をのぼると、塔のたもとの見晴らし台。渡月橋と月の道、来た道の提灯の列が眼下にひらける',
     tags:['法輪寺の見立て','見晴らし'],
     pos:[-13, 6.82, -134.5], tgt:[2, 0.5, -104] }
@@ -404,7 +410,11 @@ const FX = {
   kawadoko    : true,   // ⑯ 対岸の納涼床（提灯の灯が水面に映る）
   hokora      : true,   // ⑰ お地蔵さんの祠（赤前掛け・蝋燭）
   andon       : true,   // ⑱ 辻行灯
-  okuribi     : false   // ⑲ 五山送り火「大」。葉月十六日の宵にだけ自動点灯（下で日付判定）
+  okuribi     : false,  // ⑲ 五山送り火「大」。葉月十六日の宵にだけ自動点灯（下で日付判定）
+  tenryuji    : true,   // ⑳ 天龍寺の境内（山門・方丈・土塀・松・石組・灯篭）
+  sogenchi    : true,   // ㉑ 曹源池の水鏡（月と方丈の灯が池面に映る）
+  sakai       : true,   // ㉒ 散策の境の景（杭柵・柳・芦むら・町の木戸）
+  chamise     : true    // ㉓ 川端の茶店（床几・緋毛氈・野点傘・行灯）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -625,6 +635,56 @@ function sasaTexture(seed){
   }
   return tex(c);
 }
+/* 柳の枝葉（しだれ。上から下へ流れる細い筋と小さな葉） */
+function yanagiTexture(){
+  const c = cv(128, 256), g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 256);
+  let seed = 727;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 44; i++){
+    const x0 = 8 + rnd() * 112, sway = (rnd() - 0.5) * 26;
+    const len = 120 + rnd() * 130;
+    const v = 40 + Math.floor(rnd() * 30);
+    g.strokeStyle = 'rgba(' + Math.floor(v * 0.72) + ',' + v + ',' + Math.floor(v * 0.62) + ',' + (0.45 + rnd() * 0.4) + ')';
+    g.lineWidth = 1 + rnd() * 1.3;
+    g.beginPath();
+    g.moveTo(x0, 0);
+    g.bezierCurveTo(x0 + sway * 0.4, len * 0.35, x0 + sway, len * 0.7, x0 + sway * 0.8, len);
+    g.stroke();
+    for (let k = 0; k < 6; k++){
+      const t = 0.2 + rnd() * 0.75;
+      g.fillStyle = 'rgba(' + Math.floor(v * 0.8) + ',' + (v + 14) + ',' + Math.floor(v * 0.7) + ',' + (0.35 + rnd() * 0.35) + ')';
+      g.beginPath();
+      g.ellipse(x0 + sway * t, len * t, 1.2 + rnd() * 1.3, 3 + rnd() * 3, rnd() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return tex(c);
+}
+/* 芦むら（水辺の細い稈と穂。境の柵の外に茂らせる） */
+function ashiTexture(){
+  const c = cv(128, 128), g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 128);
+  let seed = 838;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 34; i++){
+    const x0 = 6 + rnd() * 116, lean = (rnd() - 0.5) * 18;
+    const v = 46 + Math.floor(rnd() * 26);
+    g.strokeStyle = 'rgba(' + v + ',' + Math.floor(v * 0.94) + ',' + Math.floor(v * 0.6) + ',' + (0.45 + rnd() * 0.4) + ')';
+    g.lineWidth = 1 + rnd();
+    g.beginPath();
+    g.moveTo(x0, 128);
+    g.quadraticCurveTo(x0 + lean * 0.4, 70, x0 + lean, 18 + rnd() * 22);
+    g.stroke();
+    if (rnd() > 0.4){
+      g.fillStyle = 'rgba(' + (v + 22) + ',' + v + ',' + Math.floor(v * 0.55) + ',0.6)';
+      g.beginPath();
+      g.ellipse(x0 + lean, 16 + rnd() * 20, 1.6, 5 + rnd() * 3, lean * 0.02, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return tex(c);
+}
 /* 冷たい光の円（月漏れの光条と地面の斑用。glow の月光版） */
 function glowCoolTexture(){
   const c = cv(128, 128), g = c.getContext('2d');
@@ -702,7 +762,9 @@ const TEX = {
   kodachiFar: treelineTexture('#1b2836', 98765),
   take     : takeTexture(),
   sasa     : sasaTexture(31415),
-  glowCool : glowCoolTexture()
+  glowCool : glowCoolTexture(),
+  yanagi   : yanagiTexture(),
+  ashi     : ashiTexture()
 };
 
 /* ============================================================
@@ -1576,7 +1638,9 @@ const chikurin = (function(){
   for (let i = 0; i < N; i++){
     const side = i % 2 === 0 ? -1 : 1;
     const x = side * (2.7 + Math.pow(rnd(), 1.4) * 3.6);   // 小径の際に濃く、外へ疎らに
-    const z = Z0 + rnd() * (Z1 - Z0);
+    let z = Z0 + rnd() * (Z1 - Z0);
+    // 西側は天龍寺の参道口（z-64.9〜-68.1）を空ける。かかった稈は前後へ譲る
+    if (side < 0 && z < -64.4 && z > -68.6) z += (z > -66.5 ? 4.6 : -4.6);
     const h = 6.8 + rnd() * 3.0;
     const r = 0.8 + rnd() * 0.5;
     eu.set((rnd() - 0.5) * 0.06, rnd() * Math.PI, -side * (0.015 + rnd() * 0.045)); // 先端はやや小径の上へ
@@ -1602,7 +1666,10 @@ const chikurin = (function(){
       p.rotation.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI);
     } else {
       const side = i % 2 === 0 ? -1 : 1;
-      p.position.set(side * (3.4 + rnd() * 1.6), 3.4 + rnd() * 2.2, Z0 + rnd() * (Z1 - Z0));
+      let bz = Z0 + rnd() * (Z1 - Z0);
+      // 参道口の頭上も空けておく（山門の景を茂みで塞がない）
+      if (side < 0 && bz < -63.8 && bz > -69.2) bz += (bz > -66.5 ? 5.4 : -5.4);
+      p.position.set(side * (3.4 + rnd() * 1.6), 3.4 + rnd() * 2.2, bz);
       p.rotation.set((rnd() - 0.5) * 0.4, rnd() * Math.PI, (rnd() - 0.5) * 0.4);
       p.scale.setScalar(0.62);
     }
@@ -1986,6 +2053,418 @@ const butai = (function(){
 })();
 
 /* ============================================================
+   5g. 天龍寺 ― 竹林の西、山門と方丈と曹源池（借景の嵐山）
+   実際の天龍寺も桂川の北岸・竹林の小径ぞい。庭は夢窓疎石の
+   池泉式で、方丈の西に曹源池、その向こうに嵐山を借りる見立て。
+   境内 x-24.2〜-7.6 / z-58.6〜-76.4。池は中心(-16.2,-69.6) rx5.4 rz3.5
+   ============================================================ */
+const tenryuji = (function(){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const shirakabe = new THREE.MeshLambertMaterial({ map: TEX.plaster });
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+
+  // ── 庭の地面（白砂の見立て。夜なのでほの明るい灰） ──
+  const niwa = new THREE.Mesh(new THREE.PlaneGeometry(16.6, 17.8),
+    new THREE.MeshLambertMaterial({ color: 0x232833 }));
+  niwa.rotation.x = -Math.PI / 2;
+  niwa.position.set(-15.9, 0.01, -67.5);
+  g.add(niwa);
+
+  // ── 土塀（白壁に瓦の笠）。東面は山門のところ（z-64.9〜-68.1）で切れる ──
+  // [中心x, 中心z, 長さ, z沿いか]
+  const WALLS = [
+    [-15.9, -58.6, 16.9, 0],     // 北
+    [-15.9, -76.4, 16.9, 0],     // 南
+    [-24.2, -67.5, 18.1, 1],     // 西
+    [-7.6, -61.75, 6.3, 1],      // 東（山門の北）
+    [-7.6, -72.25, 8.3, 1]       // 東（山門の南）
+  ];
+  const wallBody = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), shirakabe, WALLS.length);
+  const wallKasa = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), MAT.roof, WALLS.length);
+  WALLS.forEach((w, i) => {
+    eu.set(0, w[3] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(w[0], 0.78, w[1]), q0, sc.set(w[2], 1.56, 0.3));
+    wallBody.setMatrixAt(i, m4);
+    m4.compose(vv.set(w[0], 1.63, w[1]), q0, sc.set(w[2] + 0.14, 0.14, 0.52));
+    wallKasa.setMatrixAt(i, m4);
+  });
+  wallBody.instanceMatrix.needsUpdate = true;
+  wallKasa.instanceMatrix.needsUpdate = true;
+  g.add(wallBody, wallKasa);
+
+  // ── 山門（切妻の四脚門。棟は z 沿い・くぐる向きは x） ──
+  const mon = new THREE.Group();
+  const hashira = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 2.5, 0.22), MAT.wallDk, 6);
+  [[0, -1.3], [0, 1.3], [-0.55, -1.3], [0.55, -1.3], [-0.55, 1.3], [0.55, 1.3]].forEach((p, i) => {
+    m4.makeTranslation(p[0], 1.25, p[1]);
+    hashira.setMatrixAt(i, m4);
+  });
+  hashira.instanceMatrix.needsUpdate = true;
+  mon.add(hashira);
+  const monLintel = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 3.1), MAT.wallDk);
+  monLintel.position.y = 2.42; mon.add(monLintel);
+  const mRise = 0.55, mRun = 1.05;
+  const mSlope = Math.sqrt(mRun * mRun + mRise * mRise), mAng = Math.atan2(mRise, mRun);
+  [1, -1].forEach(dir => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(mSlope, 0.1, 3.8), MAT.roof);
+    p.rotation.z = -dir * mAng;
+    p.position.set(dir * mRun / 2, 2.72 + mRise / 2, 0);
+    mon.add(p);
+  });
+  const mMune = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 3.9), MAT.roofEdge);
+  mMune.position.y = 2.72 + mRise + 0.02; mon.add(mMune);
+  // 門提灯（参道へ灯をこぼす）
+  const monCho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color: 0xffd28a }));
+  monCho.scale.set(0.8, 1.05, 0.8);
+  monCho.position.y = 1.95; mon.add(monCho);
+  const monHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
+  monHalo.scale.set(1.6, 1.6, 1);
+  monHalo.position.y = 1.95; mon.add(monHalo);
+  mon.position.set(-7.6, 0, -66.5);
+  g.add(mon);
+
+  // ── 参道の敷石（山門から竹の小径へ） ──
+  const shiki = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.05, 0.62), stone, 7);
+  for (let i = 0; i < 7; i++){
+    m4.makeTranslation(-6.9 + i * 0.8, 0.028, -66.5 + (i % 2 ? 0.12 : -0.12));
+    shiki.setMatrixAt(i, m4);
+  }
+  shiki.instanceMatrix.needsUpdate = true;
+  g.add(shiki);
+
+  // ── 方丈（入母屋の大屋根と広縁。南面の障子の灯が庭にこぼれる） ──
+  const hojo = new THREE.Group();
+  const HW = 5.8, HD = 4.0, HH = 2.3;
+  const kidan = new THREE.Mesh(new THREE.BoxGeometry(HW + 1.4, 0.3, HD + 1.4), stone);
+  kidan.position.y = 0.15; hojo.add(kidan);
+  const hbody = new THREE.Mesh(new THREE.BoxGeometry(HW, HH, HD), MAT.wall);
+  hbody.position.y = 0.3 + HH / 2; hojo.add(hbody);
+  const hRise = 1.15, hEave = 0.75;
+  const hRun = HD / 2 + hEave;
+  const hSlope = Math.sqrt(hRun * hRun + hRise * hRise), hAng = Math.atan2(hRise, hRun);
+  [1, -1].forEach(dir => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(HW + 1.7, 0.14, hSlope), MAT.roof);
+    p.rotation.x = dir * hAng;
+    p.position.set(0, HH + 0.3 + hRise / 2, dir * hRun / 2);
+    hojo.add(p);
+  });
+  const hMune = new THREE.Mesh(new THREE.BoxGeometry(HW * 0.62, 0.2, 0.4), MAT.roofEdge);
+  hMune.position.y = HH + 0.3 + hRise + 0.05; hojo.add(hMune);
+  // 妻（入母屋の見立て。棟の両端を小さな壁で締める）
+  [1, -1].forEach(dir => {
+    const tsuma = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.72, HD * 0.5), MAT.wallDk);
+    tsuma.position.set(dir * HW * 0.31, HH + 0.3 + hRise * 0.42, 0);
+    hojo.add(tsuma);
+  });
+  // 広縁（正面）と障子の灯
+  const en = new THREE.Mesh(new THREE.BoxGeometry(HW + 0.9, 0.12, 0.85), MAT.wallDk);
+  en.position.set(0, 0.52, HD / 2 + 0.45); hojo.add(en);
+  const shoji = new THREE.Mesh(new THREE.PlaneGeometry(HW - 0.7, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0xffc98e, transparent: true, opacity: 0.85 }));
+  shoji.position.set(0, 1.25, HD / 2 + 0.011); hojo.add(shoji);
+  const sans = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 1.4, 0.03), MAT.wallDk, 6);
+  for (let i = 0; i < 6; i++){
+    m4.makeTranslation(-HW / 2 + 0.85 + i * ((HW - 1.7) / 5), 1.25, HD / 2 + 0.03);
+    sans.setMatrixAt(i, m4);
+  }
+  sans.instanceMatrix.needsUpdate = true;
+  hojo.add(sans);
+  const hojoGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+  hojoGlow.scale.set(5.2, 2.6, 1);
+  hojoGlow.position.set(0, 1.35, HD / 2 + 0.6); hojo.add(hojoGlow);
+  const hojoPool = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 2.6),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0.10,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  hojoPool.rotation.x = -Math.PI / 2;
+  hojoPool.position.set(0, 0.02, HD / 2 + 1.5); hojo.add(hojoPool);
+  hojo.position.set(-13.4, 0, -61.5);
+  hojo.rotation.y = Math.PI;          // 正面（広縁と障子）を南＝池へ向ける
+  g.add(hojo);
+
+  // ── 曹源池（renderOrder -2 で先に描き、水鏡の光を飲ませない＝川と同じ手） ──
+  const PC = { x: -16.2, z: -69.6, rx: 5.4, rz: 3.5 };
+  const ike = new THREE.Mesh(new THREE.CircleGeometry(1, 40),
+    new THREE.MeshBasicMaterial({ map: TEX.water.clone(), color: 0x9db1d8,
+      transparent: true, opacity: 0.94 }));
+  ike.material.map.wrapS = ike.material.map.wrapT = THREE.RepeatWrapping;
+  ike.material.map.repeat.set(3, 2);
+  ike.rotation.x = -Math.PI / 2;
+  ike.scale.set(PC.rx, PC.rz, 1);
+  ike.position.set(PC.x, 0.025, PC.z);
+  ike.renderOrder = -2;
+  g.add(ike);
+
+  // 護岸の石と岩島・龍門瀑の石組（ひとまとめの一描画）
+  const ISHI = [];
+  let seed = 1339;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 16; i++){        // 汀の石
+    const th = (i / 16) * Math.PI * 2 + rnd() * 0.2;
+    ISHI.push([PC.x + Math.cos(th) * (PC.rx + 0.25), 0.09, PC.z + Math.sin(th) * (PC.rz + 0.25),
+               0.55 + rnd() * 0.75]);
+  }
+  ISHI.push([PC.x + 1.4, 0.16, PC.z + 0.9, 1.15]);     // 岩島二つ
+  ISHI.push([PC.x - 1.8, 0.13, PC.z - 1.1, 0.9]);
+  ISHI.push([-20.6, 0.5, -69.2, 1.9]);                 // 龍門瀑（立石を西の際に）
+  ISHI.push([-20.9, 0.32, -68.3, 1.4]);
+  ISHI.push([-20.3, 0.26, -70.2, 1.25]);
+  ISHI.push([-19.6, 0.10, -69.5, 0.8]);                // 鯉魚石
+  const iwa = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.32, 0), stone, ISHI.length);
+  ISHI.forEach((s, i) => {
+    eu.set(rnd() * Math.PI, rnd() * Math.PI, rnd() * 0.4); q0.setFromEuler(eu);
+    m4.compose(vv.set(s[0], s[1], s[2]), q0, sc.set(s[3], s[3] * (0.8 + rnd() * 0.5), s[3]));
+    iwa.setMatrixAt(i, m4);
+    if (iwa.setColorAt) iwa.setColorAt(i, col.setHSL(0.6, 0.05, 0.38 + rnd() * 0.2));
+  });
+  iwa.instanceMatrix.needsUpdate = true;
+  if (iwa.instanceColor) iwa.instanceColor.needsUpdate = true;
+  g.add(iwa);
+  // 三連の石橋（龍門瀑の前に平石を渡す）
+  const hashi = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, 0.09, 0.4), stone, 3);
+  [[-19.9, -67.6, 0.5], [-19.4, -68.6, 0.2], [-19.8, -69.7, -0.25]].forEach((p, i) => {
+    eu.set(0, p[2], 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 0.16, p[1]), q0, sc.set(1, 1, 1));
+    hashi.setMatrixAt(i, m4);
+  });
+  hashi.instanceMatrix.needsUpdate = true;
+  g.add(hashi);
+
+  // ── 水鏡（㉑）。月の映りと方丈の灯の映り、それに水面のきらめき ──
+  const mirror = new THREE.Group();
+  const moonStreak = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 5.2),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xcfe0ff, transparent: true,
+      opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false }));
+  moonStreak.rotation.x = -Math.PI / 2;
+  moonStreak.rotation.z = -0.30;                       // 月の方位（南南西）へ寝かせる
+  moonStreak.position.set(PC.x - 1.2, 0.045, PC.z - 0.5);
+  mirror.add(moonStreak);
+  const warmStreak = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 3.4),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xffc978, transparent: true,
+      opacity: 0.10, blending: THREE.AdditiveBlending, depthWrite: false }));
+  warmStreak.rotation.x = -Math.PI / 2;
+  warmStreak.rotation.z = 0.55;                        // 方丈の方（北東）から伸びる
+  warmStreak.position.set(PC.x + 2.3, 0.045, PC.z + 1.6);
+  mirror.add(warmStreak);
+  const N_KIRA = 12, kpos = new Float32Array(N_KIRA * 3);
+  for (let i = 0; i < N_KIRA; i++){
+    const th = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * 0.82;
+    kpos[i*3]   = PC.x + Math.cos(th) * PC.rx * rr;
+    kpos[i*3+1] = 0.05;
+    kpos[i*3+2] = PC.z + Math.sin(th) * PC.rz * rr;
+  }
+  const kgeo = new THREE.BufferGeometry();
+  kgeo.setAttribute('position', new THREE.BufferAttribute(kpos, 3));
+  const shimmer = new THREE.Points(kgeo, new THREE.PointsMaterial({
+    map: TEX.glow, color: 0xcfe0ff, size: 0.16, sizeAttenuation: true,
+    transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
+  mirror.add(shimmer);
+  g.add(mirror);
+
+  // ── 松（庭木。池の北西、方丈の裏手の歩けない一角に） ──
+  const matsuKan = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.12, 1.9, 6), MAT.wallDk, 2);
+  const MATSU = [[-21.0, -61.2, 0.16], [-18.9, -62.6, -0.12]];
+  MATSU.forEach((p, i) => {
+    eu.set(p[2], 0, p[2] * 0.7); q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 0.95, p[1]), q0, sc.set(1, 1, 1));
+    matsuKan.setMatrixAt(i, m4);
+  });
+  matsuKan.instanceMatrix.needsUpdate = true;
+  g.add(matsuKan);
+  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0x1d3226 }), 6);
+  const HA = [[-21.2, 2.0, -61.0, 1.3], [-20.6, 1.6, -61.7, 1.0], [-21.5, 1.45, -61.6, 0.8],
+              [-18.8, 1.85, -62.8, 1.15], [-19.4, 1.5, -62.3, 0.9], [-18.5, 1.35, -62.1, 0.75]];
+  HA.forEach((p, i) => {
+    m4.compose(vv.set(p[0], p[1], p[2]), q0.identity(), sc.set(p[3], p[3] * 0.42, p[3]));
+    matsuHa.setMatrixAt(i, m4);
+  });
+  matsuHa.instanceMatrix.needsUpdate = true;
+  g.add(matsuHa);
+
+  // ── 庭の灯篭二基（池の東の際と、参道の竹の際） ──
+  const halos = [];
+  [[-12.0, -66.8], [-5.0, -68.6]].forEach(p => {
+    const sao = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.55, 0.22), stone);
+    sao.position.set(p[0], 0.28, p[1]); g.add(sao);
+    const hib = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.26, 0.3), MAT.inner);
+    hib.position.set(p[0], 0.68, p[1]); g.add(hib);
+    const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.22, 4), stone);
+    kasa.rotation.y = Math.PI / 4;
+    kasa.position.set(p[0], 0.92, p[1]); g.add(kasa);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+      opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.set(1.3, 1.3, 1);
+    halo.position.set(p[0], 0.68, p[1]); g.add(halo);
+    halos.push(halo);
+  });
+
+  // Sprite は r128 の raycast で TypeError の火種になる（Raycaster.camera 前提）。
+  // クリックの当たりは形のある方に任せ、光り物は素通しにしておく
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, monHalo: monHalo, shoji: shoji, hojoGlow: hojoGlow, halos: halos,
+           mirror: mirror, moonStreak: moonStreak, warmStreak: warmStreak, shimmer: shimmer,
+           pond: PC, stoneCount: ISHI.length };
+})();
+
+/* ============================================================
+   5h. 散策の境と川端の景 ― 杭柵・柳・芦むら・町の木戸・茶店
+   （そぞろ歩きの可動域を絞ったぶん、境そのものを景色にする。
+     柵の外にも柳と蛍を残して、行けないが見える奥行きをとる）
+   ============================================================ */
+const sakai = (function(){
+  const g = new THREE.Group();
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3();
+  let seed = 2929;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // ── 杭と縄の柵（河原の東西の際 x±15.25。可動域の縁がそのまま景色になる） ──
+  const KUI_N = 6, KZ0 = -78.6, KZ1 = -87.8;
+  const kui = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.065, 0.9, 6), MAT.bamboo, KUI_N * 2);
+  const nawa = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 4), MAT.bar, (KUI_N - 1) * 2);
+  let ki = 0, ni = 0;
+  [-15.25, 15.25].forEach(x => {
+    const zs = [];
+    for (let i = 0; i < KUI_N; i++){
+      const z = KZ0 + (i / (KUI_N - 1)) * (KZ1 - KZ0) + (rnd() - 0.5) * 0.3;
+      zs.push(z);
+      eu.set((rnd() - 0.5) * 0.08, 0, (rnd() - 0.5) * 0.08); q0.setFromEuler(eu);
+      m4.compose(vv.set(x, 0.45, z), q0, sc.set(1, 1, 1));
+      kui.setMatrixAt(ki++, m4);
+    }
+    for (let i = 0; i < KUI_N - 1; i++){
+      const za = zs[i], zb = zs[i + 1];
+      eu.set(Math.PI / 2, 0, 0); q0.setFromEuler(eu);
+      m4.compose(vv.set(x, 0.62 - 0.05, (za + zb) / 2), q0, sc.set(1, Math.abs(zb - za), 1));
+      nawa.setMatrixAt(ni++, m4);
+    }
+  });
+  kui.instanceMatrix.needsUpdate = true;
+  nawa.instanceMatrix.needsUpdate = true;
+  g.add(kui, nawa);
+
+  // ── 柳四本（柵の外側。しだれの幕を吊り、幹ごとゆっくりそよぐ） ──
+  const yanagi = [];
+  const frondGeo = new THREE.PlaneGeometry(1.9, 2.7);
+  frondGeo.translate(0, -1.35, 0);                     // 上端を吊り元に
+  [[-17.6, -80.6], [-18.6, -86.4], [17.6, -80.9], [18.5, -86.2]].forEach(p => {
+    const tree = new THREE.Group();
+    const kan = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 2.5, 6), MAT.wallDk);
+    kan.position.y = 1.25;
+    kan.rotation.z = (rnd() - 0.5) * 0.16;
+    tree.add(kan);
+    const fronds = new THREE.InstancedMesh(frondGeo,
+      new THREE.MeshLambertMaterial({ map: TEX.yanagi, transparent: true,
+        side: THREE.DoubleSide, depthWrite: false }), 4);
+    for (let i = 0; i < 4; i++){
+      eu.set((rnd() - 0.5) * 0.2, (i / 4) * Math.PI * 2 + rnd(), (rnd() - 0.5) * 0.14);
+      q0.setFromEuler(eu);
+      m4.compose(vv.set((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.5), q0,
+                 sc.set(0.9 + rnd() * 0.3, 0.9 + rnd() * 0.25, 1));
+      fronds.setMatrixAt(i, m4);
+    }
+    fronds.instanceMatrix.needsUpdate = true;
+    fronds.position.y = 2.55;                          // 吊り元＝梢。ここを振ってそよがせる
+    tree.add(fronds);
+    tree.position.set(p[0], 0, p[1]);
+    g.add(tree);
+    yanagi.push(fronds);
+  });
+
+  // ── 芦むら（柵の外と水際。交差した二枚板の茂み） ──
+  const ashiGeo = new THREE.PlaneGeometry(1.4, 1.1);
+  ashiGeo.translate(0, 0.55, 0);
+  const ASHI = [];
+  [[-16.4, -79.4], [-16.9, -84.2], [-15.9, -88.1], [-19.8, -88.0],
+   [16.3, -79.6], [16.8, -84.8], [15.8, -88.2], [19.6, -87.9], [21.5, -88.6], [-21.8, -88.5]].forEach(p => {
+    ASHI.push([p[0], p[1], rnd() * Math.PI]);
+    ASHI.push([p[0] + 0.1, p[1] - 0.05, rnd() * Math.PI]);
+  });
+  const ashi = new THREE.InstancedMesh(ashiGeo,
+    new THREE.MeshLambertMaterial({ map: TEX.ashi, transparent: true,
+      side: THREE.DoubleSide, depthWrite: false }), ASHI.length);
+  ASHI.forEach((p, i) => {
+    eu.set(0, p[2], 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 0, p[1]), q0, sc.set(0.8 + rnd() * 0.5, 0.8 + rnd() * 0.4, 1));
+    ashi.setMatrixAt(i, m4);
+  });
+  ashi.instanceMatrix.needsUpdate = true;
+  g.add(ashi);
+
+  // ── 町の木戸（通りの北の端。振り返った先を虚空にしない冠木門） ──
+  const kido = new THREE.Group();
+  [-2.1, 2.1].forEach(x => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.3, 0.2), MAT.wallDk);
+    p.position.set(x, 1.15, 0); kido.add(p);
+  });
+  const kabuki = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.24, 0.24), MAT.wall);
+  kabuki.position.y = 2.34; kido.add(kabuki);
+  const kyane = new THREE.Mesh(new THREE.BoxGeometry(5.3, 0.1, 0.8), MAT.roof);
+  kyane.position.y = 2.56; kido.add(kyane);
+  const kidoCho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color: 0xffd28a }));
+  kidoCho.scale.set(0.7, 0.95, 0.7);
+  kidoCho.position.set(0, 1.9, 0); kido.add(kidoCho);
+  const kidoHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
+  kidoHalo.scale.set(1.5, 1.5, 1);
+  kidoHalo.position.set(0, 1.9, 0); kido.add(kidoHalo);
+  kido.position.set(0, 0, 4.8);
+  g.add(kido);
+
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, yanagi: yanagi, kidoHalo: kidoHalo };
+})();
+
+/* 川端の茶店（㉓）。東の河原に床几と緋毛氈、野点傘、行灯の小さな灯 */
+const chamise = (function(){
+  const g = new THREE.Group();
+  const shogi = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.07, 0.55), MAT.wall);
+  shogi.position.y = 0.42; g.add(shogi);
+  const ashiG = new THREE.InstancedMesh(new THREE.BoxGeometry(0.055, 0.42, 0.055), MAT.wallDk, 4);
+  const m4 = new THREE.Matrix4();
+  [[-0.75, -0.2], [0.75, -0.2], [-0.75, 0.2], [0.75, 0.2]].forEach((p, i) => {
+    m4.makeTranslation(p[0], 0.21, p[1]);
+    ashiG.setMatrixAt(i, m4);
+  });
+  ashiG.instanceMatrix.needsUpdate = true;
+  g.add(ashiG);
+  const mousen = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.03, 0.5),
+    new THREE.MeshLambertMaterial({ color: 0xa8352c }));
+  mousen.position.y = 0.47; g.add(mousen);
+  // 野点傘（床几のかたわらに立てて開く）
+  const kasaPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 2.6, 6), MAT.bamboo);
+  kasaPole.position.set(-1.05, 1.3, -0.1); g.add(kasaPole);
+  const kasa = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.55, 10),
+    new THREE.MeshLambertMaterial({ color: 0x93302a, side: THREE.DoubleSide }));
+  kasa.position.set(-1.05, 2.45, -0.1); g.add(kasa);
+  // 行灯（小さな灯と地の照り）
+  const anBody = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.22), MAT.inner);
+  anBody.position.set(1.15, 0.14, 0.05); g.add(anBody);
+  const anKasa = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.28), MAT.roof);
+  anKasa.position.set(1.15, 0.30, 0.05); g.add(anKasa);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.set(1.2, 1.2, 1);
+  halo.position.set(1.15, 0.2, 0.05); g.add(halo);
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0.10,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(0.6, 0.02, 0.2); g.add(pool);
+  g.position.set(10.8, 0, -82.4);
+  g.rotation.y = 0.6;                 // 床几を川と橋の眺めへ向ける
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, halo: halo, pool: pool };
+})();
+
+/* ============================================================
    6. 屋根の猫（参の町屋に一匹）
    ============================================================ */
 const cat = (function(){
@@ -2091,10 +2570,13 @@ function updateCamera(dt){
     t = Math.min(1, t + dt / TRAVEL_S);
     const e = smooth(t);
     // 通りの真ん中をふくらんで進む（ベジェ）。長い戻りは屋根の上、
-    // 塔の舞台（高所）への出入りは石段の上を高めに飛んで、丘に潜らない
+    // 塔の舞台（高所）への出入りは石段の上を高めに飛んで、丘に潜らない。
+    // 天龍寺は土塀と竹の内側＝出入りは竹の梢を越えて飛び、境内を上から見せる
     const span = Math.abs(fromPos.z - s.pos.z);
     const hi = Math.max(fromPos.y, s.pos.y) > 5;
-    ctrl.set(0, span > 60 ? 12 : (hi ? 11 : 1.6), (fromPos.z + s.pos.z) / 2);
+    const tera = p => p.x < -7.3 && p.z > -77 && p.z < -58;
+    const arcY = span > 60 ? 12 : (hi ? 11 : ((tera(fromPos) || tera(s.pos)) ? 13.5 : 1.6));
+    ctrl.set(0, arcY, (fromPos.z + s.pos.z) / 2);
     const u = 1 - e;
     camera.position.set(
       u*u*fromPos.x + 2*u*e*ctrl.x + e*e*s.pos.x,
@@ -2138,11 +2620,16 @@ const WALK = {
 };
 const WALK_ZONES = [
   { x0: -1.85, x1: 1.85, z0:   3.4, z1:  -77.8 },   // 通りと竹林の小径
-  { x0: -26,   x1: 26,   z0: -77.8, z1:  -88.4 },   // 川端の河原
+  { x0: -15,   x1: 15,   z0: -77.8, z1:  -88.4 },   // 川端の河原（杭柵まで。景のある幅に絞った）
   { x0: -1.15, x1: 1.15, z0: -88.4, z1: -121.6 },   // 渡月橋の上
   { x0: -17,   x1: 10,   z0: -121.6, z1: -127  },   // 対岸（納涼床の手前まで）
   { x0: -11.8, x1: -8.8, z0: -127,  z1: -133.5 },   // 参道の石段（物見の丘へ）
-  { x0: -21,   x1: -9,   z0: -133.5, z1: -137.5 }   // 塔の舞台
+  { x0: -21,   x1: -9,   z0: -133.5, z1: -137.5 },  // 塔の舞台
+  { x0: -7.9,  x1: -1.85, z0: -64.9, z1: -68.1 },   // 天龍寺の参道（山門をくぐる）
+  { x0: -10.2, x1: -7.9,  z0: -59.0, z1: -76.1 },   // 境内の東庭
+  { x0: -23.7, x1: -7.9,  z0: -63.8, z1: -65.9 },   // 曹源池の北縁（方丈の前庭）
+  { x0: -23.7, x1: -7.9,  z0: -73.4, z1: -76.1 },   // 曹源池の南縁
+  { x0: -23.7, x1: -21.9, z0: -65.9, z1: -73.4 }    // 曹源池の西縁（龍門瀑のほとり）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -2418,7 +2905,7 @@ window.addEventListener('keyup', e => {
 /* 町屋・川・橋・山をクリックして選ぶ（レール時）／タップで歩き・なぞって見回す（散歩時） */
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
-const clickRoots = houseGroups.concat([river, bridgeGroup, mtGroup]);
+const clickRoots = houseGroups.concat([tenryuji.group, river, bridgeGroup, mtGroup]);
 function setNdc(cx, cy){
   const r = renderer.domElement.getBoundingClientRect();
   ndc.x =  ((cx - r.left) / r.width)  * 2 - 1;
@@ -2430,10 +2917,11 @@ function railPick(){
   let o = hit.object, target = -1;
   while (o){
     const hi = houseGroups.indexOf(o);
-    if (hi >= 0)           { target = hi;     break; }
-    if (o === river)       { target = NH;     break; }
-    if (o === bridgeGroup) { target = NH + 1; break; }
-    if (o === mtGroup)     { target = NH + 2; break; }
+    if (hi >= 0)                { target = hi;     break; }
+    if (o === tenryuji.group)   { target = NH;     break; }
+    if (o === river)            { target = NH + 1; break; }
+    if (o === bridgeGroup)      { target = NH + 2; break; }
+    if (o === mtGroup)          { target = NH + 3; break; }
     o = o.parent;
   }
   return target;
@@ -2931,6 +3419,37 @@ function update(dt){
     h.material.opacity = 0.30 + Math.sin(elapsed * 3.5 + k * 2.6) * 0.07;
   });
   butai.glowSprites[1].material.opacity = 0.24 + Math.sin(elapsed * 2.9) * 0.05;
+  // ⑳ 天龍寺：門提灯・障子・灯篭のまたたき／㉑ 曹源池の水鏡の呼吸
+  tenryuji.group.visible = FX.tenryuji;
+  if (FX.tenryuji){
+    tenryuji.monHalo.material.opacity = 0.34 + Math.sin(elapsed * 3.3 + 0.7) * 0.07;
+    tenryuji.shoji.material.opacity = 0.82 + Math.sin(elapsed * 1.9) * 0.06;
+    tenryuji.hojoGlow.material.opacity = 0.22 + Math.sin(elapsed * 2.7) * 0.045;
+    tenryuji.halos.forEach((h, k) => {
+      h.material.opacity = 0.30 + Math.sin(elapsed * 3.6 + k * 2.3) * 0.07;
+    });
+  }
+  tenryuji.mirror.visible = FX.tenryuji && FX.sogenchi;
+  if (tenryuji.mirror.visible){
+    tenryuji.moonStreak.material.opacity = 0.13 + Math.sin(elapsed * 0.55) * 0.035;
+    tenryuji.moonStreak.scale.x = 1 + Math.sin(elapsed * 0.8 + 1.2) * 0.08;
+    tenryuji.warmStreak.material.opacity = 0.10 + Math.sin(elapsed * 2.4) * 0.03;
+    tenryuji.shimmer.material.opacity = 0.30 + Math.max(0, Math.sin(elapsed * 1.7)) * 0.25;
+  }
+  // ㉒ 境の景：柳が梢ごとそよぐ・木戸の提灯／㉓ 茶店の行灯
+  sakai.group.visible = FX.sakai;
+  if (FX.sakai){
+    sakai.yanagi.forEach((y, k) => {
+      y.rotation.z = Math.sin(elapsed * 0.5 + k * 1.7) * 0.045;
+      y.rotation.x = Math.sin(elapsed * 0.37 + k * 2.4) * 0.025;
+    });
+    sakai.kidoHalo.material.opacity = 0.28 + Math.sin(elapsed * 3.8 + 1.1) * 0.06;
+  }
+  chamise.group.visible = FX.chamise;
+  if (FX.chamise){
+    chamise.halo.material.opacity = 0.30 + Math.sin(elapsed * 4.2 + 2.2) * 0.07;
+    chamise.pool.material.opacity = 0.10 + Math.sin(elapsed * 4.2 + 2.9) * 0.03;
+  }
   // ⑲ 送り火：葉月十六日の宵にだけ「大」が燃える（試灯は __machiya.FX.okuribi）
   okuribi.group.visible = FX.okuribi;
   if (FX.okuribi){
@@ -3043,6 +3562,7 @@ window.__machiya = {
                   take: chikurin.N, sasa: chikurin.canopy.length,
                   shafts: chikurin.shafts.length,
                   okuribiHi: okuribi.count,
+                  teraIshi: tenryuji.stoneCount, yanagi: sakai.yanagi.length,
                   meteorOn: meteor ? meteor.life >= 0 : false },
       fudaOn: fuda.classList.contains('on'),
       fudaView: fuda.classList.contains('view'),
@@ -3071,6 +3591,8 @@ window.__machiya = {
         peak   : proj(new THREE.Vector3(MTS[0].cx, MTS[0].r * MTS[0].sy, MTS[0].cz + MTS[0].r * MTS[0].sz * 0.5)),
         kagari : proj(boats[0].position),
         touro  : proj(touros[2].g.position),
+        pond   : proj(new THREE.Vector3(tenryuji.pond.x, 0.05, tenryuji.pond.z)),
+        hojo   : proj(new THREE.Vector3(-13.4, 2.0, -61.5)),
         nagashi: nagashiTouro.length ? proj(nagashiTouro[0].position) : null,
         walker : walkers.length ? proj(walkers[0].position) : null
       };
