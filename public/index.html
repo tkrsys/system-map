@@ -168,6 +168,59 @@
   .fuda .enter:hover{ filter:brightness(1.1) }
   .fuda .enter:focus-visible{ outline:2px solid #fff; outline-offset:2px }
 
+  /* ===== 短冊（右・その場の一句を掛ける） ===== */
+  .tanzaku{
+    position:fixed; top:66px; right:22px; z-index:10;
+    display:flex; flex-direction:column; align-items:center;
+    padding:16px 13px 12px;
+    background:
+      repeating-linear-gradient(96deg, rgba(120,96,54,0.055) 0 1px, rgba(0,0,0,0) 1px 6px),
+      linear-gradient(160deg, #EFE6CD 0%, #E6DABB 55%, #DACDA6 100%);
+    border:1px solid rgba(120,96,54,0.35);
+    border-radius:2px;
+    box-shadow:0 12px 28px rgba(0,0,0,0.6), inset 0 0 22px rgba(140,116,70,0.16);
+    color:#2A2119;
+    opacity:0; transform:translateY(-18px);
+    transition:opacity .55s ease, transform .55s ease;
+    pointer-events:none;
+  }
+  .tanzaku.on{ opacity:1; transform:translateY(0) }
+  /* 掛けている鋲（朱） */
+  .tanzaku::before{
+    content:""; position:absolute; top:-5px; left:50%; margin-left:-5px;
+    width:10px; height:10px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #F0A891, var(--shu) 72%);
+    box-shadow:0 1px 3px rgba(0,0,0,0.75);
+  }
+  /* 揺れは内側で。外側の出し入れ（transform）と喧嘩させない */
+  .tanzaku .tz-in{
+    display:flex; flex-direction:column; align-items:center;
+    transform-origin:50% -14px;
+    opacity:1; transition:opacity .28s ease;
+  }
+  .tanzaku.on .tz-in{ animation:yure 8.5s ease-in-out infinite }
+  @keyframes yure{
+    0%,100%{ transform:rotate(-0.75deg) }
+    50%    { transform:rotate(0.75deg) }
+  }
+  .tanzaku .tz-ku{
+    writing-mode:vertical-rl;
+    font-size:17px; letter-spacing:3.5px; line-height:2.1;
+    white-space:nowrap;      /* 縦組みで折り返さない＝高さは中身なり */
+    color:#231C14;
+  }
+  /* 中七・下五は少し下げて書き出す（短冊の手） */
+  .tanzaku .tz-l + .tz-l{ padding-top:13px }
+  .tanzaku .tz-l + .tz-l + .tz-l{ padding-top:26px }
+  .tanzaku .tz-foot{
+    margin-top:11px; font-size:9.5px; letter-spacing:1px;
+    color:#6B5A3E; text-align:center; line-height:1.7;
+  }
+  .tanzaku .tz-foot span{ display:block }
+  .tanzaku .tz-ba{ opacity:0.75 }
+  /* 詠み替えのひと呼吸 */
+  .tanzaku .tz-in.kae{ opacity:0.05 }
+
   /* ===== 操作（最下部） ===== */
   .kaji{
     position:fixed; left:50%; bottom:18px; z-index:11;
@@ -246,6 +299,8 @@
     .kaji .dots{ order:9; width:100%; justify-content:center; gap:1px }
     .kaji .dot{ width:26px; height:26px }
     .hint{ display:none }
+    .tanzaku{ top:62px; right:12px; padding:13px 10px 10px }   /* 一覧の釦の下に少し余白 */
+    .tanzaku .tz-ku{ font-size:15px; letter-spacing:2.5px; line-height:2 }
   }
   /* 背の低い画面（横持ちの電話など）では題字の列を畳む */
   @media (max-height:480px){
@@ -282,6 +337,17 @@
   <a class="enter" id="f-enter" href="#" target="_blank" rel="noopener">暖 簾 を く ぐ る</a>
 </div>
 
+<!-- 短冊：いまいる停留と季節でひと句。中身は haiku.json（歳時記） -->
+<div class="tanzaku" id="tanzaku" aria-live="polite">
+  <div class="tz-in" id="tz-in">
+    <div class="tz-ku" id="tz-ku"></div>
+    <div class="tz-foot">
+      <span id="tz-kigo"></span>
+      <span class="tz-ba" id="tz-ba"></span>
+    </div>
+  </div>
+</div>
+
 <div class="hint">← → で通りから渡月橋までめぐる　／　町屋や橋をクリックでも選べます</div>
 
 <div class="kaji">
@@ -292,6 +358,7 @@
   <button id="btn-walk" aria-pressed="false">そぞろ歩き</button>
   <button id="btn-fune" aria-pressed="false">屋形舟</button>
   <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
+  <button id="btn-ku" aria-pressed="false">一句詠む</button>
 </div>
 
 <div id="fallback">
@@ -350,6 +417,13 @@ try {
   const res = await fetch('./systems.json', { cache: 'no-store' });
   if (res.ok) DATA = await res.json();
 } catch (e) {}
+/* 歳時記（停留×四季の句）。読めなければ短冊は掛けない ―― 町は歩ける */
+let HAIKU = null;
+try {
+  const hres = await fetch('./haiku.json', { cache: 'no-store' });
+  if (hres.ok) HAIKU = await hres.json();
+} catch (e) {}
+
 if (!DATA || !DATA.systems || !DATA.systems.length){
   // 出典が読めなければ通りは組めない。御絵図への案内に落とす
   document.getElementById('fallback').style.display = 'flex';
@@ -3332,6 +3406,83 @@ setTimeout(layoutBottom, 400);
 
 paintDots(); syncAutoBtn(); layoutBottom();
 
+/* ============================================================
+   8c. 短冊 ― その場の一句（歳時記 haiku.json より）
+   いまいる停留と、きょうの季節で選ぶ。舟の上と送り火の宵は特別の句。
+   歩いて停留が変われば、掛けたままでも静かに詠み替える
+   ============================================================ */
+const tzEl   = document.getElementById('tanzaku');
+const tzIn   = document.getElementById('tz-in');
+const tzKu   = document.getElementById('tz-ku');
+const tzKigo = document.getElementById('tz-kigo');
+const tzBa   = document.getElementById('tz-ba');
+const kuBtn  = document.getElementById('btn-ku');
+let kuOpen = false;
+let kuKey  = '';                 // いま掛かっている句の出どころ。変わったら詠み替える
+let kuT    = 0;
+
+if (!HAIKU || !HAIKU.ku) kuBtn.style.display = 'none';
+tzEl.setAttribute('aria-hidden', 'true');
+
+/* 居どころ＝散歩と舟の最中はいちばん近い停留、巡りの最中はいまの停留 */
+function kuStopIdx(){ return (walkMode || rideActive()) ? nearestStopIdx() : idx; }
+
+function kuPick(){
+  if (!HAIKU || !HAIKU.ku) return null;
+  const toki = HAIKU.toki || {};
+  if (rideActive() && toki.fune)   return { key:'fune',    ku:toki.fune,    ba:toki.fune.ba };
+  if (FX.okuribi && toki.okuribi)  return { key:'okuribi', ku:toki.okuribi, ba:toki.okuribi.ba };
+  const st  = TOUR[kuStopIdx()];
+  const set = HAIKU.ku[st.kanji];
+  const one = set && set[SHIKI.current];
+  if (!one || !one.ku) return null;
+  return { key: st.kanji + '/' + SHIKI.current, ku: one, ba: st.kanji + '　' + st.name };
+}
+
+function kuPaint(force){
+  const p = kuPick();
+  if (!p){ if (kuOpen) setKu(false); return; }
+  if (!force && p.key === kuKey) return;
+  const draw = () => {
+    tzKu.innerHTML = '';
+    p.ku.ku.forEach(line => {
+      const d = document.createElement('div');
+      d.className = 'tz-l';
+      d.textContent = line;
+      tzKu.appendChild(d);
+    });
+    tzKigo.textContent = p.ku.kigo ? '季語　' + p.ku.kigo : '';
+    tzBa.textContent   = p.ba || '';
+    kuKey = p.key;
+  };
+  if (kuOpen && kuKey){          // 掛けたままの詠み替えは、ひと呼吸おいて
+    tzIn.classList.add('kae');
+    setTimeout(() => { draw(); tzIn.classList.remove('kae'); }, 300);
+  } else {
+    draw();
+  }
+}
+
+function setKu(on){
+  kuOpen = !!on;
+  if (kuOpen) kuPaint(true);
+  tzEl.classList.toggle('on', kuOpen);
+  tzEl.setAttribute('aria-hidden', String(!kuOpen));
+  kuBtn.textContent = kuOpen ? '短冊を畳む' : '一句詠む';
+  kuBtn.setAttribute('aria-pressed', String(kuOpen));
+}
+
+/* 掛けている間だけ、場所の移りを見張る（毎フレームは要らない） */
+function updateTanzaku(dt){
+  if (!kuOpen) return;
+  kuT += dt;
+  if (kuT < 0.35) return;
+  kuT = 0;
+  kuPaint(false);
+}
+
+kuBtn.addEventListener('click', () => setKu(!kuOpen));
+
 document.getElementById('btn-prev').addEventListener('click', () => goTo(idx - 1, true));
 document.getElementById('btn-next').addEventListener('click', () => goTo(idx + 1, true));
 autoBtn.addEventListener('click', () => {
@@ -4075,10 +4226,32 @@ function update(dt){
   // 宵の音：場所に合わせて聞こえ方を寄せていく
   updateSoundMix();
 
+  // 短冊：掛けている間、場所が移れば詠み替える
+  updateTanzaku(dt);
+
   // 猫のしっぽ
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
   cat.rotation.y = ((HOUSES[2] || HOUSES[0]).side < 0 ? Math.PI / 2 : -Math.PI / 2)
                  + Math.sin(elapsed * 0.31) * 0.22;
+}
+
+/* ============================================================
+   10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
+   ?tour=1 を付ければ従来どおり壱の町屋から自動で巡る（案内用に残す）
+   ============================================================ */
+/* 池の北東の角に立ち、灯篭ごしに曹源池と借景の嵐山を見る（月は右上に懸かる） */
+const ENTRY = { pos:[-10.3, 1.62, -64.1], tgt:[-22.2, 3.4, -82.6] };
+if (new URLSearchParams(location.search).get('tour') !== '1'){
+  camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
+  curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
+  camera.lookAt(curTgt);
+  idx = NH;                       // 点列は「捌 天龍寺」を灯しておく
+  setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
+  paintDots();
+  const subEl = document.querySelector('.t-sub');
+  if (subEl) subEl.textContent = '池のほとりから、七軒の灯をたずねて';
+  // ひと呼吸おいて短冊を掛ける（先にご自分で触っていたら邪魔しない）
+  setTimeout(() => { if (!kuOpen && kuKey === '') setKu(true); }, 2600);
 }
 
 function loop(){
@@ -4276,6 +4449,19 @@ window.__machiya = {
   },
   /* 四季の試着：'haru'|'natsu'|'aki'|'fuyu' */
   season: function(s){ return s ? SHIKI.set(s) : SHIKI.current; },
+  /* 短冊の検証口：set で掛け外し、state で掛かっている句 */
+  ku: {
+    set: function(v){ setKu(!!v); return kuOpen; },
+    state: function(){
+      return {
+        open: kuOpen, key: kuKey,
+        ku: [].map.call(tzKu.children, e => e.textContent),
+        kigo: tzKigo.textContent, ba: tzBa.textContent,
+        btn: kuBtn.textContent, cls: tzEl.className,
+        loaded: !!(HAIKU && HAIKU.ku)
+      };
+    }
+  },
   /* 雲龍図の瞳の現在位置（八方睨みの検証用） */
   unryuPupils: function(){
     return unryu.pupils.map(p => [+p.mesh.position.x.toFixed(3), +p.mesh.position.z.toFixed(3)]);
