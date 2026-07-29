@@ -447,19 +447,19 @@ const SPOTS = [
   { kanji:'捌', view:true, name:'天龍寺',
     desc:'竹の小径のなかほど、山門をくぐると曹源池のほとり。池面に月と方丈の灯がゆれ、庭は川向こうの嵐山を借りて静かに暮れている',
     tags:['曹源池庭園','借景の嵐山','夢窓疎石'],
-    pos:[-9.3, 1.62, -63.0], tgt:[-26, 4.2, -85] },
+    pos:[9.3, 1.62, -63.0], tgt:[26, 4.2, -85] },
   { kanji:'玖', view:true, name:'桂川のほとり',
     desc:'町並みが尽き、竹の小径を抜けると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
     tags:['竹林の小径','桂川','鵜飼の篝火'],
-    pos:[1.7, 1.62, -80.5], tgt:[-3, 1.3, -103] },
+    pos:[1.7, 1.62, -80.5], tgt:[3, 1.3, -103] },
   { kanji:'拾', view:true, name:'渡月橋',
     desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
     tags:['渡月橋','月の名の橋'],
-    pos:[0, 2.88, -105], tgt:[-26, 6, -140] },
+    pos:[0, 2.88, -105], tgt:[26, 6, -140] },
   { kanji:'拾壱', view:true, name:'嵐山',
     desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
     tags:['嵐山','宿の灯'],
-    pos:[-2.2, 1.62, -124.8], tgt:[-38, 20, -157] },
+    pos:[2.2, 1.62, -124.8], tgt:[38, 20, -157] },
   { kanji:'拾弐', view:true, name:'塔の舞台',
     desc:'石段をのぼると、塔のたもとの見晴らし台。渡月橋と月の道、来た道の提灯の列が眼下にひらける',
     tags:['法輪寺の見立て','見晴らし'],
@@ -500,7 +500,7 @@ const FX = {
   koboku      : true,   // ㉘ 藪のなかの一本の高木（葉を落とした木のシルエット）
   enzan       : true,   // ㉙ 盆地の遠山（北に小倉山と愛宕山、西に保津峡、東に川下の低い山）
   nakanoshima : true,   // ㉚ 中之島の州（松と川茶屋の灯が川下に浮かぶ）
-  ubune       : true,   // ㉛ 鵜舟の舟だまり（東の水際、篝の残り火）
+  ubune       : true,   // ㉛ 鵜舟の舟だまり（上流の水際、篝の残り火）
   iwaba       : true,   // ㉜ 上流の岩場と早瀬（保津峡の入口の見立て）
   garan       : true,   // ㉝ 塀ごしの伽藍（庫裏の大屋根と鐘楼の影）
   ienami      : true,   // ㉞ 木戸の先の家並み（続きの町の影と提灯の点列が霧に溶ける）
@@ -836,9 +836,9 @@ function ridgeTexture(){
   const pts = [[0,250],[150,190],[320,235],[520,150],[760,215],[980,130],[1200,205],[1420,160],[1650,225],[1860,175],[2048,230]];
   pts.forEach(p => g.lineTo(p[0], p[1]));
   g.lineTo(2048, 360); g.closePath(); g.fill();
-  // 五重塔
+  // 五重塔（東山は画面左＝x負側なのでテクスチャ内も左寄りに）
   g.fillStyle = '#05070e';
-  const bx = 1330, by = 205;
+  const bx = 718, by = 205;
   for (let i = 0; i < 5; i++){
     const w = 96 - i * 13, h = 26, y = by - i * 30;
     g.beginPath();
@@ -936,7 +936,7 @@ const moonFx = (function moon(){
     g.add(ring);
   }
   g.add(halo, disc, bite);
-  g.position.set(-42, 46, -152);   // 嵐山の頂の上に懸かる（渡月の名の由来の構図）
+  g.position.set(42, 46, -152);    // 嵐山の頂の上に懸かる（渡月の名の由来の構図）
   scene.add(g);
   return { halo: halo, ring: ring };
 })();
@@ -1275,7 +1275,7 @@ const moonPath = (function(){
                                   blending:THREE.AdditiveBlending, depthWrite:false, fog:false })
   );
   m.rotation.x = -Math.PI / 2;
-  m.position.set(-20, -0.19, -105);
+  m.position.set(20, -0.19, -105);
   scene.add(m);
   return m;
 })();
@@ -1373,7 +1373,7 @@ const touros = [];
   });
 })();
 
-/* 川舟（上流に鵜飼の篝火舟、下流に屋形舟） */
+/* 川舟（どちらも上流＝西の川面に。鵜飼の篝火舟と屋形舟） */
 const boats = [];
 function buildBoat(opt){
   const g = new THREE.Group();
@@ -1425,7 +1425,7 @@ function buildBoat(opt){
   g.add(pool);
   return g;
 }
-[{ yakata:false, x:-15, z:-111, rot:0.15 }, { yakata:true, x:16, z:-110, rot:-0.1 }].forEach((o, k) => {
+[{ yakata:false, x:24, z:-113, rot:-0.15 }, { yakata:true, x:16, z:-110, rot:-0.1 }].forEach((o, k) => {
   const b = buildBoat(o);
   b.position.set(o.x, -0.07, o.z);
   b.rotation.y = o.rot;
@@ -1437,9 +1437,9 @@ function buildBoat(opt){
 
 /* 嵐山（三つの峰。渡月橋の先にどっしり） */
 const MTS = [
-  { cx:-38, cz:-168, r:62, sy:0.50, sz:0.60 },   // 主峰（月がその上に懸かる）
-  { cx:  6, cz:-164, r:30, sy:0.40, sz:0.55 },   // 間の丘
-  { cx: 40, cz:-172, r:48, sy:0.44, sz:0.60 }    // 東の峰
+  { cx: 38, cz:-168, r:62, sy:0.50, sz:0.60 },   // 主峰（南西＝画面右奥。月がその上に懸かる）
+  { cx: -6, cz:-164, r:30, sy:0.40, sz:0.55 },   // 間の丘
+  { cx:-40, cz:-172, r:48, sy:0.44, sz:0.60 }    // 東の峰（南東＝画面左奥。送り火の山）
 ];
 const mtGroup = (function(){
   const g = new THREE.Group();
@@ -1486,7 +1486,7 @@ const yadoClouds = [];
 
 /* 山の霞（⑩ゆっくり山肌を流れて呼吸する） */
 const kasumis = [];
-[[-38, 24, -160, 64, 15, 0], [30, 15, -158, 42, 10, 2.6]].forEach(k => {
+[[38, 24, -160, 64, 15, 0], [-30, 15, -158, 42, 10, 2.6]].forEach(k => {
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(k[3], k[4]),
     new THREE.MeshBasicMaterial({ map:TEX.glow, color:0xa9c4e6, transparent:true, opacity:0.07,
@@ -1696,15 +1696,15 @@ if (FX.hitokage){
 const kodachiPlanes = [];
 if (FX.kodachi){
   [ // [x, y, z, 幅, 高さ, 傾き, 濃い層か]
-    [-38, 29.6, -154.5, 52, 7,  0,     true ],   // 主峰の頂
-    [-74, 24.0, -163.0, 26, 6,  0.38,  true ],   // 主峰の西肩（下り）
-    [ -6, 24.5, -163.5, 24, 6, -0.35,  true ],   // 主峰の東肩
-    [  6, 11.3, -163.2, 26, 4.5, 0,    true ],   // 中の丘の頂
-    [ 40, 20.0, -162.5, 32, 6,  0,     true ],   // 東峰の頂
-    [ 20, 16.0, -165.0, 20, 5,  0.42,  true ],   // 東峰の西肩
-    [ 61, 15.5, -165.0, 22, 5, -0.42,  true ],   // 東峰の東肩
-    [-38, 15.0, -135.6, 84, 7,  0,     false],   // 主峰の山腹（手前の森）
-    [ 40, 10.0, -146.4, 66, 6,  0,     false]    // 東峰の山腹
+    [ 38, 29.6, -154.5, 52, 7,  0,     true ],   // 主峰の頂
+    [ 74, 24.0, -163.0, 26, 6, -0.38,  true ],   // 主峰の西肩（下り）
+    [  6, 24.5, -163.5, 24, 6,  0.35,  true ],   // 主峰の東肩
+    [ -6, 11.3, -163.2, 26, 4.5, 0,    true ],   // 中の丘の頂
+    [-40, 20.0, -162.5, 32, 6,  0,     true ],   // 東峰の頂
+    [-20, 16.0, -165.0, 20, 5, -0.42,  true ],   // 東峰の西肩
+    [-61, 15.5, -165.0, 22, 5,  0.42,  true ],   // 東峰の東肩
+    [ 38, 15.0, -135.6, 84, 7,  0,     false],   // 主峰の山腹（手前の森）
+    [-40, 10.0, -146.4, 66, 6,  0,     false]    // 東峰の山腹
   ].forEach(k => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(k[3], k[4]),
@@ -1759,8 +1759,8 @@ const chikurin = (function(){
     const side = i % 2 === 0 ? -1 : 1;
     const x = side * (2.45 + Math.pow(rnd(), 1.5) * 4.3);  // 垣のすぐ後ろに濃く、外へ疎らに
     let z = Z0 + rnd() * (Z1 - Z0);
-    // 西側は天龍寺の参道口（z-64.9〜-68.1）と法堂の敷地（〜z-72）を空ける
-    if (side < 0 && z < -64.4 && z > -72.0){
+    // 西側（x正）は天龍寺の参道口（z-64.9〜-68.1）と法堂の敷地（〜z-72）を空ける
+    if (side > 0 && z < -64.4 && z > -72.0){
       z = z > -66.5 ? z + 4.6 : Math.max(z - 6.2, -77.3);
     }
     const h = 9.2 + rnd() * 4.2;                           // 梢が視野の外へ抜ける丈
@@ -1791,7 +1791,7 @@ const chikurin = (function(){
       const side = i % 2 === 0 ? -1 : 1;
       let bz = Z0 + rnd() * (Z1 - Z0);
       // 参道口と法堂の頭上も空けておく（山門と屋根を茂みで塞がない）
-      if (side < 0 && bz < -63.8 && bz > -72.4){
+      if (side > 0 && bz < -63.8 && bz > -72.4){
         bz = bz > -66.5 ? bz + 5.4 : Math.max(bz - 6.4, -77.2);
       }
       p.position.set(side * (3.4 + rnd() * 1.6), 3.4 + rnd() * 2.2, bz);
@@ -1803,7 +1803,7 @@ const chikurin = (function(){
   }
 
   // 月漏れの光条：月光の向きに軸を合わせ、自身の軸まわりだけばらす
-  const moonDir = new THREE.Vector3(-8, 16, 6).normalize();
+  const moonDir = new THREE.Vector3(8, 16, 6).normalize();
   const shafts = [];
   for (let i = 0; i < 7; i++){
     const mat = new THREE.MeshBasicMaterial({
@@ -1879,8 +1879,8 @@ const yabu = (function(){
   [-1, 1].forEach(side => {
     for (let i = 0; i < NSEG; i++){
       const z = Z0 - SEG * (i + 0.5);
-      // 西側は天龍寺の参道口（歩ける切れ目 z-64.9〜-68.1）を見通せるだけ空ける
-      if (side < 0 && z < -64.4 && z > -69.4) continue;
+      // 西側（x正）は天龍寺の参道口（歩ける切れ目 z-64.9〜-68.1）を見通せるだけ空ける
+      if (side > 0 && z < -64.4 && z > -69.4) continue;
       segs.push({ side: side, z: z });
     }
   });
@@ -2125,10 +2125,10 @@ const okuribi = (function(){
   glow.scale.set(16, 12, 1);
   glow.renderOrder = 2;   // 火床と同じく稜線の後に
   g.add(glow);
-  // 東の峰（中心 x+40, z-172 の山体）の川向きの山腹に置く。如意ヶ嶽の見立て。
+  // 東の峰（中心 x-40, z-172 の山体）の川向きの山腹に置く。如意ヶ嶽の見立て。
   // 遠景の稜線板(z-195)は西の高峰にも東の峰にも遮られるため、
   // いちばん手前で深度を書くこの峰の斜面そのものをキャンバスにする（表面から1.5手前）
-  g.position.set(24.5, 7.5, -144.5);
+  g.position.set(-24.5, 7.5, -144.5);
   scene.add(g);
   return { group: g, matA: matA, matB: matB, glow: glow, count: pts.length };
 })();
@@ -2291,7 +2291,9 @@ const butai = (function(){
    5g. 天龍寺 ― 竹林の西、山門と方丈と曹源池（借景の嵐山）
    実際の天龍寺も桂川の北岸・竹林の小径ぞい。庭は夢窓疎石の
    池泉式で、方丈の西に曹源池、その向こうに嵐山を借りる見立て。
-   境内 x-24.2〜-7.6 / z-58.6〜-76.4。池は中心(-16.2,-69.6) rx5.4 rz3.5
+   中身は旧来の座標（x負側）のまま組み、グループの scale.x=-1 で
+   西＝x正側（南向き歩行の右手）へ鏡像で建てる。
+   実座標: 境内 x+7.6〜+24.2 / z-58.6〜-76.4。池は中心(+16.2,-69.6) rx5.4 rz3.5
    ============================================================ */
 const tenryuji = (function(){
   const g = new THREE.Group();
@@ -2540,17 +2542,20 @@ const tenryuji = (function(){
   // Sprite は r128 の raycast で TypeError の火種になる（Raycaster.camera 前提）。
   // クリックの当たりは形のある方に任せ、光り物は素通しにしておく
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  g.scale.x = -1;             // 実世界どおり西（x正）側へ鏡像で建てる
   scene.add(g);
   return { group: g, monHalo: monHalo, shoji: shoji, hojoGlow: hojoGlow, halos: halos,
            mirror: mirror, moonStreak: moonStreak, warmStreak: warmStreak, shimmer: shimmer,
-           pond: PC, stoneCount: ISHI.length };
+           pond: { x: -PC.x, z: PC.z, rx: PC.rx, rz: PC.rz }, stoneCount: ISHI.length };
 })();
 
 /* ============================================================
    5g-2. 法堂と雲龍図（㉕）― 参道の南、竹の際の小さなお堂
    天龍寺の名物「八方睨みの龍」の見立て。中に入って見上げると
    天井いっぱいの龍。瞳が立ち位置を追いかけてくる。
-   堂 x-6.8〜-3.6 / z-68.4〜-71.4・入口は北面（参道側）
+   天龍寺と同じく scale.x=-1 の鏡像で西側へ。実座標: 堂 x+3.6〜+6.8 /
+   z-68.4〜-71.4・入口は北面（参道側）。瞳の追従はローカル系で計算
+   （カメラ x を反転して渡す）
    ============================================================ */
 const unryu = (function(){
   const g = new THREE.Group();
@@ -2723,8 +2728,9 @@ const unryu = (function(){
   });
 
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  g.scale.x = -1;             // 天龍寺と同じく西（x正）側へ鏡像で建てる
   scene.add(g);
-  return { group: g, pupils: pupils, candles: candles, cx: CX, cz: CZ };
+  return { group: g, pupils: pupils, candles: candles, cx: -CX, cz: CZ };
 })();
 
 /* ============================================================
@@ -2983,9 +2989,9 @@ const SHIKI = (function(){
   sakuraG.add(hanaTree(-3.4, -80.2, 0xC993A8, 1.15));
   sakuraG.add(hanaTree(4.4, -85.8, 0xBF8AA0, 1.0));
   const momijiG = new THREE.Group();
-  momijiG.add(hanaTree(-7.8, -72.4, 0x9C3A1C, 1.0));   // 法堂のかたわら
-  momijiG.add(hanaTree(-2.6, -71.8, 0xAA4A20, 0.85));
-  momijiG.add(hanaTree(-6.2, -80.6, 0x8F3418, 1.1));   // 川端
+  momijiG.add(hanaTree(7.8, -72.4, 0x9C3A1C, 1.0));    // 法堂のかたわら
+  momijiG.add(hanaTree(2.6, -71.8, 0xAA4A20, 0.85));
+  momijiG.add(hanaTree(6.2, -80.6, 0x8F3418, 1.1));    // 川端
   sakuraG.visible = momijiG.visible = false;
   scene.add(sakuraG, momijiG);
 
@@ -3073,12 +3079,12 @@ const enzan = (function(){
   const mat = new THREE.MeshLambertMaterial({ color: 0x111a26 });   // 三峰よりひとつ遠い色
   // [cx, cz, r, sy, sz]
   const MINE = [
-    [  14,   52, 34, 0.42, 0.62],   // 小倉山（通りの延長の北）
-    [ -34,   74, 58, 0.60, 0.60],   // 愛宕山（北西の高峰）
-    [ -66,   38, 30, 0.35, 0.60],   // 間の丘（西の裾へ繋ぐ）
-    [  70,   55, 40, 0.30, 0.60],   // 北東の低い稜線（市街の方へ低く）
-    [ -72,  -88, 40, 0.48, 0.85],   // 保津峡の北の山（川がこの間へ消える）
-    [ -80, -132, 44, 0.52, 0.85]    // 保津峡の南の山
+    [  14,   52, 34, 0.42, 0.62],   // 小倉山（通りの延長の北、竹林の背）
+    [  34,   74, 58, 0.60, 0.60],   // 愛宕山（北西＝x正の高峰）
+    [  66,   38, 30, 0.35, 0.60],   // 間の丘（西の裾へ繋ぐ）
+    [ -70,   55, 40, 0.30, 0.60],   // 北東の低い稜線（市街の方へ低く）
+    [  72,  -88, 40, 0.48, 0.85],   // 保津峡の北の山（川がこの間へ消える）
+    [  80, -132, 44, 0.52, 0.85]    // 保津峡の南の山
   ];
   // 川下（東）には山を置かない＝実際の桂川と同じく盆地へ開ける。
   // 遠い東山の低い霞（下の稜線板）と市街の灯だけが水平線に並ぶ
@@ -3097,17 +3103,17 @@ const enzan = (function(){
   const joya = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
     transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   joya.scale.set(2.8, 2.8, 1);
-  joya.position.set(-34, 58 * 0.60 + 0.6, 74 - 5);
+  joya.position.set(34, 58 * 0.60 + 0.6, 74 - 5);
   g.add(joya);
   // 川下の町の灯（東は盆地へ開ける＝市街の灯が水平線に点々と。宿の灯と同じ作法）
   const MB = [];
   let seed = 4747;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 16; i++){
-    MB.push(50 + rnd() * 52, 0.4 + rnd() * 2.2, -96 - rnd() * 38);
+    MB.push(-(50 + rnd() * 52), 0.4 + rnd() * 2.2, -96 - rnd() * 38);
   }
-  // 保津峡の山腹の杣の灯（西の宵にぽつり。曹源池の入口構図の右手に懸かる）
-  [[-58, 9.5, -104], [-66, 13, -112], [-71, 8, -122]].forEach(p => MB.push(p[0], p[1], p[2]));
+  // 保津峡の山腹の杣の灯（西＝x正の宵にぽつり）
+  [[58, 9.5, -104], [66, 13, -112], [71, 8, -122]].forEach(p => MB.push(p[0], p[1], p[2]));
   const mbGeo = new THREE.BufferGeometry();
   mbGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MB), 3));
   const machibi = new THREE.Points(mbGeo, new THREE.PointsMaterial({ map: TEX.glow,
@@ -3132,8 +3138,8 @@ const enzan = (function(){
   }
   [
     [460, 62,    0, 17,  120,  Math.PI,     111,  95, 90],   // 北（愛宕の奥の北山）
-    [400, 56, -145, 15,  -40,  Math.PI / 2, 222,  95, 90],   // 西（保津峡の奥の西山）
-    [400, 38,  145,  9,  -40, -Math.PI / 2, 333, 150, 45]    // 東（盆地の対岸の東山＝低く霞む）
+    [400, 56,  145, 15,  -40, -Math.PI / 2, 222,  95, 90],   // 西＝x正（保津峡の奥の西山）
+    [400, 38, -145,  9,  -40,  Math.PI / 2, 333, 150, 45]    // 東＝x負（盆地の対岸の東山＝低く霞む）
   ].forEach(k => {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(k[0], k[1]),
       new THREE.MeshBasicMaterial({ map: tooyamaTex(k[6], k[7], k[8]), transparent: true,
@@ -3155,10 +3161,10 @@ const nakanoshima = (function(){
     new THREE.MeshLambertMaterial({ color: 0x1a212c }));
   suhama.rotation.x = -Math.PI / 2;
   suhama.scale.set(15, 7.2, 1);
-  suhama.position.set(40, -0.16, -107);
+  suhama.position.set(-40, -0.16, -107);
   g.add(suhama);
   // 松（幹はまとめて一描画、傘は二段のシルエット）
-  const KAN = [[33.5, -104.5, 4.4, 0.06], [41.5, -110, 5.2, -0.05], [47, -103.5, 3.8, 0.09]];
+  const KAN = [[-33.5, -104.5, 4.4, -0.06], [-41.5, -110, 5.2, 0.05], [-47, -103.5, 3.8, -0.09]];
   const kanMat = new THREE.MeshLambertMaterial({ color: 0x161009 });
   const kasaMat = new THREE.MeshLambertMaterial({ color: 0x0e1a15 });
   const kan = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.15, 1, 5), kanMat, KAN.length);
@@ -3182,13 +3188,13 @@ const nakanoshima = (function(){
   // 川茶屋（小屋の影。提灯二つの灯だけ暖かい）
   const koya = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.5, 2.0),
     new THREE.MeshLambertMaterial({ color: 0x10151e }));
-  koya.position.set(40, 0.59, -108.2);
+  koya.position.set(-40, 0.59, -108.2);
   g.add(koya);
   const kyane = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.12, 2.5), MAT.roof);
-  kyane.position.set(40, 1.42, -108.2);
+  kyane.position.set(-40, 1.42, -108.2);
   g.add(kyane);
   const lamps = [];
-  [[38.9, -107.1], [41.2, -107.1]].forEach(p => {
+  [[-38.9, -107.1], [-41.2, -107.1]].forEach(p => {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
       transparent: true, opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     s.scale.set(1.7, 1.7, 1);
@@ -3200,14 +3206,14 @@ const nakanoshima = (function(){
     new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xffb46e, transparent: true, opacity: 0.10,
       blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   teri.rotation.x = -Math.PI / 2;
-  teri.position.set(40, -0.19, -113.5);
+  teri.position.set(-40, -0.19, -113.5);
   g.add(teri);
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   scene.add(g);
   return { group: g, lamps: lamps, teri: teri };
 })();
 
-/* ㉛ 鵜舟の舟だまり ― 東の水際に三艘舫って、舳先の篝に残り火 */
+/* ㉛ 鵜舟の舟だまり ― 上流（西＝x正）の水際に三艘舫って、舳先の篝に残り火 */
 const ubune = (function(){
   const g = new THREE.Group();
   const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
@@ -3247,15 +3253,15 @@ const ubune = (function(){
   return { group: g, embers: embers };
 })();
 
-/* ㉜ 上流の岩場と早瀬 ― 保津峡の入口の見立て。岩の下流側で白波がちらつく */
+/* ㉜ 上流の岩場と早瀬 ― 保津峡の入口の見立て（西＝x正）。岩の下流側で白波がちらつく */
 const iwaba = (function(){
   const g = new THREE.Group();
   const mat = new THREE.MeshLambertMaterial({ color: 0x272e3b });
   // [x, z, 大きさ, 低さ, 川の中か]
   const IWA = [
-    [-17.5, -83.0, 1.1, 0.75, 0], [-20.5, -86.5, 1.5, 0.90, 0], [-24.5, -81.5, 0.9, 0.60, 0],
-    [-31, -97, 1.5, 0.80, 1], [-38, -104, 2.0, 1.00, 1], [-46, -111, 1.6, 0.80, 1],
-    [-34, -114, 1.2, 0.60, 1], [-52, -100, 1.3, 0.70, 1]
+    [17.5, -83.0, 1.1, 0.75, 0], [20.5, -86.5, 1.5, 0.90, 0], [24.5, -81.5, 0.9, 0.60, 0],
+    [31, -97, 1.5, 0.80, 1], [38, -104, 2.0, 1.00, 1], [46, -111, 1.6, 0.80, 1],
+    [34, -114, 1.2, 0.60, 1], [52, -100, 1.3, 0.70, 1]
   ];
   const rock = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), mat, IWA.length);
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
@@ -3271,14 +3277,14 @@ const iwaba = (function(){
   rock.instanceMatrix.needsUpdate = true;
   rock.frustumCulled = false;
   g.add(rock);
-  // 早瀬の白波（川の中の岩の下流＝東側で明滅）
+  // 早瀬の白波（川の中の岩の下流＝東・x負側で明滅）
   const nami = [];
   IWA.filter(p => p[4]).slice(0, 4).forEach(p => {
     const n = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.8),
       new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xbfd4ea, transparent: true, opacity: 0.09,
         blending: THREE.AdditiveBlending, depthWrite: false }));
     n.rotation.x = -Math.PI / 2;
-    n.position.set(p[0] + p[2] + 0.5, -0.18, p[1]);
+    n.position.set(p[0] - p[2] - 0.5, -0.18, p[1]);
     g.add(n); nami.push(n);
   });
   scene.add(g);
@@ -3286,8 +3292,9 @@ const iwaba = (function(){
 })();
 
 /* ㉝ 塀ごしの伽藍 ― 天龍寺の北、庫裏の大屋根と鐘楼の影。宵の鐘の出どころ
-   （方丈 x-10.5〜-16.3/z-59.5〜-63.5 の真裏は陰になる。庫裏は方丈の北東＝
-     東庭の正面、鐘楼は方丈の西脇の隙間から見える位置に置く） */
+   （方丈の真裏は陰になる。庫裏は方丈の脇＝境内の庭の正面、鐘楼は
+     方丈の反対脇の隙間から見える位置に。天龍寺と同じく scale.x=-1 の
+     鏡像で西＝x正側へ建てる） */
 const garan = (function(){
   const g = new THREE.Group();
   const wallMat = new THREE.MeshLambertMaterial({ color: 0x11161f });
@@ -3340,6 +3347,7 @@ const garan = (function(){
   hi.position.set(-15.6, 1.5, -54.8);
   g.add(hi);
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  g.scale.x = -1;             // 天龍寺と同じく西（x正）側へ鏡像で建てる
   scene.add(g);
   return { group: g, hi: hi };
 })();
@@ -3413,7 +3421,7 @@ const sora = (function(){
     new THREE.MeshBasicMaterial({ map: tex(c), transparent: true, opacity: 0.15,
       blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
   // そぞろ歩きの見上げ上限（0.5rad）でも入る高さ＝東の峰の上から南東の空へ立ち上る帯にする
-  milky.position.set(75, 60, -160);
+  milky.position.set(-75, 60, -160);
   milky.lookAt(0, 2, -70);          // 歩ける中心域へ正対させ
   milky.rotateZ(0.8);               // 帯を斜めに渡す
   scene.add(milky);
@@ -3431,8 +3439,8 @@ const sora = (function(){
   }
   const cloudTex = tex(cc);
   const clouds = [];
-  [[74, 11, -20, 47, -149, 0.55], [52, 8, 35, 41, -139, 0.34],
-   [46, 7, -55, 20, -92, 0.42]].forEach(k => {
+  [[74, 11, 20, 47, -149, 0.55], [52, 8, -35, 41, -139, 0.34],
+   [46, 7, 55, 20, -92, 0.42]].forEach(k => {
     const cl = new THREE.Mesh(new THREE.PlaneGeometry(k[0], k[1]),
       new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, opacity: 0.9,
         depthWrite: false, fog: false }));
@@ -3557,7 +3565,7 @@ function updateCamera(dt){
     // 天龍寺は土塀と竹の内側＝出入りは竹の梢を越えて飛び、境内を上から見せる
     const span = Math.abs(fromPos.z - s.pos.z);
     const hi = Math.max(fromPos.y, s.pos.y) > 5;
-    const tera = p => p.x < -7.3 && p.z > -77 && p.z < -58;
+    const tera = p => p.x > 7.3 && p.z > -77 && p.z < -58;
     const arcY = span > 60 ? 12 : (hi ? 11 : ((tera(fromPos) || tera(s.pos)) ? 13.5 : 1.6));
     ctrl.set(0, arcY, (fromPos.z + s.pos.z) / 2);
     const u = 1 - e;
@@ -3608,13 +3616,13 @@ const WALK_ZONES = [
   { x0: -17,   x1: 10,   z0: -121.6, z1: -127  },   // 対岸（納涼床の手前まで）
   { x0: -11.8, x1: -8.8, z0: -127,  z1: -133.5 },   // 参道の石段（物見の丘へ）
   { x0: -21,   x1: -9,   z0: -133.5, z1: -137.5 },  // 塔の舞台
-  { x0: -7.9,  x1: -1.85, z0: -64.9, z1: -68.1 },   // 天龍寺の参道（山門をくぐる）
-  { x0: -10.2, x1: -7.9,  z0: -59.0, z1: -76.1 },   // 境内の東庭
-  { x0: -23.7, x1: -7.9,  z0: -63.8, z1: -65.9 },   // 曹源池の北縁（方丈の前庭）
-  { x0: -23.7, x1: -7.9,  z0: -73.4, z1: -76.1 },   // 曹源池の南縁
-  { x0: -23.7, x1: -21.9, z0: -65.9, z1: -73.4 },   // 曹源池の西縁（龍門瀑のほとり）
+  { x0: 1.85,  x1: 7.9,   z0: -64.9, z1: -68.1 },   // 天龍寺の参道（山門をくぐる）
+  { x0: 7.9,   x1: 10.2,  z0: -59.0, z1: -76.1 },   // 境内の入りの庭（通り側）
+  { x0: 7.9,   x1: 23.7,  z0: -63.8, z1: -65.9 },   // 曹源池の北縁（方丈の前庭）
+  { x0: 7.9,   x1: 23.7,  z0: -73.4, z1: -76.1 },   // 曹源池の南縁
+  { x0: 21.9,  x1: 23.7,  z0: -65.9, z1: -73.4 },   // 曹源池の奥の縁（龍門瀑のほとり）
   { x0: 4.95,  x1: 6.25,  z0: -88.4, z1: -92.6 },   // 舟の桟橋
-  { x0: -6.3,  x1: -4.1,  z0: -68.05, z1: -71.0 }   // 法堂の堂内（雲龍図を見上げる）
+  { x0: 4.1,   x1: 6.3,   z0: -68.05, z1: -71.0 }   // 法堂の堂内（雲龍図を見上げる）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -4129,7 +4137,7 @@ window.addEventListener('pointermove', ev => {
     } else {
       WALK.yaw  -= dx * 0.0042;
       // 法堂の中では天井の龍まで見上げられるよう、上向きの上限をゆるめる
-      const pUp = (camera.position.x >= -6.3 && camera.position.x <= -4.1 &&
+      const pUp = (camera.position.x >= 4.1 && camera.position.x <= 6.3 &&
                    camera.position.z <= -68.05 && camera.position.z >= -71.0) ? 1.25 : 0.5;
       WALK.pitch = Math.max(-0.55, Math.min(pUp, WALK.pitch - dy * 0.0032));
       WALK.manualUntil = elapsed + 2.0;
@@ -4406,7 +4414,7 @@ function updateSoundMix(){
   const fg = Math.max(0, 1 - fd / 26);
   const furinT = SND.furin ? 0.6 * fg * fg : 0;
   // 鐘：天龍寺の境内にいるあいだは近く、すこし明るく響く
-  const inTera = x < -7.3 && z > -77 && z < -58;
+  const inTera = x > 7.3 && z > -77 && z < -58;
   const kaneG = inTera ? 1.75 : 1.0;
   const kaneF = inTera ? 1350 : 950;
   const k = 0.06;
@@ -4539,7 +4547,7 @@ function update(dt){
     nagashiTouro.forEach((g, i) => {
       g.visible = FX.touronagashi;
       const u = g.userData;
-      const x = -58 + ((u.off + elapsed * u.v) % 116);
+      const x = 58 - ((u.off + elapsed * u.v) % 116);   // 上流（西＝x正）から下流へ流れ下る
       g.position.set(x, -0.16 + Math.sin(elapsed * 1.1 + u.ph) * 0.02, u.z);
       g.rotation.y = elapsed * 0.12 + u.ph;
       gp.array[i*3] = x; gp.array[i*3+1] = g.position.y + 0.12; gp.array[i*3+2] = u.z;
@@ -4742,7 +4750,8 @@ function update(dt){
       s.material.opacity = 0.20 + Math.sin(elapsed * 7.3 + k * 2.4) * 0.05;
     });
     unryu.pupils.forEach(p => {
-      const dx = camera.position.x - p.cx, dz = camera.position.z - p.cz;
+      // 堂は scale.x=-1 の鏡像＝カメラ x をローカル系へ写してから追わせる
+      const dx = (-camera.position.x) - p.cx, dz = camera.position.z - p.cz;
       const d = Math.hypot(dx, dz) || 1;
       const s = Math.min(0.052, d * 0.02) / d;
       p.mesh.position.x = p.cx + dx * s;
@@ -4829,8 +4838,8 @@ function update(dt){
    10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
    ?tour=1 を付ければ従来どおり壱の町屋から自動で巡る（案内用に残す）
    ============================================================ */
-/* 池の北東の角に立ち、灯篭ごしに曹源池と借景の嵐山を見る（月は右上に懸かる） */
-const ENTRY = { pos:[-10.3, 1.62, -64.1], tgt:[-22.2, 3.4, -82.6] };
+/* 池の北東の角（東西を正した実地理では x正側）に立ち、灯篭ごしに曹源池と借景の嵐山を見る（月は左上に懸かる） */
+const ENTRY = { pos:[10.3, 1.62, -64.1], tgt:[22.2, 3.4, -82.6] };
 if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
@@ -4970,7 +4979,7 @@ window.__machiya = {
         kagari : proj(boats[0].position),
         touro  : proj(touros[2].g.position),
         pond   : proj(new THREE.Vector3(tenryuji.pond.x, 0.05, tenryuji.pond.z)),
-        hojo   : proj(new THREE.Vector3(-13.4, 2.0, -61.5)),
+        hojo   : proj(new THREE.Vector3(13.4, 2.0, -61.5)),
         nagashi: nagashiTouro.length ? proj(nagashiTouro[0].position) : null,
         walker : walkers.length ? proj(walkers[0].position) : null
       };
