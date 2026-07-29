@@ -494,7 +494,10 @@ const FX = {
   sakai       : true,   // ㉒ 散策の境の景（杭柵・柳・芦むら・町の木戸）
   chamise     : true,   // ㉓ 川端の茶店（床几・緋毛氈・野点傘・行灯）
   fune        : true,   // ㉔ 屋形舟遊び（桟橋と乗合の舟。乗って川をひとめぐり）
-  unryu       : true    // ㉕ 法堂の雲龍図（見上げると八方睨みの龍）
+  unryu       : true,   // ㉕ 法堂の雲龍図（見上げると八方睨みの龍）
+  hogaki      : true,   // ㉖ 竹穂垣（小径の両側。嵯峨野の竹林の道の顔）
+  yabumichi   : true,   // ㉗ 藪の道（竹林のあいだだけ石畳と側溝をやめ、土と砂利の細道に）
+  koboku      : true    // ㉘ 藪のなかの一本の高木（葉を落とした木のシルエット）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -765,6 +768,29 @@ function ashiTexture(){
   }
   return tex(c);
 }
+/* 竹穂垣（枯れた細竹を束ねて立てた低い垣。小径に沿って横へ繰り返す） */
+function hogakiTexture(){
+  const c = cv(128, 64), g = c.getContext('2d');
+  let seed = 6161;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#20190f'; g.fillRect(0, 0, 128, 64);     // 束の奥の闇
+  for (let x = 0; x < 128; x += 2.2){
+    const v = 72 + Math.floor(rnd() * 48);                // 枯れ色のばらつき
+    g.fillStyle = 'rgb(' + v + ',' + Math.floor(v * 0.85) + ',' + Math.floor(v * 0.5) + ')';
+    const w = 1.3 + rnd() * 0.8;
+    g.fillRect(x + (rnd() - 0.5) * 0.7, 0, w, 64);
+    g.fillStyle = 'rgba(0,0,0,' + (0.2 + rnd() * 0.24) + ')';   // 一本ごとの陰
+    g.fillRect(x + w, 0, 0.7, 64);
+  }
+  // 穂先は月あかりを弾き、根方は土に沈む
+  const gr = g.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0,    'rgba(226,214,178,0.20)');
+  gr.addColorStop(0.22, 'rgba(0,0,0,0)');
+  gr.addColorStop(0.72, 'rgba(0,0,0,0)');
+  gr.addColorStop(1,    'rgba(0,0,0,0.55)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 64);
+  return tex(c);
+}
 /* 冷たい光の円（月漏れの光条と地面の斑用。glow の月光版） */
 function glowCoolTexture(){
   const c = cv(128, 128), g = c.getContext('2d');
@@ -844,7 +870,8 @@ const TEX = {
   sasa     : sasaTexture(31415),
   glowCool : glowCoolTexture(),
   yanagi   : yanagiTexture(),
-  ashi     : ashiTexture()
+  ashi     : ashiTexture(),
+  hogaki   : hogakiTexture()
 };
 
 /* ============================================================
@@ -928,19 +955,24 @@ const moonFx = (function moon(){
   scene.add(m);
 })();
 
-// 両脇の側溝（水がゆっくり流れる。川端まで）
+// 両脇の側溝（水がゆっくり流れる）。町なかは通しで、竹林の区間（z-56.5〜-77.5）は
+// 藪の道（FX.yabumichi）に譲って隠す ―― 土の道に側溝は通っていない
 const waterStrips = [];
-[-1, 1].forEach(s => {
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.38, 98),
-    new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.85 })
-  );
-  m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
-  m.material.map.repeat.set(1, 9);
-  m.rotation.x = -Math.PI / 2;
-  m.position.set(s * 2.28, 0.015, -29);
-  scene.add(m);
-  waterStrips.push(m);
+const waterStripsYabu = [];
+[[-18.25, 76.5, 7, false], [-67.0, 21.0, 2, true]].forEach(k => {
+  [-1, 1].forEach(s => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.38, k[1]),
+      new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.85 })
+    );
+    m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
+    m.material.map.repeat.set(1, k[2]);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(s * 2.28, 0.015, k[0]);
+    scene.add(m);
+    waterStrips.push(m);              // 流れの更新はまとめて受ける
+    if (k[3]) waterStripsYabu.push(m);
+  });
 });
 
 /* ============================================================
@@ -1708,7 +1740,7 @@ const chikurin = (function(){
   const Z0 = -56.5, Z1 = -77.5;
 
   // 稈は一描画にまとめる（インスタンス描画）。位置が散るので境界球カリングは切る
-  const N = 128;
+  const N = 256;                 // 見上げても切れ目のない壁にする（描画は一回のまま）
   const geo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
   geo.translate(0, 0.5, 0);   // 根元を原点に置き、高さは行列の scale で決める
   const stalks = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map: TEX.take }), N);
@@ -1717,13 +1749,13 @@ const chikurin = (function(){
         v3 = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
   for (let i = 0; i < N; i++){
     const side = i % 2 === 0 ? -1 : 1;
-    const x = side * (2.7 + Math.pow(rnd(), 1.4) * 3.6);   // 小径の際に濃く、外へ疎らに
+    const x = side * (2.45 + Math.pow(rnd(), 1.5) * 4.3);  // 垣のすぐ後ろに濃く、外へ疎らに
     let z = Z0 + rnd() * (Z1 - Z0);
     // 西側は天龍寺の参道口（z-64.9〜-68.1）と法堂の敷地（〜z-72）を空ける
     if (side < 0 && z < -64.4 && z > -72.0){
       z = z > -66.5 ? z + 4.6 : Math.max(z - 6.2, -77.3);
     }
-    const h = 6.8 + rnd() * 3.0;
+    const h = 9.2 + rnd() * 4.2;                           // 梢が視野の外へ抜ける丈
     const r = 0.8 + rnd() * 0.5;
     eu.set((rnd() - 0.5) * 0.06, rnd() * Math.PI, -side * (0.015 + rnd() * 0.045)); // 先端はやや小径の上へ
     q.setFromEuler(eu);
@@ -1744,7 +1776,8 @@ const chikurin = (function(){
   for (let i = 0; i < 16; i++){
     const p = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 5.5), sasaMat);
     if (i < 11){
-      p.position.set((rnd() - 0.5) * 6.5, 6.4 + rnd() * 2.2, Z0 + (i / 10) * (Z1 - Z0));
+      // 天井は稈を伸ばしたぶん高く。捌へ飛ぶ弧の最高到達(7.57)より上に置き、葉を突き抜けない
+      p.position.set((rnd() - 0.5) * 6.5, 8.8 + rnd() * 2.4, Z0 + (i / 10) * (Z1 - Z0));
       p.rotation.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI);
     } else {
       const side = i % 2 === 0 ? -1 : 1;
@@ -1769,8 +1802,9 @@ const chikurin = (function(){
       map: TEX.glowCool, transparent: true, opacity: 0.06,
       blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide
     });
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 7.6), mat);
-    s.position.set((rnd() - 0.5) * 4.4, 3.6, Z0 + ((i + 0.5) / 7) * (Z1 - Z0) + (rnd() - 0.5) * 1.6);
+    // 光条の頭は葉の天井（8.8〜11.2）より下に収める。空へ突き抜けると筋だけが浮いて見える
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 8.2), mat);
+    s.position.set((rnd() - 0.5) * 4.4, 4.2, Z0 + ((i + 0.5) / 7) * (Z1 - Z0) + (rnd() - 0.5) * 1.6);
     s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), moonDir);
     s.rotateY(rnd() * Math.PI);
     s.userData = { baseO: 0.05 + rnd() * 0.05, ph: rnd() * Math.PI * 2 };
@@ -1793,6 +1827,115 @@ const chikurin = (function(){
 
   scene.add(group, moonGroup);
   return { group: group, moonGroup: moonGroup, canopy: canopy, shafts: shafts, dapples: dapples, N: N };
+})();
+
+/* ============================================================
+   5d-2. 藪の道 ― 竹穂垣・土と砂利の細道・藪の一本の高木（FX ㉖㉗㉘）
+   嵯峨野の竹林の小径の顔は、両側にひくく続く竹穂垣。
+   小径の区間だけ石畳と側溝をやめ、土の道に替えて「町を出た」を告げる
+   ============================================================ */
+const yabu = (function(){
+  const Z0 = -56.5, Z1 = -77.5;          // 竹林と同じ区間
+  const LEN = Z0 - Z1;                   // 21m
+  const SEG = 2.1;                       // 垣ひと区切り
+  const NSEG = Math.round(LEN / SEG);    // 10
+  const HX = 2.12;                       // 垣の位置（歩ける幅 x±1.85 のすぐ外）
+  const HH = 0.62;                       // 垣の丈（__machiya.yabu.height() で試せる）
+  const zc = (Z0 + Z1) / 2;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(),
+        eu = new THREE.Euler(), v3 = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
+
+  /* ── ㉗ 土と砂利の細道。石畳の上に薄く敷く ── */
+  const michi = new THREE.Group();
+  // 藪の底は石畳を隠して土に。西は天龍寺の土塀（x-7.6）の手前まで敷く
+  const tsuchi = new THREE.Mesh(new THREE.PlaneGeometry(15.0, LEN),
+    new THREE.MeshLambertMaterial({ color: 0x1a1c16 }));
+  tsuchi.rotation.x = -Math.PI / 2;
+  tsuchi.position.set(0, 0.006, zc);
+  michi.add(tsuchi);
+  const jariMap = TEX.stone.clone();
+  jariMap.wrapS = jariMap.wrapT = THREE.RepeatWrapping;
+  jariMap.repeat.set(5, 44);             // 細かく刻んで、敷石ではなく砂利に見せる
+  jariMap.needsUpdate = true;
+  const jari = new THREE.Mesh(new THREE.PlaneGeometry(2.35, LEN),
+    // 藪のなかに灯りは無いので、月あかりぶんは emissive で下駄を履かせる（道だけ白く浮く）
+    new THREE.MeshLambertMaterial({ map: jariMap, color: 0xb0a992, emissive: 0x16170f }));
+  jari.rotation.x = -Math.PI / 2;
+  jari.position.set(0, 0.011, zc);
+  michi.add(jari);
+  scene.add(michi);
+
+  /* ── ㉖ 竹穂垣。区切りを並べ、参道口だけ大きく空ける ── */
+  const kaki = new THREE.Group();
+  const segs = [];
+  [-1, 1].forEach(side => {
+    for (let i = 0; i < NSEG; i++){
+      const z = Z0 - SEG * (i + 0.5);
+      // 西側は天龍寺の参道口（歩ける切れ目 z-64.9〜-68.1）を見通せるだけ空ける
+      if (side < 0 && z < -64.4 && z > -69.4) continue;
+      segs.push({ side: side, z: z });
+    }
+  });
+  const kakiMap = TEX.hogaki.clone();
+  kakiMap.wrapS = THREE.RepeatWrapping;
+  kakiMap.repeat.set(4, 1);
+  kakiMap.needsUpdate = true;
+  const body = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.07, HH, SEG),
+    new THREE.MeshLambertMaterial({ map: kakiMap }), segs.length);
+  const rail = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.032, 0.032, SEG, 5), MAT.bamboo, segs.length * 2);
+  const post = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.042, 0.052, HH + 0.14, 5), MAT.bamboo, segs.length * 2);
+  eu.set(Math.PI / 2, 0, 0); q.setFromEuler(eu);          // 横竹は z 沿いに寝かせる
+  segs.forEach((s, i) => {
+    m4.makeTranslation(s.side * HX, HH / 2, s.z);
+    body.setMatrixAt(i, m4);
+    [HH - 0.07, HH * 0.42].forEach((y, k) => {            // 押縁は上と中ほどの二段
+      m4.compose(v3.set(s.side * (HX + 0.05), y, s.z), q, sc);
+      rail.setMatrixAt(i * 2 + k, m4);
+    });
+    [-1, 1].forEach((e, k) => {                            // 柱は区切りの両端に
+      m4.makeTranslation(s.side * (HX + 0.02), (HH + 0.14) / 2, s.z + e * SEG / 2);
+      post.setMatrixAt(i * 2 + k, m4);
+    });
+  });
+  [body, rail, post].forEach(o => { o.instanceMatrix.needsUpdate = true; o.frustumCulled = false; });
+  kaki.add(body, rail, post);
+  scene.add(kaki);
+
+  /* ── ㉘ 藪のなかの一本の高木。葉を落とし、月あかりに黒く立つ ── */
+  const ko = new THREE.Group();
+  const TX = 2.75, TZ = -74.2, TH = 11.4;   // 垣のすぐ後ろ。小径の先に幹が立ち上がる
+  const kiMat = new THREE.MeshLambertMaterial({ color: 0x1f1c15 });   // 影として立たせる
+  const miki = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.26, TH, 7), kiMat);
+  miki.position.set(TX, TH / 2, TZ);
+  miki.rotation.z = 0.035;
+  ko.add(miki);
+  // 枝は上の三分の一にだけ、細く長く。梯子に見えないよう高さも向きも散らす
+  const eda = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.05, 1, 5), kiMat, 7);
+  let s2 = 777;
+  const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 7; i++){
+    const y = 7.4 + r2() * 3.6;
+    const len = 2.2 + r2() * 1.9;
+    const dir = r2() * Math.PI * 2;
+    eu.set(0, dir, (0.42 + r2() * 0.42) * (r2() > 0.45 ? 1 : -1));
+    q.setFromEuler(eu);
+    m4.compose(v3.set(TX + Math.sin(dir) * 0.1, y, TZ + Math.cos(dir) * 0.1),
+               q, sc.set(1, len, 1));
+    eda.setMatrixAt(i, m4);
+  }
+  eda.instanceMatrix.needsUpdate = true;
+  sc.set(1, 1, 1);
+  ko.add(eda);
+  scene.add(ko);
+
+  return {
+    michi: michi, kaki: kaki, ko: ko, segs: segs.length,
+    /* 垣の丈の試着（根方が y=0 なので群ごと縦に伸縮すればよい） */
+    height: function(h){ kaki.scale.y = (h || HH) / HH; return HH * kaki.scale.y; }
+  };
 })();
 
 /* ============================================================
@@ -4111,6 +4254,12 @@ function update(dt){
     }
   }
 
+  // ㉖㉗㉘ 藪の道：垣・土の道・高木。土の道のときは側溝を隠す
+  yabu.kaki.visible  = FX.hogaki;
+  yabu.michi.visible = FX.yabumichi;
+  yabu.ko.visible    = FX.koboku;
+  waterStripsYabu.forEach(m => { m.visible = !FX.yabumichi; });
+
   // ⑭ 竹林の小径：葉むらがそよぐ／⑮ 月漏れがまたたく
   chikurin.group.visible = FX.chikurin;
   if (FX.chikurin){
@@ -4474,6 +4623,15 @@ window.__machiya = {
   },
   FX: FX,
   okuribi: okuribi,   // 試灯と赤入れ用（FX.okuribi=true と合わせて使う）
+  /* 藪の道の赤入れ口：yabu.height(0.75) で垣の丈を試着、state で現況 */
+  yabu: {
+    height: yabu.height,
+    state: function(){
+      return { segs: yabu.segs, kakiH: +(0.62 * yabu.kaki.scale.y).toFixed(2),
+               kaki: yabu.kaki.visible, michi: yabu.michi.visible, ko: yabu.ko.visible,
+               dobu: waterStripsYabu.map(m => m.visible), take: chikurin.N };
+    }
+  },
   /* 宵の音の計測口：state で混合値、level で出力RMS、kane で鐘を即打ち */
   snd: {
     SND: SND,
