@@ -505,7 +505,7 @@ const FX = {
   garan       : true,   // ㉝ 塀ごしの伽藍（庫裏の大屋根と鐘楼の影）
   ienami      : true,   // ㉞ 木戸の先の家並み（続きの町の影と提灯の点列が霧に溶ける）
   amanogawa   : true,   // ㉟ 天の川と夜雲（月のそばをゆっくり流れる）
-  adashino    : true    // ㊱ 化野の石仏の野（通りの東の隠れ道の先。青白い供え灯と鬼火）
+  adashino    : true    // ㊱ 化野の石仏の野（通りの東の隠れ道の先。青白い供え灯と鬼火・囲いの竹藪）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -3464,6 +3464,8 @@ const sora = (function(){
    そぞろ歩きで竹の切れ目を東へ折れた人だけが辿り着く。
    誰とも知れぬ石仏の群れに、青白い供え灯と鬼火。奥の祠に
    ひとつだけ暖かい灯（千灯供養の見立て）。
+   野はくすんだ竹藪でぐるりと囲い、入りは門の小道ひとつ
+   （実際の化野も竹林の地。入れない縁は竹の壁で景色にする）。
    野 x-26.5〜-8.6 / z-57.5〜-77・小道 z-60.4〜-63.4
    ============================================================ */
 const adashino = (function(){
@@ -3474,11 +3476,11 @@ const adashino = (function(){
   let seed = 6464;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
-  // ── 土の面（石畳の広場を土に返す。藪の道と同じ作法） ──
+  // ── 土の面（石畳の広場を土に返す。藪の道と同じ作法。囲いの竹の根方まで敷く） ──
   const tsuchiMat = new THREE.MeshLambertMaterial({ color: 0x191b15 });
-  const no = new THREE.Mesh(new THREE.PlaneGeometry(19.6, 20.6), tsuchiMat);
+  const no = new THREE.Mesh(new THREE.PlaneGeometry(21.2, 22.0), tsuchiMat);
   no.rotation.x = -Math.PI / 2;
-  no.position.set(-17.4, 0.012, -67.2);
+  no.position.set(-18.2, 0.012, -67.1);
   g.add(no);
   const komichi = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 3.0), tsuchiMat);
   komichi.rotation.x = -Math.PI / 2;
@@ -3638,9 +3640,72 @@ const adashino = (function(){
     g.add(eda);
   });
 
+  // ── 囲いの竹藪（野をぐるりと囲む。切れ目は通り側の門の小道だけ） ──
+  // 川端の河原から素通しだと「入れそうで入れない」に見える。行けない縁は
+  // 竹の壁でそのまま景色にする（杭柵・土塀・石積みと同じ文法）。
+  // 稈は四辺ぶんまとめて一描画。竹林の青竹よりくすんだ灰緑で、風に鳴らない静けさに
+  // 一列に並べると柵に見えるので、どの面も z（x）に厚みを持たせて藪にする。
+  // 南は歩ける河原（z-77.8 から南）に踏み込ませない＝野の側にだけ厚みを取る
+  const TAKE_POS = [];
+  for (let i = 0; i < 48; i++){                        // 南＝川端の際（素通しだった正面）
+    // 最前列は歩ける河原の縁（z-77.8）から 0.3m 逃がす（竹穂垣と同じ作法）
+    TAKE_POS.push([-8.6 - rnd() * 19.2, -76.30 - Math.pow(rnd(), 0.7) * 1.20]);
+  }
+  for (let i = 0; i < 36; i++){                        // 通り側の帯（門の小道だけ空ける）
+    const x = -6.7 - rnd() * 1.75;
+    let z = -57.6 - rnd() * 19.2;
+    if (z < -59.7 && z > -64.1) z = z > -61.9 ? Math.min(z + 4.4, -57.4) : z - 4.4;
+    TAKE_POS.push([x, z]);
+  }
+  for (let i = 0; i < 32; i++){                        // 西の奥（石積みと卒塔婆の後ろ）
+    TAKE_POS.push([-27.1 - Math.pow(rnd(), 0.7) * 1.7, -58.2 - rnd() * 19.4]);
+  }
+  for (let i = 0; i < 26; i++){                        // 北の際（石積みの後ろ）
+    TAKE_POS.push([-9.3 - rnd() * 17.4, -56.20 - Math.pow(rnd(), 0.7) * 1.15]);
+  }
+  const kakoiGeo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
+  kakoiGeo.translate(0, 0.5, 0);                       // 根元を原点に。丈は行列の scale で
+  const kakoiTake = new THREE.InstancedMesh(kakoiGeo,
+    new THREE.MeshLambertMaterial({ map: TEX.take }), TAKE_POS.length);
+  kakoiTake.frustumCulled = false;                     // 位置が散るので境界球カリングは切る
+  TAKE_POS.forEach((p, i) => {
+    eu.set((rnd() - 0.5) * 0.08, rnd() * Math.PI, (rnd() - 0.5) * 0.08);
+    q0.setFromEuler(eu);
+    const h = 6.0 + rnd() * 3.6, r = 0.7 + rnd() * 0.45;
+    m4.compose(vv.set(p[0], 0, p[1]), q0, sc.set(r, h, r));
+    kakoiTake.setMatrixAt(i, m4);
+    // 灰緑にくすませる（供え灯や鬼火は稈の隙間からちらりと覗く）
+    if (kakoiTake.setColorAt) kakoiTake.setColorAt(i,
+      col.setHSL(0.27 + rnd() * 0.06, 0.10 + rnd() * 0.06, 0.24 + rnd() * 0.14));
+  });
+  kakoiTake.instanceMatrix.needsUpdate = true;
+  if (kakoiTake.instanceColor) kakoiTake.instanceColor.needsUpdate = true;
+  g.add(kakoiTake);
+
+  // 葉むらも一描画。門の頭上は空けて、切れ目の見通しを塞がない
+  const HA_POS = [
+    [-12.4, 5.6, -77.2, 0.62], [-18.8, 6.5, -77.4, 0.78], [-25.0, 5.3, -77.1, 0.60],
+    [-7.9,  5.1, -67.2, 0.58], [-7.8,  6.0, -73.0, 0.66],
+    [-27.9, 6.6, -63.5, 0.72], [-28.0, 5.5, -71.8, 0.64],
+    [-17.2, 5.8, -56.7, 0.70]
+  ];
+  const kakoiHa = new THREE.InstancedMesh(new THREE.PlaneGeometry(8.5, 5.5),
+    new THREE.MeshBasicMaterial({ map: TEX.sasa, color: 0x7d8a76, transparent: true,
+      opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), HA_POS.length);
+  kakoiHa.frustumCulled = false;
+  HA_POS.forEach((p, i) => {
+    eu.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI);
+    q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], p[1], p[2]), q0, sc.set(p[3], p[3], p[3]));
+    kakoiHa.setMatrixAt(i, m4);
+  });
+  kakoiHa.instanceMatrix.needsUpdate = true;
+  g.add(kakoiHa);
+
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   scene.add(g);
-  return { group: g, onibi: onibi, tomoshi: tomoshi.material, rouHalos: rouHalos, hokoraHi: hokoraHi };
+  return { group: g, onibi: onibi, tomoshi: tomoshi.material, rouHalos: rouHalos, hokoraHi: hokoraHi,
+           kakoiTake: kakoiTake, kakoiHa: kakoiHa };
 })();
 
 /* ============================================================
@@ -3816,7 +3881,7 @@ const WALK_ZONES = [
   { x0: 4.95,  x1: 6.25,  z0: -88.4, z1: -92.6 },   // 舟の桟橋
   { x0: 4.1,   x1: 6.3,   z0: -68.05, z1: -71.0 },  // 法堂の堂内（雲龍図を見上げる）
   { x0: -8.6,  x1: -1.85, z0: -60.4, z1: -63.4 },   // 化野への隠れ道（通りの東の竹の切れ目）
-  { x0: -26.5, x1: -8.6,  z0: -57.5, z1: -77.0 }    // 化野の石仏の野（奥まで歩ける）
+  { x0: -26.5, x1: -8.6,  z0: -57.5, z1: -76.2 }    // 化野の石仏の野（南の際は囲いの藪の厚みに譲る）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -5283,6 +5348,7 @@ window.__machiya = {
   },
   FX: FX,
   okuribi: okuribi,   // 試灯と赤入れ用（FX.okuribi=true と合わせて使う）
+  adashino: adashino, // 化野の赤入れ用（kakoiTake/kakoiHa.visible で囲いの竹藪だけ入切）
   /* 藪の道の赤入れ口：yabu.height(0.75) で垣の丈を試着、state で現況 */
   yabu: {
     height: yabu.height,
