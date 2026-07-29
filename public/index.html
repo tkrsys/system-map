@@ -209,9 +209,12 @@
     white-space:nowrap;      /* 縦組みで折り返さない＝高さは中身なり */
     color:#231C14;
   }
-  /* 中七・下五は少し下げて書き出す（短冊の手） */
-  .tanzaku .tz-l + .tz-l{ padding-top:13px }
-  .tanzaku .tz-l + .tz-l + .tz-l{ padding-top:26px }
+  /* 中七・下五は少し下げて書き出す（短冊の手）。
+     五行のとき（短歌）は四行目＝下句で段を上に戻し、上句と下句の切れを見せる */
+  .tanzaku .tz-l:nth-child(2){ padding-top:13px }
+  .tanzaku .tz-l:nth-child(3){ padding-top:26px }
+  .tanzaku .tz-l:nth-child(4){ padding-top:13px }
+  .tanzaku .tz-l:nth-child(5){ padding-top:26px }
   .tanzaku .tz-foot{
     margin-top:11px; font-size:9.5px; letter-spacing:1px;
     color:#6B5A3E; text-align:center; line-height:1.7;
@@ -3433,6 +3436,9 @@ function kuPick(){
   if (rideActive() && toki.fune)   return { key:'fune',    ku:toki.fune,    ba:toki.fune.ba };
   if (FX.okuribi && toki.okuribi)  return { key:'okuribi', ku:toki.okuribi, ba:toki.okuribi.ba };
   const st  = TOUR[kuStopIdx()];
+  // at を持つ特別の一首は、その停留では四季の句より先に掛かる
+  const at = Object.keys(toki).find(k => toki[k].at === st.kanji);
+  if (at) return { key: at, ku: toki[at], ba: toki[at].ba || (st.kanji + '　' + st.name) };
   const set = HAIKU.ku[st.kanji];
   const one = set && set[SHIKI.current];
   if (!one || !one.ku) return null;
@@ -3451,7 +3457,7 @@ function kuPaint(force){
       d.textContent = line;
       tzKu.appendChild(d);
     });
-    tzKigo.textContent = p.ku.kigo ? '季語　' + p.ku.kigo : '';
+    tzKigo.textContent = p.ku.kigo ? '季語　' + p.ku.kigo : (p.ku.kata || '');
     tzBa.textContent   = p.ba || '';
     kuKey = p.key;
   };
