@@ -2257,36 +2257,25 @@ const butai = (function(){
   knoll.position.set(-19, 0, -140);
   g.add(knoll);
 
-  // ── 参道の石段（18段を一描画に） ──
+  // ── 参道の石段（18段を一描画に）──
+  // ⚠ かつては段の下を「斜面埋めの板（3×8.5m）」で塞いでいたが、板が斜めに浮いて
+  //   舞台から見下ろすと大きなでっぱりに見えた。板と両脇の石垣はやめ、
+  //   **一段ずつ地面まで届く塊**にして、石段そのものを石積みの体にする。
+  //   これで舞台から見えるのは段の面だけ＝余分な板が出ない
   const STEPS = 18;
   const stepGeo = new THREE.BoxGeometry(3.0, 0.32, 0.42);
   const steps = new THREE.InstancedMesh(stepGeo, stone, STEPS);
   steps.frustumCulled = false;
-  const m4 = new THREE.Matrix4();
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3();
   for (let k = 0; k < STEPS; k++){
     const z = SANDO.z0 - (k + 0.5) * ((SANDO.z0 - SANDO.z1) / STEPS);
     const top = (k + 1) * (SANDO.rise / STEPS);
-    m4.makeTranslation(-10.3, top - 0.16, z);
+    m4.compose(vv.set(-10.3, top / 2, z), q0.identity(), sc.set(1, top / 0.32, 1));
     steps.setMatrixAt(k, m4);
   }
   steps.instanceMatrix.needsUpdate = true;
   g.add(steps);
-  // 石段の下の斜面埋めと、両脇の石垣
-  // 舞台から見下ろすと、段の外へ張り出した端と明るい石垣が「でっぱり」に見えてしまう。
-  // 長さは段の丈ぴったりに詰め、石垣は低く・丘の色に寄せて段の影に納める
-  const slopeLen = Math.hypot(SANDO.z0 - SANDO.z1, SANDO.rise) + 0.15;
-  const slopeAng = Math.atan2(SANDO.rise, SANDO.z0 - SANDO.z1);
-  const under = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.34, slopeLen), hillMat);
-  under.rotation.x = -slopeAng;
-  under.position.set(-10.3, SANDO.rise / 2 - 0.32, (SANDO.z0 + SANDO.z1) / 2);
-  g.add(under);
-  const kakiMat = new THREE.MeshLambertMaterial({ color: 0x1a2230 });
-  [-11.75, -8.85].forEach(x => {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, slopeLen), kakiMat);
-    w.rotation.x = -slopeAng;
-    w.position.set(x, SANDO.rise / 2 - 0.06, (SANDO.z0 + SANDO.z1) / 2);
-    g.add(w);
-  });
 
   // ── 舞台（懸造）。床 5.2・北向きに渡月橋と通りを見晴らす ──
   // 見晴らし台なので**床が視界を食わない**ことが第一。奥行は 3.4 に浅く取り、
