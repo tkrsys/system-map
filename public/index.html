@@ -2283,16 +2283,18 @@ const butai = (function(){
   });
 
   // ── 舞台（懸造）。床 5.2・北向きに渡月橋と通りを見晴らす ──
+  // 見晴らし台なので**床が視界を食わない**ことが第一。奥行は 3.4 に浅く取り、
+  // 北の欄干は低く（笠木 0.64）＝すこし見下げても川が隠れない
   const FLOOR = SANDO.rise;
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.22, 4.2), MAT.wallDk);
-  deck.position.set(-15, FLOOR - 0.11, -135.5);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.22, 3.4), MAT.wallDk);
+  deck.position.set(-15, FLOOR - 0.11, -134.9);
   g.add(deck);
   const railMat = new THREE.MeshLambertMaterial({ color: 0x2a1d12 });
   // 欄干（北・東・西。南は丘と塔につながる）
-  [[[-15, -133.55], 12.2, 0],
-   [[-9.05, -135.5], 4.2, 1],
-   [[-20.95, -135.5], 4.2, 1]].forEach(r => {
-    [0.42, 0.78].forEach(h => {
+  [[[-15, -133.35], 12.2, 0],
+   [[-9.05, -134.9], 3.4, 1],
+   [[-20.95, -134.9], 3.4, 1]].forEach(r => {
+    [0.34, 0.64].forEach(h => {
       const b = new THREE.Mesh(
         new THREE.BoxGeometry(r[2] ? 0.06 : r[1], 0.06, r[2] ? r[1] : 0.06), railMat);
       b.position.set(r[0][0], FLOOR + h, r[0][1]);
@@ -2300,13 +2302,13 @@ const butai = (function(){
     });
   });
   for (let i = 0; i < 7; i++){
-    const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.84, 0.07), railMat);
-    p.position.set(-20.9 + i * (11.8 / 6), FLOOR + 0.42, -133.56);
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.70, 0.07), railMat);
+    p.position.set(-20.9 + i * (11.8 / 6), FLOOR + 0.35, -133.36);
     g.add(p);
   }
-  [[-9.05, -134.4], [-9.05, -136.6], [-20.95, -134.4], [-20.95, -136.6]].forEach(p => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.84, 0.07), railMat);
-    b.position.set(p[0], FLOOR + 0.42, p[1]);
+  [[-9.05, -134.0], [-9.05, -135.8], [-20.95, -134.0], [-20.95, -135.8]].forEach(p => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.70, 0.07), railMat);
+    b.position.set(p[0], FLOOR + 0.35, p[1]);
     g.add(b);
   });
   // 懸造の柱と貫（前縁から地面へ）
@@ -2319,8 +2321,8 @@ const butai = (function(){
   nuki.position.set(-15, FLOOR * 0.45, -133.78);
   g.add(nuki);
   // 床下の闇（丘とのすき間を見せない）
-  const dark = new THREE.Mesh(new THREE.BoxGeometry(11.8, FLOOR, 3.6), MAT.dark);
-  dark.position.set(-15, FLOOR / 2 - 0.12, -135.7);
+  const dark = new THREE.Mesh(new THREE.BoxGeometry(11.8, FLOOR, 3.0), MAT.dark);
+  dark.position.set(-15, FLOOR / 2 - 0.12, -135.1);
   g.add(dark);
 
   // ── 三重塔（舞台の南・丘の頂に建つ） ──
@@ -4487,7 +4489,7 @@ const WALK_ZONES = [
   { x0: -1.15, x1: 1.15, z0: -88.4, z1: -121.6 },   // 渡月橋の上
   { x0: -17,   x1: 10,   z0: -121.6, z1: -127  },   // 対岸（納涼床の手前まで）
   { x0: -11.8, x1: -8.8, z0: -127,  z1: -133.5 },   // 参道の石段（物見の丘へ）
-  { x0: -21,   x1: -9,   z0: -133.5, z1: -137.5 },  // 塔の舞台
+  { x0: -21,   x1: -9,   z0: -133.5, z1: -136.2 },  // 塔の舞台（浅くした床の上。北の際に立って川を見晴らす）
   { x0: 1.85,  x1: 7.9,   z0: -64.9, z1: -68.1 },   // 天龍寺の参道（山門をくぐる）
   { x0: 7.9,   x1: 10.2,  z0: -59.0, z1: -76.1 },   // 境内の入りの庭（通り側）
   { x0: 7.9,   x1: 23.7,  z0: -63.8, z1: -65.9 },   // 曹源池の北縁（方丈の前庭）
