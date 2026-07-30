@@ -511,7 +511,8 @@ const FX = {
   nonomiya    : true,   // ㊲ 野宮神社（通りの西の路地の奥。黒木鳥居・小柴垣・苔の庭・お亀石）
   shoro       : true,   // ㊳ 鐘楼の庭（天龍寺の北。撞ける梵鐘と除夜の鐘）
   daikakuji   : true,   // ㊴ 大覚寺（木戸の先の田の道の突き当り。表門・宸殿・村雨の廊下・五大堂・心経宝塔）
-  hirosawa    : true    // ㊵ 広沢の池（大覚寺の東。観月の池。北の汀に立つと月の道が渡月橋の月へつながる）
+  hirosawa    : true,   // ㊵ 広沢の池（大覚寺の東。観月の池。北の汀に立つと月の道が渡月橋の月へつながる）
+  osawa       : true    // ㊶ 大沢池と五大堂の観月台（日本最古の庭池。菊ヶ島と天神島・名古曽の滝跡・龍頭鷁首の舟）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -4591,8 +4592,8 @@ const sagano = (function(){
     new THREE.MeshLambertMaterial({ color: 0x1a1811, emissive: 0x040302 }), [
     [   0, 0.016, 11.4, -Math.PI/2, 0, 0,  4.6, 14.0, 1],   // 街道（木戸 z+4.8 → 表門 z+18.4）
     [-4.05, 0.016, 15.5, -Math.PI/2, 0, 0, 4.9,  3.2, 1],   // 辻から東へ折れる畦道
-    [-5.0, 0.016, 19.9, -Math.PI/2, 0, 0,  3.0, 12.0, 1],   // 池の西の汀
-    [-10.2, 0.016, 24.75, -Math.PI/2, 0, 0, 13.6, 2.8, 1]   // 池の北の汀（月をのぞむ道）
+    [-5.0, 0.016, 19.6, -Math.PI/2, 0, 0,  3.0, 11.4, 1],   // 池の西の汀
+    [-10.2, 0.016, 24.3, -Math.PI/2, 0, 0, 13.6, 2.0, 1]    // 池の北の汀（月をのぞむ道）
   ]);
   g.add(michi);
 
@@ -4665,8 +4666,10 @@ const daikakuji = (function(){
 
   // ── 土塀（白壁に瓦の笠）。南面は表門のところ（x-1.4〜+1.4）で切れる ──
   // [中心x, 中心z, 長さ, z沿いか]
-  [[-2.2, 18.5, 1.6, 0], [7.7, 18.5, 12.6, 0], [-3.0, 24.25, 11.5, 1],
-   [5.5, 30.0, 17.0, 0], [14.0, 24.25, 11.5, 1]].forEach(w => {
+  // 東面は五大堂の南（z23.2）で切れ、その先は大沢池にひらける（㊶）。
+  // 北面も五大堂と観月台のぶん東端を下げて x3.0 から
+  [[-2.2, 18.5, 1.6, 0], [7.7, 18.5, 12.6, 0], [-3.0, 20.85, 4.7, 1],
+   [8.5, 30.0, 11.0, 0], [14.0, 24.25, 11.5, 1]].forEach(w => {
     const ry = w[3] ? Math.PI / 2 : 0;
     PLASTER.push([w[0], 0.78, w[1], 0, ry, 0, w[2], 1.56, 0.3]);
     ROOF.push([w[0], 1.63, w[1], 0, ry, 0, w[2] + 0.14, 0.14, 0.52]);
@@ -4726,7 +4729,7 @@ const daikakuji = (function(){
   g.add(shindenGlow);
 
   // ── 五大堂（本堂。宸殿の東。南に広縁、板戸の奥にほのかな灯） ──
-  const GW = 3.4, GD = 3.6, GH = 2.4, GX = 0.6, GZ = 26.6;
+  const GW = 3.4, GD = 3.0, GH = 2.4, GX = 0.6, GZ = 27.9;   // 観月台と大沢池のぶん北へ寄せた（㊶）
   STONE.push([GX, 0.16, GZ, 0, 0, 0, GW + 1.0, 0.32, GD + 1.0]);
   WALLM.push([GX, 0.32 + GH / 2, GZ, 0, 0, 0, GW, GH, GD]);
   kiritsuma(GX, 0.32 + GH, GZ, GW, GD, 1.15, 0.7, true, true);
@@ -4798,7 +4801,7 @@ const daikakuji = (function(){
   g.add(touHi);
 
   // ── 松二本（北の際の歩けない一角に） ──
-  const MATSU = [[-1.9, 28.9, 1.0], [4.0, 29.0, 0.85]];
+  const MATSU = [[4.0, 29.0, 0.9]];        // 東の一本は観月台に場所を譲った（㊶）
   const matsuKan = kitaInst(new THREE.CylinderGeometry(0.08, 0.13, 2.0, 6), MAT.wallDk,
     MATSU.map(pp => [pp[0], 1.0 * pp[2], pp[1], 0, 0, 0, 1, pp[2], 1]));
   const matsuHa = kitaInst(new THREE.SphereGeometry(0.6, 8, 6),
@@ -4860,20 +4863,21 @@ const hirosawa = (function(){
   g.add(ike);
 
   // ── 遍照寺山（池の北にもたげる低い山。嵯峨富士とも呼ばれた） ──
+  const YX = -21.5, YZ = 31.5;      // 大沢池（㊶）に場所を譲って北西へ退けた
   const yama = new THREE.Mesh(
     new THREE.SphereGeometry(8.5, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.MeshLambertMaterial({ color: 0x131c29 }));
   yama.scale.set(1, 0.5, 0.55);
-  yama.position.set(-20, 0, 31);
+  yama.position.set(YX, 0, YZ);
   g.add(yama);
   // 山肌の木立（つるりとした半球は坊主山に見える。南斜面に叢を散らして稜線を割る）
   const KODACHI = [];
-  for (let i = 0; i < 14; i++){
-    const u = (i / 13) * 1.7 - 0.85;                 // 南面をなぞる角度
-    const rr = 0.55 + rnd() * 0.4;
-    const hx = -20 + Math.sin(u) * 8.5 * rr;
-    const hz = 31 - Math.cos(u) * 4.675 * rr;
-    const q = 1 - Math.min(1, ((hx + 20) / 8.5) * ((hx + 20) / 8.5) + ((hz - 31) / 4.675) * ((hz - 31) / 4.675));
+  for (let i = 0; i < 19; i++){
+    const u = (i / 18) * 2.9 - 1.45;                 // 山肌をぐるりとなぞる角度
+    const rr = 0.4 + rnd() * 0.5;
+    const hx = YX + Math.sin(u) * 8.5 * rr;
+    const hz = YZ - Math.cos(u) * 4.675 * rr;
+    const q = 1 - Math.min(1, ((hx - YX) / 8.5) * ((hx - YX) / 8.5) + ((hz - YZ) / 4.675) * ((hz - YZ) / 4.675));
     const hy = 4.25 * Math.sqrt(Math.max(0, q));
     const sz2 = 0.9 + rnd() * 0.8;
     KODACHI.push([hx, hy + sz2 * 0.25, hz, 0, rnd() * Math.PI, 0, sz2, sz2 * 0.8, sz2]);
@@ -4988,6 +4992,220 @@ const hirosawa = (function(){
   scene.add(g);
   return { group: g, tsukiMichi: tsukiMichi, shimmer: shimmer, funeHi: funeHi, fune: fune, pond: PC };
 })();
+
+/* ============================================================
+/* ㊶ 大沢池と五大堂の観月台 ― 五大堂の東、水の上へ張り出す床
+   嵯峨天皇の離宮の池で、日本最古の庭池。中国の洞庭湖に倣って「庭湖」とも
+   呼ばれ、いまも観月の夕べに龍頭鷁首の舟が浮かぶ。北の際には名古曽の滝跡
+   ―― 水はとうに絶えて石組だけが残る（「滝の音は絶えて久しくなりぬれど
+   名こそ流れてなほ聞こえけれ」）。
+   五大堂を z26.6→27.9 へ北に寄せ、東の土塀を z23.2 で切って池に開いた。
+   観月台は床 0.45m の高さ。実座標＝池 中心(-8.0,+29.2) rx4.4 rz3.8、
+   観月台 x-1.1〜-4.8 / z+26.9〜+29.3（北と東に高欄、南は上がり口）
+   ============================================================ */
+const osawa = (function(){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const stone2 = new THREE.MeshLambertMaterial({ color: 0x272c37 });
+  let seed = 9091;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const PC = { x: -8.0, z: 29.2, rx: 4.4, rz: 3.8 };
+  const BOX = [], DARK = [], ISHI = [[], []], HI = [];
+
+  // ── 池（renderOrder -2 で先に描き、水鏡の光を飲ませない） ──
+  const ike = new THREE.Mesh(new THREE.CircleGeometry(1, 44),
+    new THREE.MeshBasicMaterial({ map: TEX.water.clone(), color: 0x8ea4cc,
+      transparent: true, opacity: 0.95 }));
+  ike.material.map.wrapS = ike.material.map.wrapT = THREE.RepeatWrapping;
+  ike.material.map.repeat.set(3, 2);
+  ike.rotation.x = -Math.PI / 2;
+  ike.scale.set(PC.rx, PC.rz, 1);
+  ike.position.set(PC.x, 0.024, PC.z);
+  ike.renderOrder = -2;
+  g.add(ike);
+
+  // ── 汀の石（明るさを二段に分けて二群で置く。r128 の setColorAt は使えない） ──
+  for (let i = 0; i < 22; i++){
+    const th = (i / 22) * Math.PI * 2 + rnd() * 0.24;
+    const sz = 0.36 + rnd() * 0.42;
+    ISHI[rnd() > 0.5 ? 0 : 1].push([
+      PC.x + Math.cos(th) * (PC.rx + 0.4), 0.06, PC.z + Math.sin(th) * (PC.rz + 0.4),
+      rnd() * Math.PI, rnd() * Math.PI, rnd() * 0.4,
+      sz, sz * (0.6 + rnd() * 0.4), sz]);
+  }
+
+  // ── 菊ヶ島と天神島（州浜のうえに、島の松と天神さんの小鳥居） ──
+  const SHIMA = [[-9.6, 30.0, 1.15], [-10.6, 28.0, 0.95]];
+  const suhama = kitaInst(new THREE.CircleGeometry(1, 18),
+    new THREE.MeshLambertMaterial({ color: 0x141822 }),
+    SHIMA.map(p => [p[0], 0.045, p[1], -Math.PI / 2, 0, 0, p[2], p[2], 1]));
+  g.add(suhama);
+  // 菊ヶ島の松
+  const shimaKan = kitaInst(new THREE.CylinderGeometry(0.06, 0.1, 1.3, 6), MAT.wallDk,
+    [[-9.6, 0.65, 30.0, 0, 0, 0, 1, 1, 1]]);
+  const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 8, 5),
+    new THREE.MeshLambertMaterial({ color: 0x1a2c22 }), [
+    [-9.55, 1.4, 29.95, 0, 0, 0, 1.15, 0.44, 1.15],
+    [-9.25, 1.14, 30.25, 0, 0, 0, 0.78, 0.34, 0.78]
+  ]);
+  g.add(shimaKan, shimaHa);
+  // 天神島の小鳥居（朱は沈ませる。夜は形だけ読めればよい）
+  const shu = new THREE.MeshLambertMaterial({ color: 0x7d3128 });
+  const TORII = [
+    [-10.6, 0.36, 27.72, 0, 0, 0, 0.07, 0.62, 0.07],
+    [-10.6, 0.36, 28.28, 0, 0, 0, 0.07, 0.62, 0.07],
+    [-10.6, 0.70, 28.00, 0, 0, 0, 0.09, 0.06, 0.86],
+    [-10.6, 0.58, 28.00, 0, 0, 0, 0.06, 0.05, 0.62]
+  ];
+  g.add(kitaInst(KITA_BOX, shu, TORII));
+
+  // ── 庭湖石（島のあいだに立てる二石。庭園の芯） ──
+  ISHI[0].push([-8.6, 0.34, 29.0, 0.1, 0.6, 0.08, 0.5, 1.5, 0.44]);
+  ISHI[1].push([-8.95, 0.22, 29.32, 0.15, 1.2, -0.1, 0.42, 1.0, 0.4]);
+
+  // ── 名古曽の滝跡（池の北。水はとうに絶えて、石組だけが草に埋もれている） ──
+  const TAKI = [
+    [-6.2, 0.55, 34.5, 0.1, 0.4, 0.05, 0.8, 2.0, 0.7],     // 立石（滝の左）
+    [-5.1, 0.44, 34.2, 0.12, 1.1, -0.06, 0.66, 1.6, 0.6],  // 立石（滝の右）
+    [-5.7, 0.26, 34.0, 0, 0.7, 0, 0.9, 0.8, 0.7],          // 水落石
+    [-5.8, 0.14, 33.5, 0.2, 0.3, 0.1, 1.0, 0.5, 0.9],
+    [-6.6, 0.12, 33.4, 0.1, 1.5, 0.15, 0.8, 0.45, 0.75],
+    [-5.0, 0.11, 33.3, 0.25, 0.9, 0, 0.7, 0.4, 0.66],
+    [-6.1, 0.09, 33.0, 0, 0.2, 0.08, 0.85, 0.35, 0.8]
+  ];
+  TAKI.forEach((t, i) => ISHI[i % 2].push(t));
+
+  // ── 龍頭鷁首の舟（観月の夕べの一対。龍の首と、鷁という水鳥の首） ──
+  // [中心x, 中心z, 向き, 龍か]
+  const FUNE = [[-7.6, 32.0, 0.5, 1], [-8.6, 26.0, -0.9, 0]];
+  const KUBI = [], hashi = [], FUNEBOX = [];
+  FUNE.forEach(f => {
+    const c = Math.cos(f[2]), s2 = Math.sin(f[2]);
+    const P = (dx, dz) => [f[0] + dx * c + dz * s2, f[1] - dx * s2 + dz * c];
+    const put = (dx, y, dz, sx, sy, sz) => {
+      const p = P(dx, dz);
+      FUNEBOX.push([p[0], y, p[1], 0, f[2], 0, sx, sy, sz]);
+    };
+    put(0,     0.08,  0,    0.74, 0.16, 2.5);          // 底
+    put(-0.36, 0.21,  0,    0.07, 0.24, 2.4);          // 舷（左）
+    put( 0.36, 0.21,  0,    0.07, 0.24, 2.4);          // 舷（右）
+    put(0,     0.49, -0.27, 0.70, 0.42, 1.1);          // 屋形
+    put(0,     0.74, -0.27, 0.94, 0.08, 1.35);         // 屋形の屋根
+    // 首（舳先から斜めに立ち上がる）
+    const kp = P(0, 1.27);
+    KUBI.push([kp[0], 0.60, kp[1], -0.5, f[2], 0, 1, 1, 1]);
+    // 頭 ―― 龍は角ばった顎に二本の角、鷁は細くとがった嘴
+    const hp = P(0, 1.58);
+    if (f[3]){
+      FUNEBOX.push([hp[0], 1.05, hp[1], 0, f[2], 0, 0.19, 0.21, 0.33]);
+      FUNEBOX.push([hp[0], 1.19, hp[1], -0.6, f[2] + 0.3, 0, 0.04, 0.22, 0.04]);
+      FUNEBOX.push([hp[0], 1.19, hp[1], -0.6, f[2] - 0.3, 0, 0.04, 0.22, 0.04]);
+    } else {
+      FUNEBOX.push([hp[0], 1.03, hp[1], 0, f[2], 0, 0.15, 0.16, 0.21]);
+      hashi.push([hp[0], 1.03, hp[1], f[2]]);
+    }
+    const lp = P(0, -0.7);
+    HI.push(lp[0], 0.63, lp[1]);                       // 屋形の灯
+  });
+  g.add(kitaInst(KITA_BOX, MAT.wall, FUNEBOX));            // 舟は明るい木で水面から起こす
+  g.add(kitaInst(new THREE.CylinderGeometry(0.07, 0.095, 0.8, 7), MAT.wall, KUBI));
+  hashi.forEach(h => {                                  // 鷁の嘴
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.27, 6), MAT.wall);
+    beak.rotation.set(Math.PI / 2 - 0.25, h[3], 0);
+    beak.position.set(h[0], h[1] + 0.02, h[2] + 0.16);
+    g.add(beak);
+  });
+
+  // ── 観月台（五大堂の東面から水の上へ張り出す。北と東に高欄、南は上がり口） ──
+  const KD = { x0: -4.8, x1: -1.1, z0: 26.9, z1: 29.3, y: 0.45 };
+  const kcx = (KD.x0 + KD.x1) / 2, kcz = (KD.z0 + KD.z1) / 2;
+  DARK.push([kcx, KD.y - 0.045, kcz, 0, 0, 0, KD.x1 - KD.x0, 0.09, KD.z1 - KD.z0]);  // 床
+  [[-1.5, 27.3], [-1.5, 28.9], [-3.1, 27.3], [-3.1, 28.9],
+   [-4.5, 27.3], [-4.5, 28.9]].forEach(p => {                                        // 束柱
+    DARK.push([p[0], 0.2, p[1], 0, 0, 0, 0.11, 0.4, 0.11]);
+  });
+  // 高欄（地覆・笠木・束）。東と北の二面だけ
+  [[KD.x0 + 0.05, kcz, 1, KD.z1 - KD.z0 - 0.1], [kcx, KD.z1 - 0.05, 0, KD.x1 - KD.x0 - 0.1]]
+    .forEach(r => {
+      const ry = r[2] ? Math.PI / 2 : 0;
+      DARK.push([r[0], KD.y + 0.06, r[1], 0, ry, 0, r[3], 0.07, 0.09]);   // 地覆
+      DARK.push([r[0], KD.y + 0.47, r[1], 0, ry, 0, r[3] + 0.1, 0.08, 0.14]); // 笠木
+      const n = Math.max(3, Math.round(r[3] / 0.42));
+      for (let i = 0; i <= n; i++){
+        const t = -r[3] / 2 + (r[3] * i / n);
+        DARK.push([r[2] ? r[0] : r[0] + t, KD.y + 0.26, r[2] ? r[1] + t : r[1],
+                   0, 0, 0, 0.05, 0.42, 0.05]);
+      }
+    });
+  // 上がり口の踏石（東の小道から床へ一段）
+  ISHI[1].push([-2.4, 0.11, 26.72, 0, 0.2, 0, 1.5, 0.44, 0.7]);
+  // 台のかたわらの常夜灯（北東の隅。可動域の外に立てる）
+  DARK.push([-4.66, 0.75, 29.14, 0, 0, 0, 0.09, 0.6, 0.09]);
+  BOX.push([-4.66, 1.16, 29.14, 0, 0, 0, 0.21, 0.2, 0.21]);
+  DARK.push([-4.66, 1.33, 29.14, 0, Math.PI / 4, 0, 0.4, 0.11, 0.4]);
+  const daiHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+  daiHalo.scale.set(1.1, 1.1, 1);
+  daiHalo.position.set(-4.66, 1.16, 29.14);
+  g.add(daiHalo);
+
+  // ── 月の道（観月台に立つと、水面の光がこちらへ伸びてくる） ──
+  const tsukiMichi = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 7.0),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xd6e4ff, transparent: true,
+      opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+  tsukiMichi.rotation.x = -Math.PI / 2;
+  tsukiMichi.rotation.z = -0.30;
+  tsukiMichi.position.set(PC.x, 0.042, PC.z);
+  g.add(tsukiMichi);
+  const N_KIRA = 12, kpos = new Float32Array(N_KIRA * 3);
+  for (let i = 0; i < N_KIRA; i++){
+    const th = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * 0.84;
+    kpos[i*3]   = PC.x + Math.cos(th) * PC.rx * rr;
+    kpos[i*3+1] = 0.05;
+    kpos[i*3+2] = PC.z + Math.sin(th) * PC.rz * rr;
+  }
+  const kgeo = new THREE.BufferGeometry();
+  kgeo.setAttribute('position', new THREE.BufferAttribute(kpos, 3));
+  const shimmer = new THREE.Points(kgeo, new THREE.PointsMaterial({ map: TEX.glow,
+    color: 0xcfe0ff, size: 0.17, sizeAttenuation: true, transparent: true, opacity: 0.30,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  g.add(shimmer);
+  // 舟の灯と常夜灯は点でまとめる（沈んだ橙をふたつ、水面近くに）
+  const hgeo = new THREE.BufferGeometry();
+  hgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(HI), 3));
+  const funeHi = new THREE.Points(hgeo, new THREE.PointsMaterial({ map: TEX.glow,
+    color: 0xffc37a, size: 1.15, sizeAttenuation: true, transparent: true, opacity: 0.56,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  g.add(funeHi);
+
+  // ── 貯めた箱をまとめて建てる ──
+  g.add(kitaInst(KITA_BOX, MAT.wallDk, DARK));
+  g.add(kitaInst(KITA_BOX, MAT.inner, BOX));
+  const ishiGeo = new THREE.DodecahedronGeometry(0.32, 0);
+  [stone, stone2].forEach((m, i) => { if (ISHI[i].length) g.add(kitaInst(ishiGeo, m, ISHI[i])); });
+
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, tsukiMichi: tsukiMichi, shimmer: shimmer, funeHi: funeHi.material,
+           daiHalo: daiHalo, pond: PC, dai: KD };
+})();
+
+/* 月の道を「立った場所と月を結ぶ線」に乗せ直す（池ごとに呼ぶ）。
+   水鏡は見る人ごとに位置が変わる ―― 置きっぱなしの一本だと、
+   汀を歩いたときに月と別のところで光ってしまう。
+   線が池からはみ出す立ち位置では、池のなかへ引き戻す */
+function aimTsukiMichi(tm, PD, tmin, tmax){
+  const mdx = 42 - camera.position.x, mdz = -152 - camera.position.z;
+  const ml = Math.hypot(mdx, mdz) || 1;
+  const ux = mdx / ml, uz = mdz / ml;
+  let tt = (PD.x - camera.position.x) * ux + (PD.z - camera.position.z) * uz;
+  tt = Math.max(tmin, Math.min(tt, tmax));
+  let px = camera.position.x + ux * tt, pz = camera.position.z + uz * tt;
+  const pe = Math.hypot((px - PD.x) / PD.rx, (pz - PD.z) / PD.rz);
+  if (pe > 0.6){ px = PD.x + (px - PD.x) * 0.6 / pe; pz = PD.z + (pz - PD.z) * 0.6 / pe; }
+  tm.position.x = px; tm.position.z = pz;
+  tm.rotation.z = Math.atan2(-ux, -uz);
+}
 
 /* ============================================================
    6. 屋根の猫（参の町屋に一匹）
@@ -5172,12 +5390,15 @@ const WALK_ZONES = [
   /* 木戸の先＝嵯峨野の北（5p）。田の道を北へ、東へ折れれば広沢の池の汀 */
   { x0: -1.85, x1: 1.85,  z0:  17.8, z1:   3.2 },   // 田の道（木戸から大覚寺の表門まで）
   { x0: -6.2,  x1: -1.75, z0:  16.8, z1:  14.2 },   // 辻から東へ折れる畦道
-  { x0: -6.2,  x1: -3.8,  z0:  25.6, z1:  14.2 },   // 広沢の池の西の汀
-  { x0: -16.5, x1: -3.8,  z0:  25.6, z1:  23.9 },   // 池の北の汀（南を向くと月の道が伸びる）
+  { x0: -6.2,  x1: -3.8,  z0:  25.0, z1:  14.2 },   // 広沢の池の西の汀
+  { x0: -16.5, x1: -3.8,  z0:  25.0, z1:  23.7 },   // 池の北の汀（南を向くと月の道が伸びる）
   { x0: -1.15, x1: 1.15,  z0:  19.8, z1:  17.6 },   // 大覚寺の表門をくぐる
   { x0: -2.2,  x1: 13.6,  z0:  23.4, z1:  19.7 },   // 境内の南の前庭（宸殿を離れて見られる深さ）
-  { x0: -2.1,  x1: 2.2,   z0:  24.0, z1:  23.2 },   // 五大堂の前（村雨の廊下を見上げる）
-  { x0: 10.4,  x1: 13.6,  z0:  25.2, z1:  19.7 }    // 西の庭（心経宝塔の下まで）
+  { x0: -2.1,  x1: 2.2,   z0:  25.5, z1:  23.2 },   // 五大堂の前（村雨の廊下を見上げる）
+  { x0: 10.4,  x1: 13.6,  z0:  25.2, z1:  19.7 },   // 西の庭（心経宝塔の下まで）
+  /* 大沢池と観月台（㊶）。五大堂の東を北へ抜けて、水の上の床に立つ */
+  { x0: -3.2,  x1: -1.8,  z0:  26.9, z1:  23.4 },   // 五大堂の東の小道
+  { x0: -4.6,  x1: -1.2,  z0:  29.2, z1:  26.9 }    // 観月台の床（0.45m 高い）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -5208,6 +5429,9 @@ function walkEyeY(x, z){
   if (z <= -88.4 && z >= -92.6 && x >= 4.95 && x <= 6.25){
     return 1.62 + 0.22;                             // 桟橋の板の上
   }
+  if (z <= 29.2 && z >= 26.9 && x >= -4.6 && x <= -1.2){
+    return 1.62 + 0.45;                             // 五大堂の観月台（㊶）
+  }
   return 1.62;
 }
 /* 画面の一点から地面（or 橋板）を求める。メッシュを持ち回らずレイを刻んで解く */
@@ -5226,6 +5450,8 @@ function groundPointFromRay(){
       gy = SANDO.rise;                              // 舞台の床
     } else if (pz <= -88.4 && pz >= -92.6 && px >= 4.95 && px <= 6.25){
       gy = 0.22;                                    // 桟橋の板
+    } else if (pz <= 29.2 && pz >= 26.9 && px >= -4.6 && px <= -1.2){
+      gy = 0.45;                                    // 観月台の床（㊶）
     }
     if (py <= gy + 0.03) return { x: px, z: pz };
     s += 0.4;
@@ -6590,21 +6816,9 @@ function update(dt){
   }
   hirosawa.group.visible = FX.hirosawa && kitaNear;
   if (hirosawa.group.visible){
-    /* 月の道は「立った場所と月を結ぶ線」に毎フレーム乗せ直す。
-       水鏡は見る人ごとに位置が変わる ―― 置きっぱなしの一本だと、
-       汀を歩いたときに月と別のところで光ってしまう。
-       線が池からはみ出す立ち位置では、池のなかへ引き戻す */
-    const tm = hirosawa.tsukiMichi, PD = hirosawa.pond;
-    const mdx = 42 - camera.position.x, mdz = -152 - camera.position.z;
-    const ml = Math.hypot(mdx, mdz) || 1;
-    const ux = mdx / ml, uz = mdz / ml;
-    let tt = (PD.x - camera.position.x) * ux + (PD.z - camera.position.z) * uz;
-    tt = Math.max(3, Math.min(tt, 13));
-    let px = camera.position.x + ux * tt, pz = camera.position.z + uz * tt;
-    const pe = Math.hypot((px - PD.x) / PD.rx, (pz - PD.z) / PD.rz);
-    if (pe > 0.6){ px = PD.x + (px - PD.x) * 0.6 / pe; pz = PD.z + (pz - PD.z) * 0.6 / pe; }
-    tm.position.set(px, 0.042, pz);
-    tm.rotation.z = Math.atan2(-ux, -uz);
+    // 月の道は立った場所ごとに乗せ直す（aimTsukiMichi・5p 末尾）
+    const tm = hirosawa.tsukiMichi;
+    aimTsukiMichi(tm, hirosawa.pond, 3, 13);
     // 水面の息づかいでゆっくり伸び縮みする（曹源池の水鏡と同じ手）
     tm.material.opacity = 0.27 + Math.sin(elapsed * 0.5) * 0.05;
     tm.scale.x = 1 + Math.sin(elapsed * 0.73 + 1.1) * 0.09;
@@ -6612,6 +6826,18 @@ function update(dt){
     hirosawa.funeHi.material.opacity = 0.28 + Math.sin(elapsed * 3.6 + 0.9) * 0.06;
     hirosawa.fune.position.y = Math.sin(elapsed * 0.7) * 0.025;
     hirosawa.fune.rotation.z = Math.sin(elapsed * 0.58 + 0.6) * 0.018;
+  }
+
+  // ㊶ 大沢池：観月台に立つと水面の光がこちらへ伸びる／舟と常夜灯のまたたき
+  osawa.group.visible = FX.osawa && kitaNear;
+  if (osawa.group.visible){
+    const om = osawa.tsukiMichi;
+    aimTsukiMichi(om, osawa.pond, 2, 7.5);
+    om.material.opacity = 0.22 + Math.sin(elapsed * 0.62 + 0.9) * 0.05;
+    om.scale.x = 1 + Math.sin(elapsed * 0.81 + 2.3) * 0.08;
+    osawa.shimmer.material.opacity = 0.26 + Math.max(0, Math.sin(elapsed * 1.9 + 0.6)) * 0.22;
+    osawa.funeHi.opacity = 0.54 + Math.sin(elapsed * 3.3 + 2.4) * 0.09;
+    osawa.daiHalo.material.opacity = 0.26 + Math.sin(elapsed * 2.7 + 1.5) * 0.05;
   }
 
   // ㊳ 鐘楼の庭：常夜灯のまたたきと、撞木の振り・鐘の震え・除夜の数え
@@ -6888,6 +7114,7 @@ window.__machiya = {
   sagano: sagano,       // 木戸の先の野（田・畦・道）の赤入れ用
   daikakuji: daikakuji, // 大覚寺の赤入れ用
   hirosawa: hirosawa,   // 広沢の池の赤入れ用
+  osawa: osawa,         // 大沢池と観月台の赤入れ用
   /* 嵯峨野の北の検証口：群れが出ているか、月の道が本当に月の方位へ寝ているか。
      zure は月の道の向きと「池から見た月の方位」のずれ（度）。0 に近いほど正しい */
   kita: function(){
@@ -6903,6 +7130,18 @@ window.__machiya = {
       sagano: sagano.group.visible,
       daikakuji: daikakuji.group.visible,
       hirosawa: hirosawa.group.visible,
+      osawa: osawa.group.visible,
+      // 観月台に立っているか（床は地面より 0.45m 高い）
+      onKangetsudai: camera.position.z <= 29.2 && camera.position.z >= 26.9 &&
+                     camera.position.x >= -4.6 && camera.position.x <= -1.2,
+      osawaZure: (function(){
+        const t2 = osawa.tsukiMichi;
+        const dx2 = -Math.sin(t2.rotation.z), dz2 = -Math.cos(t2.rotation.z);
+        const ax = 42 - t2.position.x, az = -152 - t2.position.z;
+        const al = Math.hypot(ax, az);
+        const d2 = Math.max(-1, Math.min(1, dx2 * (ax / al) + dz2 * (az / al)));
+        return +(Math.acos(d2) * 180 / Math.PI).toFixed(2);
+      })(),
       zure: +(Math.acos(dot) * 180 / Math.PI).toFixed(2),
       // いまの視界に月が入っているか（汀に立って南を向いたときの確かめ）
       moonNdc: [+eye.x.toFixed(3), +eye.y.toFixed(3)],
