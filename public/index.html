@@ -5149,13 +5149,17 @@ const osawa = (function(){
   daiHalo.position.set(-4.66, 1.16, 29.14);
   g.add(daiHalo);
 
-  // ── 月の道（観月台に立つと、水面の光がこちらへ伸びてくる） ──
-  const tsukiMichi = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 7.0),
+  // ── 月の道 ──
+  // 広沢と違い、ここは立つ場所（観月台＝西の汀）と月（南南西）と池（北東）が
+  // 一直線に並ばない。視点に追わせると光が足もとに落ちて、見下ろさないと
+  // 写らなくなる ―― so 大沢は池のなかほどに置いたままにする。
+  // 向きだけは月の方位に合わせる（この位置から月へは -0.269rad）
+  const tsukiMichi = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 5.5),
     new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xd6e4ff, transparent: true,
-      opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+      opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false }));
   tsukiMichi.rotation.x = -Math.PI / 2;
-  tsukiMichi.rotation.z = -0.30;
-  tsukiMichi.position.set(PC.x, 0.042, PC.z);
+  tsukiMichi.rotation.z = -0.269;
+  tsukiMichi.position.set(-8.0, 0.042, 29.6);
   g.add(tsukiMichi);
   const N_KIRA = 12, kpos = new Float32Array(N_KIRA * 3);
   for (let i = 0; i < N_KIRA; i++){
@@ -6832,8 +6836,7 @@ function update(dt){
   osawa.group.visible = FX.osawa && kitaNear;
   if (osawa.group.visible){
     const om = osawa.tsukiMichi;
-    aimTsukiMichi(om, osawa.pond, 2, 7.5);
-    om.material.opacity = 0.22 + Math.sin(elapsed * 0.62 + 0.9) * 0.05;
+    om.material.opacity = 0.24 + Math.sin(elapsed * 0.62 + 0.9) * 0.05;
     om.scale.x = 1 + Math.sin(elapsed * 0.81 + 2.3) * 0.08;
     osawa.shimmer.material.opacity = 0.26 + Math.max(0, Math.sin(elapsed * 1.9 + 0.6)) * 0.22;
     osawa.funeHi.opacity = 0.54 + Math.sin(elapsed * 3.3 + 2.4) * 0.09;
