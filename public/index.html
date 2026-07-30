@@ -2655,7 +2655,9 @@ const unryu = (function(){
 
   const W = 3.2, D = 3.0, H = 2.6;
   const CX = -5.2, CZ = -69.9;             // 堂の中心
-  // 床と壁（入口は北面の中央 1.2 だけ開ける）
+  // 床と壁（入口は北面＝参道側の中央 1.2 だけ開ける）
+  // ⚠この世界は z マイナスが南（川と橋の方）。参道は堂の北＝z プラス側にある。
+  //   開口・踏み石・框は必ず CZ+1.5 の側に置く（南に空けると参道から壁が正面になる）
   const yuka = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.1, D - 0.1), MAT.wallDk);
   yuka.rotation.x = -Math.PI / 2;
   yuka.position.set(CX, 0.02, CZ);
@@ -2664,9 +2666,9 @@ const unryu = (function(){
   const wm4 = new THREE.Matrix4(), wq = new THREE.Quaternion(), weu = new THREE.Euler(),
         wv = new THREE.Vector3(), ws = new THREE.Vector3();
   [ // [cx, cz, 長さ, z沿いか]
-    [CX - 1.1, CZ - 1.5, 1.0, 0],          // 北の西片
-    [CX + 1.1, CZ - 1.5, 1.0, 0],          // 北の東片
-    [CX, CZ + 1.5, W, 0],                  // 南
+    [CX - 1.1, CZ + 1.5, 1.0, 0],          // 北（参道側）の西片
+    [CX + 1.1, CZ + 1.5, 1.0, 0],          // 北（参道側）の東片
+    [CX, CZ - 1.5, W, 0],                  // 南（奥は無双の壁）
     [CX - W / 2, CZ, D, 1],                // 西
     [CX + W / 2, CZ, D, 1]                 // 東
   ].forEach((w, i) => {
@@ -2693,13 +2695,13 @@ const unryu = (function(){
     tsuma.position.set(CX + dir * (W / 2 + 0.02), H + uRise * 0.38, CZ);
     g.add(tsuma);
   });
-  // 入口の踏み石と框
+  // 入口の踏み石と框（北面＝参道から一歩で上がる側に）
   const fumi = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.07, 0.5),
     new THREE.MeshLambertMaterial({ color: 0x343a46 }));
-  fumi.position.set(CX, 0.035, CZ - 1.75);
+  fumi.position.set(CX, 0.035, CZ + 1.75);
   g.add(fumi);
   const kamachi = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.3, 0.12), MAT.wallDk);
-  kamachi.position.set(CX, H - 0.15, CZ - 1.5);
+  kamachi.position.set(CX, H - 0.15, CZ + 1.5);
   g.add(kamachi);
   // 天井の雲龍図と、こちらを追う瞳
   const tenjo = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.2, D - 0.2),
@@ -2722,9 +2724,9 @@ const unryu = (function(){
     g.add(kuro);
     pupils.push({ mesh: kuro, cx: e[0], cz: e[1] });
   });
-  // 堂内の蝋燭二つ
+  // 堂内の蝋燭二つ（戸口の正面＝堂の奥に据える）
   const candles = [];
-  [[CX - 1.2, CZ + 1.1], [CX + 1.2, CZ + 1.1]].forEach(p => {
+  [[CX - 1.2, CZ - 1.1], [CX + 1.2, CZ - 1.1]].forEach(p => {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.1), MAT.inner);
     body.position.set(p[0], 0.13, p[1]); g.add(body);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
@@ -3879,7 +3881,8 @@ const WALK_ZONES = [
   { x0: 7.9,   x1: 23.7,  z0: -73.4, z1: -76.1 },   // 曹源池の南縁
   { x0: 21.9,  x1: 23.7,  z0: -65.9, z1: -73.4 },   // 曹源池の奥の縁（龍門瀑のほとり）
   { x0: 4.95,  x1: 6.25,  z0: -88.4, z1: -92.6 },   // 舟の桟橋
-  { x0: 4.1,   x1: 6.3,   z0: -68.05, z1: -71.0 },  // 法堂の堂内（雲龍図を見上げる）
+  { x0: 4.65,  x1: 5.75,  z0: -68.0,  z1: -68.7 },  // 法堂の戸口（北面の開口 1.2 をくぐる）
+  { x0: 4.1,   x1: 6.3,   z0: -68.6,  z1: -71.15 }, // 法堂の堂内（雲龍図を見上げる）
   { x0: -8.6,  x1: -1.85, z0: -60.4, z1: -63.4 },   // 化野への隠れ道（通りの東の竹の切れ目）
   { x0: -26.5, x1: -8.6,  z0: -57.5, z1: -76.2 }    // 化野の石仏の野（南の際は囲いの藪の厚みに譲る）
 ];
@@ -4397,7 +4400,7 @@ window.addEventListener('pointermove', ev => {
       WALK.yaw  -= dx * 0.0042;
       // 法堂の中では天井の龍まで見上げられるよう、上向きの上限をゆるめる
       const pUp = (camera.position.x >= 4.1 && camera.position.x <= 6.3 &&
-                   camera.position.z <= -68.05 && camera.position.z >= -71.0) ? 1.25 : 0.5;
+                   camera.position.z <= -68.05 && camera.position.z >= -71.2) ? 1.25 : 0.5;
       WALK.pitch = Math.max(-0.55, Math.min(pUp, WALK.pitch - dy * 0.0032));
       WALK.manualUntil = elapsed + 2.0;
     }
