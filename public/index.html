@@ -362,6 +362,8 @@
   <button id="btn-fune" aria-pressed="false">屋形舟</button>
   <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
   <button id="btn-ku" aria-pressed="false">一句詠む</button>
+  <button id="btn-kane" style="display:none">鐘を撞く</button>
+  <button id="btn-joya" style="display:none" aria-pressed="false">除夜の鐘</button>
 </div>
 
 <div id="fallback">
@@ -506,7 +508,8 @@ const FX = {
   ienami      : true,   // ㉞ 木戸の先の家並み（続きの町の影と提灯の点列が霧に溶ける）
   amanogawa   : true,   // ㉟ 天の川と夜雲（月のそばをゆっくり流れる）
   adashino    : true,   // ㊱ 愛宕念仏寺出張所（通りの東の隠れ道の先。羅漢の群れ・青白い供え灯と鬼火・囲いの竹藪）
-  nonomiya    : true    // ㊲ 野宮神社（通りの西の路地の奥。黒木鳥居・小柴垣・苔の庭・お亀石）
+  nonomiya    : true,   // ㊲ 野宮神社（通りの西の路地の奥。黒木鳥居・小柴垣・苔の庭・お亀石）
+  shoro       : true    // ㊳ 鐘楼の庭（天龍寺の北。撞ける梵鐘と除夜の鐘）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
@@ -2269,16 +2272,19 @@ const butai = (function(){
   steps.instanceMatrix.needsUpdate = true;
   g.add(steps);
   // 石段の下の斜面埋めと、両脇の石垣
-  const slopeLen = Math.hypot(SANDO.z0 - SANDO.z1, SANDO.rise) + 1.4;
+  // 舞台から見下ろすと、段の外へ張り出した端と明るい石垣が「でっぱり」に見えてしまう。
+  // 長さは段の丈ぴったりに詰め、石垣は低く・丘の色に寄せて段の影に納める
+  const slopeLen = Math.hypot(SANDO.z0 - SANDO.z1, SANDO.rise) + 0.15;
   const slopeAng = Math.atan2(SANDO.rise, SANDO.z0 - SANDO.z1);
-  const under = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.45, slopeLen), hillMat);
+  const under = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.34, slopeLen), hillMat);
   under.rotation.x = -slopeAng;
-  under.position.set(-10.3, SANDO.rise / 2 - 0.35, (SANDO.z0 + SANDO.z1) / 2);
+  under.position.set(-10.3, SANDO.rise / 2 - 0.32, (SANDO.z0 + SANDO.z1) / 2);
   g.add(under);
-  [-11.95, -8.65].forEach(x => {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.7, slopeLen), stone);
+  const kakiMat = new THREE.MeshLambertMaterial({ color: 0x1a2230 });
+  [-11.75, -8.85].forEach(x => {
+    const w = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, slopeLen), kakiMat);
     w.rotation.x = -slopeAng;
-    w.position.set(x, SANDO.rise / 2 + 0.1, (SANDO.z0 + SANDO.z1) / 2);
+    w.position.set(x, SANDO.rise / 2 - 0.06, (SANDO.z0 + SANDO.z1) / 2);
     g.add(w);
   });
 
@@ -2416,10 +2422,12 @@ const tenryuji = (function(){
   niwa.position.set(-15.9, 0.01, -67.5);
   g.add(niwa);
 
-  // ── 土塀（白壁に瓦の笠）。東面は山門のところ（z-64.9〜-68.1）で切れる ──
+  // ── 土塀（白壁に瓦の笠）。東面は山門のところ（z-64.9〜-68.1）で切れ、
+  //     北面は鐘楼の庭へ抜ける小門のところ（実座標 x9.4〜11.4）で切れる ──
   // [中心x, 中心z, 長さ, z沿いか]
   const WALLS = [
-    [-15.9, -58.6, 16.9, 0],     // 北
+    [-17.875, -58.6, 12.95, 0],  // 北（小門の西）
+    [-8.425, -58.6, 1.95, 0],    // 北（小門の東）
     [-15.9, -76.4, 16.9, 0],     // 南
     [-24.2, -67.5, 18.1, 1],     // 西
     [-7.6, -61.75, 6.3, 1],      // 東（山門の北）
@@ -2469,6 +2477,30 @@ const tenryuji = (function(){
   monHalo.position.y = 1.95; mon.add(monHalo);
   mon.position.set(-7.6, 0, -66.5);
   g.add(mon);
+
+  // ── 北の小門（鐘楼の庭へ抜けるくぐり戸。棟は x 沿い・くぐる向きは z） ──
+  const komon = new THREE.Group();
+  const kHashira = new THREE.InstancedMesh(new THREE.BoxGeometry(0.18, 2.2, 0.18), MAT.wallDk, 2);
+  [-1, 1].forEach((s, i) => {
+    m4.makeTranslation(s * 1.05, 1.1, 0);
+    kHashira.setMatrixAt(i, m4);
+  });
+  kHashira.instanceMatrix.needsUpdate = true;
+  komon.add(kHashira);
+  const kLintel = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.26, 0.18), MAT.wallDk);
+  kLintel.position.y = 2.12; komon.add(kLintel);
+  const kRise = 0.4, kRun = 0.85;
+  const kSlope = Math.sqrt(kRun * kRun + kRise * kRise), kAng = Math.atan2(kRise, kRun);
+  [1, -1].forEach(dir => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.09, kSlope), MAT.roof);
+    p.rotation.x = dir * kAng;
+    p.position.set(0, 2.32 + kRise / 2, dir * kRun / 2);
+    komon.add(p);
+  });
+  const kMune = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 0.18), MAT.roofEdge);
+  kMune.position.y = 2.32 + kRise + 0.02; komon.add(kMune);
+  komon.position.set(-10.4, 0, -58.6);
+  g.add(komon);
 
   // ── 参道の敷石（山門から竹の小径へ） ──
   const shiki = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.05, 0.62), stone, 7);
@@ -2840,6 +2872,195 @@ const unryu = (function(){
   g.scale.x = -1;             // 天龍寺と同じく西（x正）側へ鏡像で建てる
   scene.add(g);
   return { group: g, pupils: pupils, candles: candles, cx: -CX, cz: CZ };
+})();
+
+/* ============================================================
+   5g-3. 鐘楼の庭（FX ㊳）― 天龍寺の北、土塀の小門をくぐった先
+   書き割りだった鐘楼を実物にして、撞ける梵鐘にした。除夜の鐘もここで。
+   庭 x6.8〜22.3 / z-48.7〜-58.9（歩けるのは x8.4〜16.8 / z-49.2〜-58.4）。
+   鐘楼は (12.6,-54.2)＝小門から敷石を辿った正面。撞木は東（手前）に吊る。
+   ⚠ 鏡像にしない群れ（実座標のまま組む）。x が大きいほど西
+   ============================================================ */
+const shoro = (function(){
+  const g = new THREE.Group();
+  const stone  = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const stoneI = new THREE.MeshLambertMaterial({ color: 0x343a46 });   // 色なしインスタンス用の双子
+  const kaneMat = new THREE.MeshLambertMaterial({ color: 0x2b3440 });
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
+  let seed = 8181;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const SX = 12.6, SZ = -54.2;                 // 鐘楼の中心
+  const halos = [];
+
+  // ── 庭の地面（白砂の見立て。境内の庭と同じ沈んだ灰） ──
+  const niwa = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 10.2),
+    new THREE.MeshLambertMaterial({ color: 0x232833 }));
+  niwa.rotation.x = -Math.PI / 2;
+  niwa.position.set(14.5, 0.013, -53.8);
+  g.add(niwa);
+
+  // ── 敷石（小門 x10.4,z-58.6 から鐘楼の前へ） ──
+  const shiki = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.05, 0.62), stoneI, 7);
+  for (let i = 0; i < 7; i++){
+    const t = i / 6;
+    m4.makeTranslation(10.4 + t * 1.7, 0.03, -58.2 + t * 2.6 + (i % 2 ? 0.1 : -0.1));
+    shiki.setMatrixAt(i, m4);
+  }
+  shiki.instanceMatrix.needsUpdate = true;
+  g.add(shiki);
+
+  // ── 鐘楼（基壇・四本柱・貫と桁・宝形の屋根） ──
+  const kidan = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.34, 3.3), stone);
+  kidan.position.set(SX, 0.17, SZ);
+  g.add(kidan);
+  const hashira = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 2.7, 0.24), MAT.wallDk, 4);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach((p, i) => {
+    m4.makeTranslation(SX + p[0] * 1.18, 1.69, SZ + p[1] * 1.18);
+    hashira.setMatrixAt(i, m4);
+  });
+  hashira.instanceMatrix.needsUpdate = true;
+  g.add(hashira);
+  const nuki = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.14, 0.12), MAT.wallDk, 8);
+  let ni = 0;
+  [1.02, 3.0].forEach(y => {                    // 下の貫と上の桁を四方に
+    [[0, -1.18, 0], [0, 1.18, 0], [-1.18, 0, 1], [1.18, 0, 1]].forEach(p => {
+      eu.set(0, p[2] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
+      m4.compose(vv.set(SX + p[0], y, SZ + p[1]), q0, sc.set(1, 1, 1));
+      nuki.setMatrixAt(ni++, m4);
+    });
+  });
+  nuki.instanceMatrix.needsUpdate = true;
+  g.add(nuki);
+  const hoyane = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.35, 4), MAT.roof);
+  hoyane.rotation.y = Math.PI / 4;
+  hoyane.position.set(SX, 3.78, SZ);
+  g.add(hoyane);
+  const roban = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.16, 0.44), MAT.roofEdge);
+  roban.position.set(SX, 4.5, SZ);
+  g.add(roban);
+  const hoju = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8),
+    new THREE.MeshLambertMaterial({ color: 0x6a5a30 }));
+  hoju.position.set(SX, 4.72, SZ);
+  g.add(hoju);
+
+  // ── 梵鐘（鐘身・笠・龍頭・撞座）。撞くとわずかに震える ──
+  const kane = new THREE.Group();
+  const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.58, 1.25, 16), kaneMat);
+  shin.position.y = -0.62; kane.add(shin);
+  const kasa = new THREE.Mesh(new THREE.SphereGeometry(0.46, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), kaneMat);
+  kane.add(kasa);
+  const ryu = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 6, 10), kaneMat);
+  ryu.rotation.x = Math.PI / 2;
+  ryu.position.y = 0.36; kane.add(ryu);
+  const tsukiza = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 12),
+    new THREE.MeshLambertMaterial({ color: 0x3a4550 }));
+  tsukiza.rotation.x = Math.PI / 2;
+  tsukiza.position.set(0, -0.5, -0.55);         // 南面＝参る側（z マイナスが南。撞木の側）
+  kane.add(tsukiza);
+  kane.position.set(SX, 2.28, SZ);
+  g.add(kane);
+  // 鐘のまわりの気配（撞くと膨らむ）
+  const kaneHi = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffd9a0,
+    transparent: true, opacity: 0.10, blending: THREE.AdditiveBlending, depthWrite: false }));
+  kaneHi.scale.set(2.6, 2.6, 1);
+  kaneHi.position.set(SX, 1.75, SZ);
+  g.add(kaneHi);
+
+  // ── 撞木（参る側＝南に吊った丸太。縄で振り子のように吊り、北へ振って鐘を撞く）
+  //     ⚠ z マイナスが南。x 軸まわりの回転は +θ で南へ・-θ で北（鐘の方）へ振れる ──
+  const shumoku = new THREE.Group();
+  const rope = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.018, 0.018, 0.82, 5), MAT.bar, 2);
+  [-1, 1].forEach((s, i) => {
+    m4.makeTranslation(s * 0.17, -0.41, 0);
+    rope.setMatrixAt(i, m4);
+  });
+  rope.instanceMatrix.needsUpdate = true;
+  shumoku.add(rope);
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.105, 1.6, 10), MAT.wallDk);
+  log.rotation.x = Math.PI / 2;
+  log.position.y = -0.82;
+  shumoku.add(log);
+  const logCap = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.1, 10),
+    new THREE.MeshLambertMaterial({ color: 0x4a3a22 }));
+  logCap.rotation.x = Math.PI / 2;
+  logCap.position.set(0, -0.82, 0.8);           // 鐘に当たる木口（北の端＝鐘の側）
+  shumoku.add(logCap);
+  shumoku.position.set(SX, 2.60, SZ - 1.62);    // 鐘の南（参る側）に吊る。丸太が撞座の高さに来る吊り元
+  g.add(shumoku);
+
+  // ── 軒の提灯（鐘楼の在り処が夜でも分かるように、南の軒下にひとつ） ──
+  const cho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color: 0xffc98a }));
+  cho.scale.set(0.85, 1.1, 0.85);
+  cho.position.set(SX, 2.62, SZ - 1.18);
+  g.add(cho);
+  const choHi = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+    opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }));
+  choHi.scale.set(2.1, 2.1, 1);
+  choHi.position.set(SX, 2.62, SZ - 1.18);
+  g.add(choHi); halos.push(choHi);
+
+  // ── 常夜灯二基（敷石の両脇。撞座を照らす） ──
+  const jSao  = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.6, 0.2), stoneI, 2);
+  const jHi   = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.26, 0.28),
+    new THREE.MeshLambertMaterial({ color: 0xf0d3a4, emissive: 0x3a2a12 }), 2);
+  const jKasa = new THREE.InstancedMesh(new THREE.ConeGeometry(0.33, 0.22, 4), stoneI, 2);
+  [[11.0, -56.6], [14.2, -56.6]].forEach((p, i) => {
+    m4.makeTranslation(p[0], 0.3, p[1]);  jSao.setMatrixAt(i, m4);
+    m4.makeTranslation(p[0], 0.73, p[1]); jHi.setMatrixAt(i, m4);
+    eu.set(0, Math.PI / 4, 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 0.97, p[1]), q0, sc.set(1, 1, 1));
+    jKasa.setMatrixAt(i, m4);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, transparent: true,
+      opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.scale.set(1.5, 1.5, 1);
+    s.position.set(p[0], 0.73, p[1]);
+    g.add(s); halos.push(s);
+  });
+  [jSao, jHi, jKasa].forEach(o => { o.instanceMatrix.needsUpdate = true; g.add(o); });
+
+  // ── 庭の際（北と東を竹穂垣で閉じる。行けない縁をそのまま景色にする） ──
+  const KAKI = [[14.4, -48.85, 14.6, 0], [7.25, -53.8, 9.8, 1]];
+  const kakiBody = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1.75, 0.22),
+    new THREE.MeshLambertMaterial({ map: TEX.hogaki }), KAKI.length);
+  const kakiTop  = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.07, 0.28), MAT.bamboo, KAKI.length);
+  KAKI.forEach((k, i) => {
+    eu.set(0, k[3] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(k[0], 0.875, k[1]), q0, sc.set(k[2], 1, 1));
+    kakiBody.setMatrixAt(i, m4);
+    m4.compose(vv.set(k[0], 1.79, k[1]), q0, sc.set(k[2] + 0.1, 1, 1));
+    kakiTop.setMatrixAt(i, m4);
+  });
+  kakiBody.instanceMatrix.needsUpdate = true;
+  kakiTop.instanceMatrix.needsUpdate = true;
+  g.add(kakiBody, kakiTop);
+
+  // ── 松二本（庫裏の手前。歩けない西の一角に） ──
+  const matsuKan = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.13, 2.1, 6), MAT.wallDk, 2);
+  const MATSU = [[18.2, -50.6], [20.4, -52.4]];
+  MATSU.forEach((p, i) => {
+    eu.set(0.1, 0, 0.08); q0.setFromEuler(eu);
+    m4.compose(vv.set(p[0], 1.05, p[1]), q0, sc.set(1, 1, 1));
+    matsuKan.setMatrixAt(i, m4);
+  });
+  matsuKan.instanceMatrix.needsUpdate = true;
+  g.add(matsuKan);
+  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.6, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0x1d3226 }), 6);
+  const HA = [[18.2, 2.2, -50.6, 1.4], [17.6, 1.8, -51.2, 1.0], [18.9, 1.7, -50.1, 0.85],
+              [20.4, 2.3, -52.4, 1.3], [19.8, 1.9, -52.9, 0.95], [21.0, 1.75, -52.0, 0.8]];
+  HA.forEach((p, i) => {
+    m4.compose(vv.set(p[0], p[1], p[2]), q0.identity(), sc.set(p[3], p[3] * 0.45, p[3]));
+    matsuHa.setMatrixAt(i, m4);
+  });
+  matsuHa.instanceMatrix.needsUpdate = true;
+  g.add(matsuHa);
+
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  g.traverse(o => { if (o.isInstancedMesh) boundInstanced(o, 13.5, 3.0, -53.8, 9.5); });
+  scene.add(g);
+  return { group: g, kane: kane, kaneHi: kaneHi, shumoku: shumoku, halos: halos,
+           x: SX, z: SZ, kaneY: 2.28 };
 })();
 
 /* ============================================================
@@ -3400,60 +3621,41 @@ const iwaba = (function(){
   return { group: g, nami: nami };
 })();
 
-/* ㉝ 塀ごしの伽藍 ― 天龍寺の北、庫裏の大屋根と鐘楼の影。宵の鐘の出どころ
-   （方丈の真裏は陰になる。庫裏は方丈の脇＝境内の庭の正面、鐘楼は
-     方丈の反対脇の隙間から見える位置に。天龍寺と同じく scale.x=-1 の
-     鏡像で西＝x正側へ建てる） */
+/* ㉝ 塀ごしの伽藍 ― 天龍寺の北、庫裏の大屋根。
+   （鐘楼は書き割りをやめ、歩いて行って撞ける本物を鐘楼の庭 5g-3 に建てた。
+     庫裏は庭の西の突き当たりへ寄せ、欄間の灯は境内側へ向ける。
+     天龍寺と同じく scale.x=-1 の鏡像で西＝x正側へ建てる） */
 const garan = (function(){
   const g = new THREE.Group();
   const wallMat = new THREE.MeshLambertMaterial({ color: 0x11161f });
   const roofMat = new THREE.MeshLambertMaterial({ color: 0x1a2130 });
-  // 庫裏（大きな切妻。塀ごしに屋根だけが見える高さ）
+  // 庫裏（大きな切妻。鐘楼の庭の西の突き当たり＝実座標 x17.3〜23.7）
+  const KX = -20.5;
   const body = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.0, 4.6), wallMat);
-  body.position.set(-10.8, 1.0, -55.0);
+  body.position.set(KX, 1.0, -55.0);
   g.add(body);
   const rise = 1.4, run = 3.2;
   const slope = Math.sqrt(run * run + rise * rise), ang = Math.atan2(rise, run);
   [1, -1].forEach(dir => {
     const p = new THREE.Mesh(new THREE.BoxGeometry(slope, 0.12, 5.0), roofMat);
     p.rotation.z = -dir * ang;
-    p.position.set(-10.8 + dir * run / 2, 2.0 + rise / 2, -55.0);
+    p.position.set(KX + dir * run / 2, 2.0 + rise / 2, -55.0);
     g.add(p);
   });
   const mune = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 5.1), MAT.roofEdge);
-  mune.position.set(-10.8, 2.0 + rise + 0.04, -55.0);
+  mune.position.set(KX, 2.0 + rise + 0.04, -55.0);
   g.add(mune);
-  // 鐘楼（四本柱に宝形の屋根、鐘がひとつ）
-  const shoro = new THREE.Group();
-  const hashira = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 2.1, 0.16), wallMat, 4);
-  const m4 = new THREE.Matrix4();
-  [[-0.75, -0.75], [0.75, -0.75], [-0.75, 0.75], [0.75, 0.75]].forEach((p, i) => {
-    m4.makeTranslation(p[0], 1.05, p[1]);
-    hashira.setMatrixAt(i, m4);
-  });
-  hashira.instanceMatrix.needsUpdate = true;
-  shoro.add(hashira);
-  const hoyane = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.0, 4), roofMat);
-  hoyane.rotation.y = Math.PI / 4;
-  hoyane.position.y = 2.6;
-  shoro.add(hoyane);
-  const kane = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.37, 0.6, 8),
-    new THREE.MeshLambertMaterial({ color: 0x232b36 }));
-  kane.position.y = 1.5;
-  shoro.add(kane);
-  shoro.position.set(-17.5, 0, -55.3);
-  g.add(shoro);
   // 庫裏の欄間にひとつ灯（夜も人のいる寺の気配。塀の上に灯だけのぞく高さ）
   const shoji = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.35),
     new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.5, fog: false }));
-  shoji.position.set(-10.8, 1.88, -57.33);
+  shoji.position.set(KX, 1.88, -57.33);
   shoji.rotation.y = Math.PI;                        // 境内（南）側へ向ける
   g.add(shoji);
-  // 鐘楼の脇の常夜灯（塀ごしにほのり）
+  // 庭のはずれの常夜灯（塀ごしにほのり）
   const hi = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
     transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   hi.scale.set(2.0, 2.0, 1);
-  hi.position.set(-15.6, 1.5, -54.8);
+  hi.position.set(-16.6, 1.5, -54.5);
   g.add(hi);
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   g.scale.x = -1;             // 天龍寺と同じく西（x正）側へ鏡像で建てる
@@ -3982,9 +4184,12 @@ const adashino = (function(){
    顔は皮付き丸太の黒木鳥居（日本最古の様式）と小柴垣、絨毯苔の庭。
    良縁・子宝・学問の神で、神石「お亀石」を撫でると願いが叶うと伝わる。
    停留にも札にもせず、そぞろ歩きで路地を折れた人だけが辿り着く。
-   境内 x7.9〜19.4 / z-43.6〜-53.4（伽藍 z-55 の北＝天龍寺の北の奥）。
-   路地は陸（z-46）と端役（z-54）のあいだの空きを西へ抜ける z-49.2〜-51.2
+   ※天龍寺の鐘楼の庭（z-49〜-58.6）を足したぶん、群れごと北へ 8.2m 退けた。
+   中身は旧座標（境内 z-41.7〜-55.6・路地 z-49.2〜-51.2）のまま組み、
+   最後に SHIFT_Z で送る。実座標＝境内 x7.9〜21.6 / z-33.5〜-47.4、
+   路地は端役（z-38）と陸（z-46）のあいだの空きを西へ抜ける z-41.0〜-43.0
    ============================================================ */
+const NONOMIYA_SHIFT_Z = 8.2;      // 鐘楼の庭に場所を譲って北へ退いたぶん（歩ける矩形も同じだけ北へ）
 const nonomiya = (function(){
   const g = new THREE.Group();
   const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
@@ -4315,12 +4520,14 @@ const nonomiya = (function(){
   hyouMen.rotation.y = -Math.PI / 2;
   hyouMen.position.set(2.245, 0.75, -51.62);
   hyouG.add(hyouMen);
+  hyouG.position.z = NONOMIYA_SHIFT_Z;
   scene.add(hyouG);
 
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   // 群れはひとまとめの境界球で包み、境内を向いていないときは描かない
   //（社叢の梢と杉の高さまで入る大きさ。ジオメトリは全て一点ものなので共用の心配なし）
   g.traverse(o => { if (o.isInstancedMesh) boundInstanced(o, 14.6, 4.5, -48.8, 14); });
+  g.position.z = NONOMIYA_SHIFT_Z;   // 群れごと北へ（境界球はローカル系なので触らない）
   scene.add(g);
   return { group: g, hyouG: hyouG, halos: halos, kameHi: kameHi, tobira: tobira, take: take, ha: ha };
 })();
@@ -4500,9 +4707,11 @@ const WALK_ZONES = [
   { x0: 4.1,   x1: 6.3,   z0: -68.6,  z1: -71.15 }, // 法堂の堂内（雲龍図を見上げる）
   { x0: -8.6,  x1: -1.85, z0: -60.4, z1: -63.4 },   // 念仏寺への隠れ道（通りの東の竹の切れ目）
   { x0: -24.3, x1: -8.6,  z0: -57.5, z1: -76.2 },   // 愛宕念仏寺出張所の野（西の際は本堂の前で止まる）
-  { x0: 1.85,  x1: 8.25,  z0: -49.2, z1: -51.2 },   // 野宮神社への路地（町屋のあいだを西へ）
-  { x0: 8.25,  x1: 16.1,  z0: -45.4, z1: -52.0 },   // 野宮神社の境内（小柴垣の内。西は本殿の前で止まる）
-  { x0: 13.0,  x1: 14.2,  z0: -43.9, z1: -45.6 }    // 白福稲荷の小径（朱の鳥居を三基くぐる）
+  { x0: 1.85,  x1: 8.25,  z0: -41.0, z1: -43.0 },   // 野宮神社への路地（端役と陸のあいだを西へ）
+  { x0: 8.25,  x1: 16.1,  z0: -37.2, z1: -43.8 },   // 野宮神社の境内（小柴垣の内。西は本殿の前で止まる）
+  { x0: 13.0,  x1: 14.2,  z0: -35.7, z1: -37.4 },   // 白福稲荷の小径（朱の鳥居を三基くぐる）
+  { x0: 8.4,   x1: 19.6,  z0: -49.2, z1: -58.4 },   // 天龍寺 鐘楼の庭（北の小門の先）
+  { x0: 9.4,   x1: 11.4,  z0: -58.4, z1: -59.6 }    // 北の小門（土塀の切れ目をくぐる）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -4585,7 +4794,7 @@ function setWalk(on){
     WALK.eyeY = walkEyeY(p.x, p.z);
     WALK.target = null; WALK.bob = 0;
     hideFuda(); walkShownPoi = -2;
-    hintEl.textContent = '地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き';
+    hintEl.textContent = HINT_WALK;
   } else {
     walkMode = false;
     hintEl.textContent = HINT_RAIL;
@@ -4593,6 +4802,110 @@ function setWalk(on){
   }
   syncWalkBtn();
 }
+/* ============================================================
+   鐘を撞く ― 鐘楼の下に立つと操舵バーにボタンが出る。
+   撞木を引いて放つと 0.45 秒で鐘に当たり、そこで音が鳴る。
+   除夜の鐘は「百八まで数える」モード。大晦日の宵は自動で入る
+   ============================================================ */
+const KANE = {
+  t: -1,          // 撞いてからの秒。-1 は静止
+  hit: false,     // この一打の当たりを鳴らしたか
+  cool: 0,        // 次に撞けるまで
+  count: 0,       // 撞いた数（除夜モードの数え）
+  joya: false,
+  near: false
+};
+const KANJI_NUM = ['〇','一','二','三','四','五','六','七','八','九'];
+function kanjiNum(n){                       // 1〜108 を漢数字に
+  if (n <= 0) return '〇';
+  if (n < 10) return KANJI_NUM[n];
+  if (n < 20) return '十' + (n % 10 ? KANJI_NUM[n % 10] : '');
+  if (n < 100){
+    const t = Math.floor(n / 10);
+    return KANJI_NUM[t] + '十' + (n % 10 ? KANJI_NUM[n % 10] : '');
+  }
+  const r = n % 100;
+  return '百' + (r ? (r < 10 ? KANJI_NUM[r] : kanjiNum(r)) : '');
+}
+const kaneBtn = document.getElementById('btn-kane');
+const joyaBtn = document.getElementById('btn-joya');
+function nearShoro(){
+  return Math.hypot(camera.position.x - shoro.x, camera.position.z - shoro.z) < 6.4;
+}
+function strikeBell(){
+  if (!FX.shoro || KANE.cool > 0 || KANE.t >= 0) return false;
+  KANE.t = 0; KANE.hit = false; KANE.cool = 2.4;
+  return true;
+}
+function syncKaneBtn(){
+  const show = FX.shoro && walkMode && KANE.near;
+  kaneBtn.style.display = show ? '' : 'none';
+  joyaBtn.style.display = show ? '' : 'none';
+  kaneBtn.textContent = KANE.cool > 0 ? '鐘のひびき…' : '鐘を撞く';
+  kaneBtn.disabled = KANE.cool > 0;
+  joyaBtn.textContent = KANE.joya ? '除夜をやめる' : '除夜の鐘';
+  joyaBtn.setAttribute('aria-pressed', String(KANE.joya));
+}
+function setJoya(v){
+  KANE.joya = !!v;
+  if (KANE.joya) KANE.count = 0;
+  syncKaneBtn();
+  if (KANE.near) showKaneHint();
+  return KANE.joya;
+}
+function showKaneHint(){
+  if (!KANE.near){ hintEl.textContent = walkMode ? HINT_WALK : HINT_RAIL; return; }
+  if (KANE.joya){
+    hintEl.textContent = KANE.count >= 108
+      ? '除夜の鐘　百八　―　ゆく年くる年'
+      : '除夜の鐘　' + kanjiNum(KANE.count) + '　／　あと ' + kanjiNum(108 - KANE.count);
+  } else {
+    hintEl.textContent = '鐘楼の下　／　「鐘を撞く」でひとつ撞けます'
+      + (KANE.count ? '　（撞いた数 ' + kanjiNum(KANE.count) + '）' : '');
+  }
+}
+/* 撞木の振りと鐘の震え。当たりの瞬間（0.45秒）に音を鳴らす */
+function updateKane(dt){
+  if (KANE.cool > 0){
+    KANE.cool = Math.max(0, KANE.cool - dt);
+    if (KANE.cool === 0) syncKaneBtn();
+  }
+  const nowNear = FX.shoro && walkMode && nearShoro();
+  if (nowNear !== KANE.near){
+    KANE.near = nowNear;
+    syncKaneBtn();
+    showKaneHint();
+  }
+  if (KANE.t < 0){
+    shoro.shumoku.rotation.x += (0 - shoro.shumoku.rotation.x) * 0.1;
+    shoro.kaneHi.material.opacity += (0.10 - shoro.kaneHi.material.opacity) * 0.05;
+    return;
+  }
+  KANE.t += dt;
+  const t = KANE.t;
+  if (t < 0.45){
+    shoro.shumoku.rotation.x = 0.30 * (t / 0.45);           // 南（手前）へ引く
+  } else {
+    const u = t - 0.45;
+    shoro.shumoku.rotation.x = -0.34 * Math.exp(-1.15 * u) * Math.cos(4.3 * u);
+    if (!KANE.hit){
+      KANE.hit = true;
+      strikeShoro();                                        // 当たりで鳴らす
+      KANE.count++;
+      if (KANE.joya && KANE.count >= 108) KANE.count = 108;
+      showKaneHint();
+      shoro.kaneHi.material.opacity = 0.42;
+      shoro.kane.position.y = shoro.kaneY - 0.012;
+    }
+    // 鐘の震えと光の余韻
+    shoro.kane.position.y = shoro.kaneY + Math.sin(u * 46) * 0.008 * Math.exp(-2.2 * u);
+    shoro.kaneHi.material.opacity = 0.10 + 0.32 * Math.exp(-1.1 * u);
+  }
+  if (t > 6){ KANE.t = -1; KANE.hit = false; shoro.kane.position.y = shoro.kaneY; }
+}
+// 大晦日の宵はひとりでに除夜の鐘（送り火と同じ日付の作法）
+if (new Date().getMonth() === 11 && new Date().getDate() === 31) KANE.joya = true;
+
 /* 歩いて近づいた家・名所を控える（点列と提灯の明るさが歩きに追随する）。
    札は出さない ―― 散歩中は景色が主役、画面の真ん中を塞がない */
 let walkShownPoi = -2;
@@ -4819,6 +5132,7 @@ function syncAutoBtn(){
 const kajiEl = document.querySelector('.kaji');
 const hintEl = document.querySelector('.hint');
 const HINT_RAIL = hintEl.textContent;   // 散歩から戻るときに元の手引きへ
+const HINT_WALK = '地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き';
 function layoutBottom(){
   const base = 18 + kajiEl.offsetHeight;
   const hintShown = getComputedStyle(hintEl).display !== 'none';
@@ -4942,6 +5256,14 @@ document.getElementById('btn-fune').addEventListener('click', () => {
   if (rideActive()){ setRideOff('walk'); return; }
   enterRide();
 });
+kaneBtn.addEventListener('click', () => {
+  // 撞くのだから音は要る。灯っていなければここで灯す（自動再生制限の解除はこの操作で足りる）
+  if (!AC){ buildSound(); SND.on = true; syncSndBtn(); layoutBottom(); }
+  if (!SND.on){ SND.on = true; AC.resume(); syncSndBtn(); }
+  strikeBell();
+  syncKaneBtn();
+});
+joyaBtn.addEventListener('click', () => setJoya(!KANE.joya));
 window.addEventListener('keydown', e => {
   if (rideActive()) return;
   if (walkMode){
@@ -5088,6 +5410,39 @@ function strikeKane(){
   return true;
 }
 
+/* 撞いた鐘：撞木の当たり（短い当たり音）＋不整数倍音八本＋わずかな唸り。
+   遠鐘より倍音を増やし、余韻を長く取る（鐘楼の下で聴く一打） */
+function strikeShoro(){
+  if (!AC || !SND.on || AC.state !== 'running' || !sndNodes.shoroBus) return false;
+  const t = AC.currentTime;
+  const f0 = 88 + Math.random() * 5;
+  // [倍率, 強さ, 減衰秒]
+  [[1, 1, 14], [1.5, 0.34, 9], [2.0, 0.55, 10], [2.67, 0.32, 7],
+   [3.01, 0.22, 5.5], [4.07, 0.14, 3.6], [5.43, 0.08, 2.4], [6.79, 0.05, 1.6]]
+  .forEach(p => {
+    // 二本をわずかに離調して重ねる＝ゆっくりした唸り（本物の梵鐘の気配）
+    [-1, 1].forEach(sgn => {
+      const o = AC.createOscillator();
+      o.frequency.value = f0 * p[0] * (1 + sgn * 0.0016 + (Math.random() - 0.5) * 0.003);
+      const g = AC.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.11 * p[1], t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+      o.connect(g); g.connect(sndNodes.shoroBus);
+      o.start(t); o.stop(t + p[2] + 0.1);
+    });
+  });
+  // 撞木の当たり（木と青銅のこすれ。ごく短いノイズ）
+  const src = AC.createBufferSource(); src.buffer = sndNodes.noise;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1750; bp.Q.value = 0.9;
+  const ng = AC.createGain();
+  ng.gain.setValueAtTime(0.14, t);
+  ng.gain.exponentialRampToValueAtTime(0.0004, t + 0.22);
+  src.connect(bp); bp.connect(ng); ng.connect(sndNodes.shoroBus);
+  src.start(t); src.stop(t + 0.3);
+  return true;
+}
+
 /* 出力の実効値（RMS）。耳で確かめられない環境向けの計測口 */
 function sndLevel(){
   if (!AC) return null;
@@ -5116,6 +5471,7 @@ function buildSound(){
   const nbuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
   const nd = nbuf.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  sndNodes.noise = nbuf;                 // 撞木の当たり音もここから濾して作る
   const noiseSrc = () => {
     const s = AC.createBufferSource();
     s.buffer = nbuf; s.loop = true;
@@ -5273,6 +5629,17 @@ function buildSound(){
     setTimeout(kaneLoop, (50 + Math.random() * 60) * 1000);
   };
   setTimeout(kaneLoop, (12 + Math.random() * 8) * 1000);   // 最初のひとつは灯して十数秒後
+
+  // ── 撞いた鐘（鐘楼の下でじぶんが撞く一打）：遠鐘とは別系統。
+  //     高域を開けて撞木の当たりを聴かせ、余韻は長く残す ──
+  const shoroBus = AC.createGain(); shoroBus.gain.value = 1;
+  sndNodes.shoroBus = shoroBus;
+  const shoroLp = AC.createBiquadFilter(); shoroLp.type = 'lowpass'; shoroLp.frequency.value = 2600;
+  shoroBus.connect(shoroLp); shoroLp.connect(master);
+  const sdly = AC.createDelay(1.5); sdly.delayTime.value = 0.41;
+  const sfb = AC.createGain(); sfb.gain.value = 0.42;
+  const swet = AC.createGain(); swet.gain.value = 0.3;
+  shoroLp.connect(sdly); sdly.connect(sfb); sfb.connect(sdly); sdly.connect(swet); swet.connect(master);
 }
 
 /* 場所で聞こえ方が変わる（毎フレーム。灯していない間は何もしない） */
@@ -5295,7 +5662,8 @@ function updateSoundMix(){
   const furinT = SND.furin ? 0.6 * fg * fg : 0;
   // 鐘：天龍寺の境内と念仏寺の野にいるあいだは近く、すこし明るく響く
   //（念仏寺の鐘は本堂の北脇の三宝の鐘）
-  const inTera = (x > 7.3 && z > -77 && z < -58) || (x < -8.6 && z > -77 && z < -57);
+  //（鐘楼の庭 z-49〜-58.4 も境内のうち。撞く鐘の足もとなので近く響く）
+  const inTera = (x > 7.3 && z > -77 && z < -48) || (x < -8.6 && z > -77 && z < -57);
   const kaneG = inTera ? 1.75 : 1.0;
   const kaneF = inTera ? 1350 : 950;
   const k = 0.06;
@@ -5702,7 +6070,7 @@ function update(dt){
   // ㊲ 野宮神社：本殿と小祠の灯のまたたき、お亀石のほのかな息
   //   境内は町屋と社叢に囲まれた一角＝遠くからは見えないので、近づいたときだけ描く
   //   （社号標だけは通りを歩く目印なので常に立てておく）
-  const dNono = Math.hypot(camera.position.x - 14.6, camera.position.z + 48.8);
+  const dNono = Math.hypot(camera.position.x - 14.6, camera.position.z + 48.8 - NONOMIYA_SHIFT_Z);
   nonomiya.hyouG.visible = FX.nonomiya;
   nonomiya.group.visible = FX.nonomiya && dNono < 34;
   if (FX.nonomiya && nonomiya.group.visible){
@@ -5738,6 +6106,15 @@ function update(dt){
     okuribi.matB.opacity = 0.72 + Math.sin(elapsed * 7.9 + 2.1) * 0.18 + Math.sin(elapsed * 11.3 + 1) * 0.06;
     okuribi.glow.material.opacity = 0.07 + Math.sin(elapsed * 1.7) * 0.02;
   }
+
+  // ㊳ 鐘楼の庭：常夜灯のまたたきと、撞木の振り・鐘の震え・除夜の数え
+  shoro.group.visible = FX.shoro;
+  if (FX.shoro){
+    shoro.halos.forEach((h, k) => {
+      h.material.opacity = 0.24 + Math.sin(elapsed * 2.4 + k * 2.1) * 0.05;
+    });
+  }
+  updateKane(dt);
 
   // 宵の音：場所に合わせて聞こえ方を寄せていく
   updateSoundMix();
@@ -5963,6 +6340,20 @@ window.__machiya = {
     curveAt: function(u){
       const p = funaasobi.curve.getPointAt(u);
       return [+p.x.toFixed(2), +p.z.toFixed(2)];
+    }
+  },
+  /* 鐘の検証口：hit で撞く、joya で除夜モード、state で現況 */
+  kane: {
+    hit: function(){ const ok = strikeBell(); syncKaneBtn(); return ok; },
+    joya: function(v){ return setJoya(v === undefined ? !KANE.joya : v); },
+    count: function(n){ if (typeof n === 'number') KANE.count = n; showKaneHint(); return KANE.count; },
+    state: function(){
+      return { near: KANE.near, joya: KANE.joya, count: KANE.count, kanji: kanjiNum(KANE.count),
+               t: +KANE.t.toFixed(2), cool: +KANE.cool.toFixed(2),
+               swing: +shoro.shumoku.rotation.x.toFixed(3),
+               btn: kaneBtn.style.display === 'none' ? '(隠れ)' : kaneBtn.textContent,
+               joyaBtn: joyaBtn.style.display === 'none' ? '(隠れ)' : joyaBtn.textContent,
+               hint: hintEl.textContent };
     }
   },
   /* 四季の試着：'haru'|'natsu'|'aki'|'fuyu' */
