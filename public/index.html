@@ -309,6 +309,11 @@
   @media (max-height:480px){
     .tate .t-sub, .tate .t-toki, .tate .t-brand{ display:none }
   }
+  /* 月の都（㊾）：転換の月白の幕と、月面での操舵の畳み */
+  #tsukifade{ position:fixed; inset:0; background:#e9edf5; opacity:0;
+    pointer-events:none; z-index:120 }
+  body.tsuki-on #btn-prev, body.tsuki-on #btn-next, body.tsuki-on #dots,
+  body.tsuki-on #btn-auto, body.tsuki-on #btn-walk, body.tsuki-on #btn-fune{ display:none }
 </style>
 </head>
 <body>
@@ -362,9 +367,13 @@
   <button id="btn-fune" aria-pressed="false">屋形舟</button>
   <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
   <button id="btn-ku" aria-pressed="false">一句詠む</button>
+  <button id="btn-chi" style="display:none">地へ帰る</button>
   <button id="btn-kane" style="display:none">鐘を撞く</button>
   <button id="btn-joya" style="display:none" aria-pressed="false">除夜の鐘</button>
 </div>
+
+<!-- 月の都（㊾）への転換の幕。不透明度は毎フレーム側で書く -->
+<div id="tsukifade" aria-hidden="true"></div>
 
 <div id="fallback">
   この端末では 3D 表示ができないようです。<br>
@@ -519,7 +528,8 @@ const FX = {
   toriigata   : false,  // ㊺ 鳥居形の送り火と広沢の池の灯篭流し（葉月十六日の宵。下で日付判定）
   jinrikisha  : true,   // ㊻ 渡月橋の北詰の人力車（客待ちの停め置き）
   kudari      : true,   // ㊼ 保津川下りの舟（西の早瀬から数分おきに下ってくる）
-  shishi      : true    // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
+  shishi      : true,   // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
+  tsukiusagi  : true    // ㊾ 月の都（月をダブルクリックで月面へ。餅つきの兎と、夜の日本列島が灯る地球）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 //（鳥居形と広沢の池の灯篭流しも同じ晩の行事＝そろって灯る）
@@ -5749,6 +5759,426 @@ const shishiodoshi = (function(){
            state: function(){ return { rot: +yoku.rotation.z.toFixed(3) }; } };
 })();
 
+/* ============================================================
+   5r. 月の都（FX ㊾ tsukiusagi）― 月をダブルクリックで月面へ
+   星のドームの内側（y120 の高み）にクレーターの原を常設し、
+   ふだんは非表示（描画 0）。月白の幕で転換して立つ。
+   不透明な月の原（半径 28）が視界の下半分を塞ぐので、眼下の町は
+   幾何的に見えない（縁の俯角 3.3°より深いものはみな隠れる＝検算済み）。
+   餅つきの兎が二羽、背の空には夜側の日本列島が灯の粒で光る地球。
+   ============================================================ */
+const tsukimen = (function(){
+  const TG = new THREE.Group();
+  const S = { x: 0, y: 120, z: -30 };            // 月の原の中心
+  let seed = 1515;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  /* 月の原（クレーターは面に描き込む。地球照のわずかな青みも） */
+  function tsukiharaTexture(){
+    const c = cv(512, 512), g2 = c.getContext('2d');
+    const base = g2.createRadialGradient(256, 256, 30, 256, 256, 260);
+    base.addColorStop(0, '#6b7078');
+    base.addColorStop(0.7, '#565b66');
+    base.addColorStop(1, '#3c414c');
+    g2.fillStyle = base; g2.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 900; i++){                       // 砂の斑
+      const a = (0.03 + rnd() * 0.08).toFixed(2);
+      g2.fillStyle = (rnd() > 0.5 ? 'rgba(255,255,255,' : 'rgba(10,12,18,') + a + ')';
+      g2.fillRect(rnd() * 512, rnd() * 512, 2, 2);
+    }
+    for (let i = 0; i < 15; i++){                        // クレーター（北西の陽をうけた縁）
+      const px = 40 + rnd() * 432, py = 40 + rnd() * 432, pr = 7 + rnd() * 30;
+      g2.fillStyle = 'rgba(20,23,32,0.34)';
+      g2.beginPath(); g2.arc(px, py, pr, 0, Math.PI * 2); g2.fill();
+      g2.strokeStyle = 'rgba(226,230,238,0.30)';
+      g2.lineWidth = 2 + pr * 0.12;
+      g2.beginPath(); g2.arc(px, py, pr, Math.PI * 0.8, Math.PI * 1.75); g2.stroke();
+      g2.strokeStyle = 'rgba(8,10,16,0.35)';
+      g2.beginPath(); g2.arc(px, py, pr, Math.PI * -0.2, Math.PI * 0.75); g2.stroke();
+    }
+    return tex(c);
+  }
+  const hara = new THREE.Mesh(new THREE.CircleGeometry(28, 44),
+    new THREE.MeshBasicMaterial({ map: tsukiharaTexture() }));
+  hara.rotation.x = -Math.PI / 2;
+  hara.position.set(S.x, S.y, S.z);
+  TG.add(hara);
+
+  /* 月の空の灯り（この一角にだけ届く。distance 55 で下界へは漏れない） */
+  const tsukiHi = new THREE.PointLight(0xfdf4e2, 0.95, 55, 2);
+  tsukiHi.position.set(S.x + 8, S.y + 11, S.z + 7);
+  TG.add(tsukiHi);
+
+  /* 遠い縁の丘とクレーターの土手・岩 */
+  const okaM = new THREE.MeshLambertMaterial({ color: 0x4a505c, emissive: 0x111420 });
+  const OKA = [];
+  [[-16, -12, 6.5, 0.34], [14, -10, 5.0, 0.3], [20, -40, 7.5, 0.36],
+   [-19, -46, 5.5, 0.3], [4, -52, 8.0, 0.4]].forEach(o => {
+    OKA.push([S.x + o[0], S.y, S.z + o[1], 0, rnd() * Math.PI, 0, o[2], o[2] * o[3], o[2]]);
+  });
+  TG.add(kitaInst(new THREE.SphereGeometry(1, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2), okaM, OKA));
+  const iwaM = new THREE.MeshLambertMaterial({ color: 0x3f4550, emissive: 0x0d1016 });
+  const IWA2 = [];
+  for (let i = 0; i < 9; i++){
+    const th = rnd() * Math.PI * 2, rr = 5 + rnd() * 16;
+    const sz = 0.22 + rnd() * 0.5;
+    IWA2.push([S.x + Math.cos(th) * rr, S.y + sz * 0.4, S.z + Math.sin(th) * rr,
+               rnd() * 0.8, rnd() * Math.PI, rnd() * 0.8, sz, sz * (0.7 + rnd() * 0.5), sz]);
+  }
+  TG.add(kitaInst(new THREE.DodecahedronGeometry(1, 0), iwaM, IWA2));
+  [[-4.6, 4.4, 2.1], [5.4, -4.8, 2.7]].forEach(k => {         // 近くのクレーターの土手（半ば砂に埋める）
+    const t2 = new THREE.Mesh(new THREE.TorusGeometry(k[2], 0.2, 7, 24), okaM);
+    t2.rotation.x = Math.PI / 2;
+    t2.position.set(S.x + k[0], S.y - 0.05, S.z + k[1]);
+    t2.scale.set(1, 1, 0.3);
+    TG.add(t2);
+  });
+
+  /* 臼と餅 */
+  const usu = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.66, 12),
+    new THREE.MeshLambertMaterial({ color: 0x3a2a1c, emissive: 0x0a0705 }));
+  usu.position.set(S.x, S.y + 0.33, S.z - 1.6);
+  TG.add(usu);
+  const mochi = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 9),
+    new THREE.MeshLambertMaterial({ color: 0xf2efe6, emissive: 0x2e2c26 }));
+  mochi.scale.set(1, 0.62, 1);
+  mochi.position.set(S.x, S.y + 0.72, S.z - 1.6);
+  TG.add(mochi);
+
+  /* 兎（白い毛・紅い目。s で丈を変える） */
+  const fur   = new THREE.MeshLambertMaterial({ color: 0xe9e7df, emissive: 0x23242a });
+  const pinkM = new THREE.MeshLambertMaterial({ color: 0xc9939d, emissive: 0x2a1c20 });
+  const eyeM  = new THREE.MeshLambertMaterial({ color: 0x7a2020, emissive: 0x3a0e0e });
+  function usagi(s){
+    const u = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), fur);
+    body.scale.set(0.95, 1.2, 0.9); body.position.y = 0.52;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.30, 12, 10), fur);
+    head.position.set(0, 1.26, 0.14);
+    // r128 に CapsuleGeometry は無い（既知）＝耳は楕円球のつぶしで
+    [-1, 1].forEach(sgn => {
+      const mimi = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), fur);
+      mimi.scale.set(0.35, 1.15, 0.26);
+      mimi.position.set(sgn * 0.13, 1.82, 0.02);
+      mimi.rotation.z = -sgn * 0.14;
+      u.add(mimi);
+      const naka = new THREE.Mesh(new THREE.SphereGeometry(0.3, 7, 7), pinkM);
+      naka.scale.set(0.17, 0.85, 0.12);
+      naka.position.set(sgn * 0.13, 1.8, 0.1);
+      naka.rotation.z = -sgn * 0.14;
+      u.add(naka);
+    });
+    [-1, 1].forEach(sgn => {
+      const me = new THREE.Mesh(new THREE.SphereGeometry(0.038, 7, 6), eyeM);
+      me.position.set(sgn * 0.115, 1.30, 0.40);
+      u.add(me);
+    });
+    const shippo = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 7), fur);
+    shippo.position.set(0, 0.42, -0.42);
+    u.add(shippo);
+    const ashi = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), fur);
+    ashi.scale.set(1.5, 0.5, 1.9);
+    ashi.position.set(0, 0.09, 0.12);
+    u.add(ashi);
+    u.add(body, head);
+    u.scale.setScalar(s);
+    return u;
+  }
+  // 杵をふるう兎（臼の向こうに立ち、こちらを向く）
+  const usagiA = usagi(1.0);
+  usagiA.position.set(S.x, S.y, S.z - 0.68 - 0.02);
+  usagiA.rotation.y = Math.PI;                    // 顔を南（カメラの側）へ
+  TG.add(usagiA);
+  // 腕と杵（肩の高さに支点。振りは rotation.x で）
+  const kine = new THREE.Group();
+  const eA = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.36, 7), fur);
+  eA.rotation.z = Math.PI / 2;
+  eA.position.set(0, 0, 0);
+  kine.add(eA);
+  const totte = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.048, 0.98, 7),
+    new THREE.MeshLambertMaterial({ color: 0x4a3a26, emissive: 0x0c0906 }));
+  totte.position.set(0, 0.44, 0);
+  kine.add(totte);
+  const kineHead = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 0.42, 9),
+    new THREE.MeshLambertMaterial({ color: 0x5a4830 , emissive: 0x0e0b07 }));
+  kineHead.position.set(0, 1.02, 0);
+  kine.add(kineHead);
+  kine.position.set(S.x + 0.12, S.y + 0.98, S.z - 0.95);   // わずかに脇へ＝休みの拍でも顔が隠れない
+  kine.rotation.x = 0.5;
+  TG.add(kine);
+  // 手返しの兎（臼の西＝すこし奥に膝をついて、合いの手で餅をかえす。臼を隠さない立ち位置）
+  const usagiB = usagi(0.80);
+  usagiB.position.set(S.x - 1.15, S.y, S.z - 1.35);
+  usagiB.rotation.order = 'YZX';                  // 向き（Y）の内側で前かがみ（X）を利かせる
+  usagiB.rotation.y = Math.PI / 2 + 0.35;         // 顔を東南東＝臼へ
+  TG.add(usagiB);
+
+  /* 地球 ― 夜側の日本列島が灯の粒で光る。東の縁にあけの光、雲の筋、大気のかさ */
+  function chikyuTexture(){
+    const c = cv(512, 256), g2 = c.getContext('2d');
+    const um = g2.createLinearGradient(0, 0, 0, 256);
+    um.addColorStop(0, '#0e2238');
+    um.addColorStop(0.5, '#123152');
+    um.addColorStop(1, '#0c1f34');
+    g2.fillStyle = um; g2.fillRect(0, 0, 512, 256);
+    // 大陸（夜側なので影のかたまり。アジアの岸を日本の左に）
+    g2.fillStyle = 'rgba(26,42,38,0.85)';
+    g2.beginPath();
+    g2.moveTo(300, 40); g2.quadraticCurveTo(340, 70, 352, 100);
+    g2.quadraticCurveTo(360, 130, 344, 150); g2.quadraticCurveTo(320, 168, 300, 160);
+    g2.quadraticCurveTo(280, 140, 284, 100); g2.quadraticCurveTo(286, 60, 300, 40);
+    g2.closePath(); g2.fill();
+    g2.beginPath();                                     // 朝鮮半島
+    g2.moveTo(356, 92); g2.quadraticCurveTo(364, 102, 362, 114);
+    g2.quadraticCurveTo(356, 122, 352, 116); g2.quadraticCurveTo(350, 100, 356, 92);
+    g2.closePath(); g2.fill();
+    // 日本列島（北東から南西へ弓なり。夜のからだ）
+    g2.save();
+    g2.fillStyle = 'rgba(30,44,40,0.95)';
+    const shima = [
+      [396, 64, 9, 6, -0.5],                            // 北海道
+      [388, 78, 7, 4, -0.9],                            // 東北
+      [381, 90, 8, 4, -1.1],                            // 関東〜中部
+      [372, 99, 8, 3.6, -1.25],                         // 近畿〜中国
+      [372, 106, 4.4, 2.4, -1.1],                       // 四国
+      [363, 108, 5, 3.4, -0.9]                          // 九州
+    ];
+    shima.forEach(sm => {
+      g2.save();
+      g2.translate(sm[0], sm[1]); g2.rotate(sm[4]);
+      g2.beginPath(); g2.ellipse(0, 0, sm[2], sm[3], 0, 0, Math.PI * 2); g2.fill();
+      g2.restore();
+    });
+    g2.restore();
+    // 列島のかたちがほの白く縁どられる（夜目にも島とわかるように）
+    g2.strokeStyle = 'rgba(190,205,215,0.30)';
+    g2.lineWidth = 1.2;
+    shima.forEach(sm => {
+      g2.save();
+      g2.translate(sm[0], sm[1]); g2.rotate(sm[4]);
+      g2.beginPath(); g2.ellipse(0, 0, sm[2], sm[3], 0, 0, Math.PI * 2); g2.stroke();
+      g2.restore();
+    });
+    // 列島の街の灯（夜側の日本が、灯の連なりで浮かぶ）
+    const AKARI = [
+      [397, 62, 2.6], [388, 76, 2.3], [385, 82, 2.2],
+      [383, 88, 3.6], [381, 90, 2.8],                   // 関東は明るく
+      [377, 95, 2.5], [374, 97, 3.2],                   // 中京〜近畿
+      [372, 99, 3.8],                                   // 京のあたりをやや強く
+      [369, 102, 2.3], [366, 105, 2.2], [363, 108, 2.8],// 中国〜九州
+      [371, 107, 1.7], [391, 70, 1.7], [379, 86, 1.9]
+    ];
+    AKARI.forEach(a => {
+      const rg = g2.createRadialGradient(a[0], a[1], 0, a[0], a[1], a[2] * 3);
+      rg.addColorStop(0, 'rgba(255,214,150,0.95)');
+      rg.addColorStop(0.4, 'rgba(255,190,120,0.4)');
+      rg.addColorStop(1, 'rgba(255,180,110,0)');
+      g2.fillStyle = rg;
+      g2.beginPath(); g2.arc(a[0], a[1], a[2] * 3, 0, Math.PI * 2); g2.fill();
+    });
+    // 大陸側にもぽつり（ソウル・上海のあたり）
+    [[357, 96, 1.2], [340, 122, 1.1]].forEach(a => {
+      g2.fillStyle = 'rgba(255,200,130,0.5)';
+      g2.beginPath(); g2.arc(a[0], a[1], a[2], 0, Math.PI * 2); g2.fill();
+    });
+    // 東の縁のあけの光（太陽は東から＝画面の右の縁が細く明るむ）
+    const asa = g2.createLinearGradient(440, 0, 512, 0);
+    asa.addColorStop(0, 'rgba(120,160,210,0)');
+    asa.addColorStop(0.72, 'rgba(150,190,235,0.45)');
+    asa.addColorStop(1, 'rgba(235,244,252,0.95)');
+    g2.fillStyle = asa; g2.fillRect(440, 0, 72, 256);
+    // 雲の筋（うすく、ながれるように）
+    g2.fillStyle = 'rgba(235,242,250,0.16)';
+    [[330, 60, 60, 9, 0.4], [400, 130, 70, 10, -0.2], [350, 190, 80, 12, 0.15],
+     [430, 80, 46, 8, -0.4], [300, 210, 56, 9, 0.3]].forEach(k => {
+      g2.save();
+      g2.translate(k[0], k[1]); g2.rotate(k[4]);
+      g2.beginPath(); g2.ellipse(0, 0, k[2], k[3], 0, 0, Math.PI * 2); g2.fill();
+      g2.restore();
+    });
+    // 極のしろい息
+    g2.fillStyle = 'rgba(225,235,245,0.20)';
+    g2.fillRect(0, 0, 512, 14);
+    g2.fillRect(0, 244, 512, 12);
+    return tex(c);
+  }
+  const chikyu = new THREE.Mesh(new THREE.SphereGeometry(3.6, 30, 22),
+    new THREE.MeshBasicMaterial({ map: chikyuTexture() }));
+  const E = { x: S.x + 2.5, y: S.y + 13.5, z: S.z + 21.5 };
+  chikyu.position.set(E.x, E.y, E.z);
+  // 球の経度合わせ（y）と、北半球をこちらへ傾ける（x）。値は画で合わせ込んだ：
+  // 日本列島の灯が面の上寄り中央、東の縁にあけの光がのぞく構図
+  chikyu.rotation.set(-0.44, -0.48, 0);
+  TG.add(chikyu);
+  // 大気のかさ（青いにじみ）
+  const taiki = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0x8fc0ff,
+    transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }));
+  taiki.scale.set(10.5, 10.5, 1);
+  taiki.position.set(E.x, E.y, E.z);
+  TG.add(taiki);
+
+  TG.visible = false;
+  TG.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(TG);
+
+  /* 当たり判定（描かれない材質＝描画コスト 0 のまま raycast だけ受ける） */
+  const moonHit = new THREE.Mesh(new THREE.CircleGeometry(7, 24),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  moonHit.position.set(42, 46, -151.8);           // 空の三日月（moonFx）の座標に重ねる
+  scene.add(moonHit);
+  const earthHit = new THREE.Mesh(new THREE.SphereGeometry(4.6, 10, 8),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  earthHit.position.set(E.x, E.y, E.z);
+  earthHit.visible = false;                       // 月面にいる間だけ当てる
+  scene.add(earthHit);
+
+  return { group: TG, S: S, E: E, hara: hara, kine: kine, mochi: mochi,
+           usagiA: usagiA, usagiB: usagiB, chikyu: chikyu, taiki: taiki,
+           moonHit: moonHit, earthHit: earthHit,
+           cam: { pos: new THREE.Vector3(S.x, S.y + 1.55, S.z - 6.6),
+                  tgt: new THREE.Vector3(S.x + 0.5, S.y + 2.6, S.z + 2.0) } };
+})();
+
+/* 月の都の行き来 ― 月白の幕で転換し、帰りは元の場所・元のモードへ */
+const TSUKI = {
+  on: false, phase: 'idle',      // idle / in1 / in2 / stay / out1 / out2
+  t: 0, u: 0,                    // t=幕の時計・u=餅つきの拍
+  yaw: 0, pitch: 0,              // なぞって見回すぶん
+  squash: 0, lastBeat: -1,
+  saved: null
+};
+const tsukifadeEl = document.getElementById('tsukifade');
+const chiBtn = document.getElementById('btn-chi');
+
+function enterTsuki(){
+  if (!FX.tsukiusagi || TSUKI.phase !== 'idle') return false;
+  if (rideActive()) setRideOff('walk');
+  if (!walkMode && phase !== 'dwell') return false;   // 飛行の途中からは行かない
+  TSUKI.saved = {
+    walk: walkMode, auto: auto,
+    pos: camera.position.clone(), tgt: curTgt.clone(),
+    fogD: scene.fog.density, bg: scene.background,
+    hint: hintEl.textContent
+  };
+  auto = false; syncAutoBtn();
+  if (walkMode) setWalk(false);
+  TSUKI.phase = 'in1'; TSUKI.t = 0; TSUKI.yaw = 0; TSUKI.pitch = 0;
+  return true;
+}
+function tsukiArrive(){
+  TSUKI.on = true;
+  tsukimen.group.visible = true;
+  tsukimen.earthHit.visible = true;
+  scene.fog.density = 0;                       // 幾何で隠す設計＝霧は月では休ませる
+  scene.background = new THREE.Color(0x030509);
+  camera.position.copy(tsukimen.cam.pos);
+  curTgt.copy(tsukimen.cam.tgt);
+  camera.lookAt(curTgt);
+  hideFuda();
+  document.body.classList.add('tsuki-on');
+  chiBtn.style.display = '';
+  hintEl.textContent = '月の都　―　なぞって見回す／地球を二度たたく・「地へ帰る」で地上へ';
+  layoutBottom();
+}
+function tsukiLeaveRestore(){
+  if (!TSUKI.saved) return;                       // 二度は戻さない（割り込みとの重なり保険）
+  const sv = TSUKI.saved;
+  TSUKI.saved = null;
+  TSUKI.on = false;
+  tsukimen.group.visible = false;
+  tsukimen.earthHit.visible = false;
+  scene.fog.density = sv.fogD;
+  scene.background = sv.bg;
+  camera.position.copy(sv.pos);
+  curTgt.copy(sv.tgt);
+  camera.lookAt(curTgt);
+  document.body.classList.remove('tsuki-on');
+  chiBtn.style.display = 'none';
+  hintEl.textContent = sv.hint;
+  if (sv.walk){ setWalk(true); }
+  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; syncAutoBtn(); showFuda(); }
+  layoutBottom();
+}
+function exitTsuki(){
+  if (!TSUKI.on || TSUKI.phase !== 'stay') return false;
+  TSUKI.phase = 'out1'; TSUKI.t = 0;
+  return true;
+}
+/* 巡りへ割り込まれたとき（goTo 等）は幕を待たずに即帰る */
+function exitTsukiInstant(){
+  if (TSUKI.phase === 'idle') return;
+  const mid = (TSUKI.phase === 'in1');           // まだ月に着いていない
+  TSUKI.phase = 'idle';
+  tsukifadeEl.style.opacity = 0;
+  if (!mid) tsukiLeaveRestore();
+  else if (TSUKI.saved){                          // 行きかけ＝保存だけ戻す
+    auto = TSUKI.saved.auto; syncAutoBtn();
+    if (TSUKI.saved.walk) setWalk(true);
+    hintEl.textContent = TSUKI.saved.hint;
+    TSUKI.saved = null;
+  }
+}
+function updateTsuki(dt){
+  const F = 0.85;                                 // 幕のひと呼吸
+  if (TSUKI.phase === 'in1'){
+    TSUKI.t += dt;
+    tsukifadeEl.style.opacity = Math.min(1, TSUKI.t / F);
+    if (TSUKI.t >= F){ tsukiArrive(); TSUKI.phase = 'in2'; TSUKI.t = 0; }
+  } else if (TSUKI.phase === 'in2'){
+    TSUKI.t += dt;
+    tsukifadeEl.style.opacity = Math.max(0, 1 - TSUKI.t / F);
+    if (TSUKI.t >= F){ TSUKI.phase = 'stay'; TSUKI.t = 0; }
+  } else if (TSUKI.phase === 'out1'){
+    TSUKI.t += dt;
+    tsukifadeEl.style.opacity = Math.min(1, TSUKI.t / F);
+    if (TSUKI.t >= F){ tsukiLeaveRestore(); TSUKI.phase = 'out2'; TSUKI.t = 0; }
+  } else if (TSUKI.phase === 'out2'){
+    TSUKI.t += dt;
+    tsukifadeEl.style.opacity = Math.max(0, 1 - TSUKI.t / F);
+    if (TSUKI.t >= F){ TSUKI.phase = 'idle'; TSUKI.t = 0; }
+  }
+  if (!TSUKI.on) return;
+
+  /* 立ち姿：息づかいと、なぞりの見回し */
+  const cp = tsukimen.cam.pos, ct = tsukimen.cam.tgt;
+  camera.position.set(cp.x, cp.y + Math.sin(elapsed * 0.7) * 0.035, cp.z);
+  const bx = ct.x - cp.x, by = ct.y - cp.y, bz = ct.z - cp.z;
+  const yaw0 = Math.atan2(bx, bz), pit0 = Math.atan2(by, Math.hypot(bx, bz));
+  const yw = yaw0 + TSUKI.yaw, pt = pit0 + TSUKI.pitch;
+  curTgt.set(
+    camera.position.x + Math.sin(yw) * Math.cos(pt) * 10,
+    camera.position.y + Math.sin(pt) * 10,
+    camera.position.z + Math.cos(yw) * Math.cos(pt) * 10
+  );
+  camera.lookAt(curTgt);
+
+  /* 餅つき：置き、もちあげ、構え、ふりおろし、ぺったん。上げているあいだに手返し */
+  const T = 1.7;
+  TSUKI.u = (TSUKI.u + dt / T) % 1;
+  const u = TSUKI.u;
+  let th;
+  if (u < 0.10)      th = -1.42;                                          // 置き
+  else if (u < 0.52) th = -1.42 + (0.5 + 1.42) * smooth((u - 0.10) / 0.42);// もちあげ
+  else if (u < 0.82) th = 0.5;                                            // 構え（手返しの間）
+  else if (u < 0.92) th = 0.5 - (0.5 + 1.42) * smooth((u - 0.82) / 0.10); // ふりおろし
+  else               th = -1.42;
+  tsukimen.kine.rotation.x = th;
+  if (TSUKI.lastBeat < 0.92 && u >= 0.92){
+    TSUKI.squash = 1;
+    strikeMochi();
+  }
+  TSUKI.lastBeat = u;
+  TSUKI.squash = Math.max(0, TSUKI.squash - dt * 4.5);
+  const sq = TSUKI.squash;
+  tsukimen.mochi.scale.set(1 + sq * 0.33, 0.62 * (1 - sq * 0.38), 1 + sq * 0.33);
+  // 手返し（杵が上がっているあいだに、身を乗り出して餅をかえす）
+  const lean = (u > 0.54 && u < 0.80) ? Math.sin((u - 0.54) / 0.26 * Math.PI) : 0;
+  tsukimen.usagiB.rotation.x = lean * 0.30;
+  // 耳としっぽの気配・地球の大気の呼吸
+  tsukimen.usagiA.rotation.z = Math.sin(elapsed * 1.1) * 0.02;
+  tsukimen.taiki.material.opacity = 0.27 + Math.sin(elapsed * 0.9) * 0.05;
+}
+
 /* 月の道を「立った場所と月を結ぶ線」に乗せ直す（池ごとに呼ぶ）。
    水鏡は見る人ごとに位置が変わる ―― 置きっぱなしの一本だと、
    汀を歩いたときに月と別のところで光ってしまう。
@@ -5852,6 +6282,7 @@ const dollyDir = new THREE.Vector3();
 const smooth = x => x * x * (3 - 2 * x);
 
 function goTo(i, byUser){
+  if (TSUKI.phase !== 'idle') exitTsukiInstant();   // 月の都からは幕を待たずに帰って合流
   if (rideActive()){             // 点列などから呼ばれたら舟を下りてレールへ
     setRideOff('rail');
     hintEl.textContent = HINT_RAIL;
@@ -6425,6 +6856,7 @@ function kuStopIdx(){ return (walkMode || rideActive()) ? nearestStopIdx() : idx
 function kuPick(){
   if (!HAIKU || !HAIKU.ku) return null;
   const toki = HAIKU.toki || {};
+  if (TSUKI.on && toki.tsuki)      return { key:'tsuki',   ku:toki.tsuki,   ba:toki.tsuki.ba };
   if (rideActive() && toki.fune)   return { key:'fune',    ku:toki.fune,    ba:toki.fune.ba };
   if (FX.okuribi && toki.okuribi)  return { key:'okuribi', ku:toki.okuribi, ba:toki.okuribi.ba };
   // 落柿舎のそば＝去来の一句（歩いて庵を訪ねた人だけに掛かる）
@@ -6570,7 +7002,8 @@ function railPick(){
 let pDown = null, pDrag = false;
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (RIDE.entering >= 0) return;                  // 乗り込みの間だけ手を離す
-  if (RIDE.on){                                    // 舟上＝なぞって見回すだけ
+  if (TSUKI.phase !== 'idle' && !TSUKI.on) return; // 月白の幕の間も手を離す
+  if (RIDE.on || TSUKI.on){                        // 舟上・月面＝なぞって見回すだけ
     pDown = { x: ev.clientX, y: ev.clientY };
     pDrag = false;
     return;
@@ -6588,11 +7021,14 @@ renderer.domElement.addEventListener('pointerdown', ev => {
   pDrag = false;
 });
 window.addEventListener('pointermove', ev => {
-  if (!pDown || (!walkMode && !RIDE.on)) return;
+  if (!pDown || (!walkMode && !RIDE.on && !TSUKI.on)) return;
   const dx = ev.clientX - pDown.x, dy = ev.clientY - pDown.y;
   if (!pDrag && Math.hypot(dx, dy) > 7) pDrag = true;
   if (pDrag){
-    if (RIDE.on){
+    if (TSUKI.on){
+      TSUKI.yaw   = Math.max(-1.9, Math.min(1.9, TSUKI.yaw - dx * 0.0042));
+      TSUKI.pitch = Math.max(-0.45, Math.min(0.62, TSUKI.pitch - dy * 0.0032));
+    } else if (RIDE.on){
       RIDE.yaw   = Math.max(-2.4, Math.min(2.4, RIDE.yaw - dx * 0.0042));
       RIDE.pitch = Math.max(-0.5, Math.min(0.5, RIDE.pitch - dy * 0.0032));
     } else {
@@ -6607,7 +7043,7 @@ window.addEventListener('pointermove', ev => {
   }
 });
 window.addEventListener('pointerup', ev => {
-  if (RIDE.on){ pDown = null; pDrag = false; return; }
+  if (RIDE.on || TSUKI.on){ pDown = null; pDrag = false; return; }
   if (!walkMode || !pDown) return;
   const wasDrag = pDrag;
   pDown = null; pDrag = false;
@@ -6631,6 +7067,31 @@ window.addEventListener('pointerup', ev => {
   if (g) WALK.target = clampToWalkable(g.x, g.z);
 });
 
+/* ㊾ 月の都への口 ― 空の三日月をすばやく二度たたくと月面へ、
+   月面では地球を二度たたくと地上へ。なぞり（見回し）は数に入れない */
+const DBL = { t: -1, x: 0, y: 0, dx: 0, dy: 0 };
+renderer.domElement.addEventListener('pointerdown', ev => {
+  DBL.dx = ev.clientX; DBL.dy = ev.clientY;
+});
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (Math.hypot(ev.clientX - DBL.dx, ev.clientY - DBL.dy) > 26){ DBL.t = -1; return; }
+  const now = performance.now();
+  if (DBL.t > 0 && now - DBL.t < 380 &&
+      Math.hypot(ev.clientX - DBL.x, ev.clientY - DBL.y) < 34){
+    DBL.t = -1;
+    setNdc(ev.clientX, ev.clientY);
+    ray.setFromCamera(ndc, camera);
+    if (!TSUKI.on && TSUKI.phase === 'idle' && FX.tsukiusagi){
+      if (ray.intersectObject(tsukimen.moonHit, false)[0]) enterTsuki();
+    } else if (TSUKI.on){
+      if (ray.intersectObject(tsukimen.earthHit, false)[0]) exitTsuki();
+    }
+    return;
+  }
+  DBL.t = now; DBL.x = ev.clientX; DBL.y = ev.clientY;
+});
+chiBtn.addEventListener('click', () => exitTsuki());
+
 /* ============================================================
    9b. 宵の音 ― Web Audio 合成（音源ファイル無し）
    川のせせらぎ・鈴虫とこおろぎ・笹の葉ずれ・遠くの鐘。
@@ -6645,7 +7106,8 @@ const SND = {
   higu : true,    // 蜩（ひぐらし）。川に近づくほど山の声が届く
   furin: true,    // 風鈴（茶店の軒。近くにいるときだけ）
   kawazu: true,   // 田の蛙（木戸の先の夏の夜。北の田でだけ満ちる）
-  shishi: true    // 鹿威し（鐘楼の庭。近くにいるとき、こおんとひとつ）
+  shishi: true,   // 鹿威し（鐘楼の庭。近くにいるとき、こおんとひとつ）
+  mochi : true    // 餅つき（月の都。杵が落ちるたび、ぺったん）
 };
 let AC = null;                // AudioContext。初回の操作で作る
 const sndNodes = {};
@@ -6731,6 +7193,33 @@ function strikeShishi(){
     o.connect(g); g.connect(sndNodes.master);
     o.start(t); o.stop(t + p[2] + 0.1);
   });
+  return true;
+}
+
+/* 餅つき：ぺったん。低いつきの身と、餅のねばりの短いノイズ（月の都で杵が落ちるたび） */
+function strikeMochi(){
+  if (!AC || !SND.on || !SND.mochi || AC.state !== 'running') return false;
+  const t = AC.currentTime;
+  // 杵の身（低い二音。すこし間を持たせた太鼓の胴のような鳴り）
+  [[165, 0.26, 0.22], [318, 0.09, 0.12]].forEach(p => {
+    const o = AC.createOscillator();
+    o.frequency.setValueAtTime(p[0] * 1.06, t);
+    o.frequency.exponentialRampToValueAtTime(p[0], t + 0.05);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(p[1], t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+    o.connect(g); g.connect(sndNodes.master);
+    o.start(t); o.stop(t + p[2] + 0.1);
+  });
+  // 餅のねばり（やわらかいノイズをひと呼吸）
+  const src = AC.createBufferSource(); src.buffer = sndNodes.noise;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 620; bp.Q.value = 1.1;
+  const ng = AC.createGain();
+  ng.gain.setValueAtTime(0.12, t);
+  ng.gain.exponentialRampToValueAtTime(0.0004, t + 0.13);
+  src.connect(bp); bp.connect(ng); ng.connect(sndNodes.master);
+  src.start(t); src.stop(t + 0.16);
   return true;
 }
 
@@ -6977,6 +7466,16 @@ function buildSound(){
 /* 場所で聞こえ方が変わる（毎フレーム。灯していない間は何もしない） */
 function updateSoundMix(){
   if (!AC || !SND.on) return;
+  if (TSUKI.on){
+    // 月は音のない世界。地上の虫も川も置いてきて、遠い鐘だけかすかに届く
+    const k2 = 0.06;
+    ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus'].forEach(n => {
+      sndNodes[n].gain.value += (0 - sndNodes[n].gain.value) * k2;
+    });
+    sndNodes.kaneBus.gain.value += (0.12 - sndNodes.kaneBus.gain.value) * k2;
+    sndNodes.kaneLp.frequency.value += (600 - sndNodes.kaneLp.frequency.value) * k2;
+    return;
+  }
   const z = camera.position.z, x = camera.position.x;
   // 川：通りでは側溝の水音がかすかに、z-30 から川の気配、川端 z-78 で満ちる
   const rv = Math.min(1, Math.max(0, (-z - 30) / 48));
@@ -7037,7 +7536,8 @@ let elapsed = 0;
 
 function update(dt){
   elapsed += dt;
-  if (RIDE.on || RIDE.entering >= 0) updateRide(dt);
+  if (TSUKI.phase !== 'idle') updateTsuki(dt);            // ㊾ 月の都（幕の間もここが手綱）
+  else if (RIDE.on || RIDE.entering >= 0) updateRide(dt);
   else if (walkMode) updateWalk(dt);
   else updateCamera(dt);
 
@@ -7796,6 +8296,21 @@ window.__machiya = {
   jinrikisha: jinrikisha,   // 人力車の赤入れ用
   kudari: kudari,           // 保津川下りの舟（state() で現在地と運行の有無）
   shishi: shishiodoshi,     // 鹿威し（state() で振りの角）
+  tsukimen: tsukimen,       // 月の都の赤入れ用（chikyu.rotation.y で日本の向きを直せる）
+  /* 月の都の検証口：set(true/false) で行き来（幕は step で送る）、state() で現況 */
+  tsuki: {
+    set: function(v){ return v ? enterTsuki() : exitTsuki(); },
+    instant: exitTsukiInstant,
+    state: function(){
+      return { on: TSUKI.on, phase: TSUKI.phase,
+               fade: +parseFloat(tsukifadeEl.style.opacity || 0).toFixed(2),
+               u: +TSUKI.u.toFixed(3), kine: +tsukimen.kine.rotation.x.toFixed(3),
+               mochiY: +tsukimen.mochi.scale.y.toFixed(3),
+               yaw: +TSUKI.yaw.toFixed(3), pitch: +TSUKI.pitch.toFixed(3),
+               cam: camera.position.toArray().map(n => +n.toFixed(2)),
+               chiBtn: chiBtn.style.display !== 'none' };
+    }
+  },
   /* 嵯峨野の北の検証口：群れが出ているか、月の道が本当に月の方位へ寝ているか。
      zure は月の道の向きと「池から見た月の方位」のずれ（度）。0 に近いほど正しい */
   kita: function(){
