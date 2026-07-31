@@ -512,10 +512,21 @@ const FX = {
   shoro       : true,   // ㊳ 鐘楼の庭（天龍寺の北。撞ける梵鐘と除夜の鐘）
   daikakuji   : true,   // ㊴ 大覚寺（木戸の先の田の道の突き当り。表門・宸殿・村雨の廊下・五大堂・心経宝塔）
   hirosawa    : true,   // ㊵ 広沢の池（大覚寺の東。観月の池。北の汀に立つと月の道が渡月橋の月へつながる）
-  osawa       : true    // ㊶ 大沢池と五大堂の観月台（日本最古の庭池。菊ヶ島と天神島・名古曽の滝跡・龍頭鷁首の舟）
+  osawa       : true,   // ㊶ 大沢池と五大堂の観月台（日本最古の庭池。菊ヶ島と天神島・名古曽の滝跡・龍頭鷁首の舟）
+  rakushisha  : true,   // ㊷ 落柿舎（田の向こうの藁葺きの庵。壁に蓑と笠、秋には柿が色づく。近づくと去来の句）
+  tahoto      : true,   // ㊸ 小倉山の中腹の多宝塔の灯（常寂光寺の見立て）
+  sennichi    : false,  // ㊹ 愛宕山の千日詣り（文月晦日〜葉月朔日の宵にだけ自動点灯。下で日付判定）
+  toriigata   : false,  // ㊺ 鳥居形の送り火と広沢の池の灯篭流し（葉月十六日の宵。下で日付判定）
+  jinrikisha  : true,   // ㊻ 渡月橋の北詰の人力車（客待ちの停め置き）
+  kudari      : true,   // ㊼ 保津川下りの舟（西の早瀬から数分おきに下ってくる）
+  shishi      : true    // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
-if (new Date().getMonth() === 7 && new Date().getDate() === 16) FX.okuribi = true;
+//（鳥居形と広沢の池の灯篭流しも同じ晩の行事＝そろって灯る）
+if (new Date().getMonth() === 7 && new Date().getDate() === 16){ FX.okuribi = true; FX.toriigata = true; }
+// 千日詣りは文月晦日の宵から夜通しの行事＝晦日と朔日の二晩だけ、愛宕山に提灯の列が灯る
+if ((new Date().getMonth() === 6 && new Date().getDate() === 31) ||
+    (new Date().getMonth() === 7 && new Date().getDate() === 1)) FX.sennichi = true;
 
 const STREET_X = 5.0;          // 町屋の中心
 const HOUSE_W  = 3.6;          // 間口
@@ -916,6 +927,21 @@ function kokeTexture(){
   }
   return tex(c, 4, 4);
 }
+/* 茅（藁屋根の面。夜露に沈んだ藁の縦筋と、軒先の影） */
+function kayaTexture(){
+  const c = cv(256, 128), g = c.getContext('2d');
+  g.fillStyle = '#221b10'; g.fillRect(0, 0, 256, 128);
+  let seed = 7575;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++){
+    const x = rnd() * 256, a = (0.07 + rnd() * 0.2).toFixed(2);
+    g.strokeStyle = (rnd() > 0.42 ? 'rgba(122,102,62,' : 'rgba(0,0,0,') + a + ')';
+    g.lineWidth = 1 + rnd() * 2;
+    g.beginPath(); g.moveTo(x, -4); g.lineTo(x + (rnd() - 0.5) * 10, 132); g.stroke();
+  }
+  g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, 108, 256, 20);
+  return tex(c, 2, 1);
+}
 /* 石の標（社号標・寺号標。縦書きの刻字を白く入れて夜でも読める） */
 function hyouTexture(name, sub){
   const c = cv(128, 512), g = c.getContext('2d');
@@ -971,7 +997,8 @@ const TEX = {
   hogaki   : hogakiTexture(),
   kuroki   : kurokiTexture(),
   shiba    : shibaTexture(),
-  koke     : kokeTexture()
+  koke     : kokeTexture(),
+  kaya     : kayaTexture()
 };
 
 /* ============================================================
@@ -3356,6 +3383,7 @@ const SHIKI = (function(){
   const akiKodachiFar = treelineTexture('#63301a', 98765);
 
   let current = 'natsu';
+  const extra = [];   // 後から生まれる景（落柿舎の柿の実など）が衣替えに相乗りする口
   function set(s){
     if (['haru','natsu','aki','fuyu'].indexOf(s) < 0) return current;
     current = s;
@@ -3378,13 +3406,14 @@ const SHIKI = (function(){
                                     : (near ? TEX.kodachi : TEX.kodachiFar);
       p2.material.needsUpdate = true;
     });
+    extra.forEach(f => f(current));
     return current;
   }
   /* きょうの季節（弥生〜皐月=春・水無月〜長月=夏・神無月霜月=秋・師走〜如月=冬） */
   const m = new Date().getMonth() + 1;
   set(m >= 3 && m <= 5 ? 'haru' : m >= 6 && m <= 9 ? 'natsu' : m >= 10 && m <= 11 ? 'aki' : 'fuyu');
 
-  return { set: set, get current(){ return current; },
+  return { set: set, get current(){ return current; }, extra: extra,
            petals: petals, leaves: leaves, snow: snow };
 })();
 
@@ -3663,7 +3692,9 @@ const ienami = (function(){
   const roofMat = new THREE.MeshLambertMaterial({ color: 0x0d1118 });
   // [side, z, 間口]（奥へゆくほど霧が呑む）
   // 北の田の道・畦道・大覚寺の境内に場所を譲り、木戸ぎわの四棟だけ残した（5p）
-  const ROWS = [[-1, 7.0, 3.4], [1, 8.6, 3.0], [-1, 11.2, 3.2], [1, 12.8, 3.4]];
+  // ―― さらに西側の二棟は落柿舎（㊷）の田に譲って畳んだ。実際の嵯峨野も
+  //    町並みが尽きると西へ田が開け、その向こうに庵が見える（東の二棟に町を託す）
+  const ROWS = [[-1, 7.0, 3.4], [-1, 11.2, 3.2]];
   const kabe = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), wallMat, ROWS.length);
   const yane = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), roofMat, ROWS.length * 2);
   kabe.frustumCulled = yane.frustumCulled = false;   // 位置が散るので境界球カリングは切る
@@ -3684,9 +3715,9 @@ const ienami = (function(){
   kabe.instanceMatrix.needsUpdate = true;
   yane.instanceMatrix.needsUpdate = true;
   g.add(kabe, yane);
-  // 続きの提灯の点列（灯だけ霧を抜いて、点々と遠くまで）
+  // 続きの提灯の点列（灯だけ霧を抜いて、点々と遠くまで。西を畳んだので東に寄せる）
   const CHO = [];
-  [[-2.35, 7.2], [2.35, 10.4], [-2.35, 13.6]].forEach(p => {
+  [[-2.35, 7.2], [-2.35, 10.4], [-2.35, 13.6]].forEach(p => {
     CHO.push(p[0], 1.85, p[1]);
   });
   const choGeo = new THREE.BufferGeometry();
@@ -5194,6 +5225,530 @@ const osawa = (function(){
            daiHalo: daiHalo, pond: PC, dai: KD };
 })();
 
+/* ============================================================
+   5q. 落柿舎 ― 田の向こうの藁葺きの庵（FX ㊷ rakushisha）
+   去来の草庵の見立て。庭の四十本の柿が一夜で落ちた逸話が名の由来。
+   壁の蓑と笠は「主が庵にいる」しるし。芭蕉がここで嵯峨日記を書いた
+   縁で、歩いて訪ねると去来の句の短冊が掛かる（kuPick・8c）。
+   実座標＝庵 x14.7〜17.7 / z10.5〜12.9、庭 x13.3〜19.3 / z7.0〜14.4
+   ============================================================ */
+const rakushisha = (function(){
+  const g = new THREE.Group();
+  let seed = 4949;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const tsuchikabe = new THREE.MeshLambertMaterial({ color: 0x352a1b });   // 草庵の土壁
+  const kayaM = new THREE.MeshLambertMaterial({ map: TEX.kaya });
+
+  // 庭の土と、田のへりの小道（畦の南側を西へ。街道から庵の縁先まで）
+  const niwa = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 7.8),
+    new THREE.MeshLambertMaterial({ color: 0x15130c, emissive: 0x030302 }));
+  niwa.rotation.x = -Math.PI / 2;
+  niwa.position.set(16.3, 0.014, 10.7);
+  g.add(niwa);
+  const komichi = new THREE.Mesh(new THREE.PlaneGeometry(13.2, 1.0),
+    new THREE.MeshLambertMaterial({ color: 0x1a1811, emissive: 0x040302 }));
+  komichi.rotation.x = -Math.PI / 2;
+  komichi.position.set(8.2, 0.016, 7.85);
+  g.add(komichi);
+
+  // 庵：土壁の身に、茅葺きの寄棟（四角錐＋短い棟）をかぶせる。軒は深く
+  const HX = 16.2, HZ = 11.7;
+  const mi = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.75, 2.4), tsuchikabe);
+  mi.position.set(HX, 0.885, HZ);
+  g.add(mi);
+  const yane = new THREE.Mesh(new THREE.ConeGeometry(2.62, 1.3, 4), kayaM);
+  yane.rotation.y = Math.PI / 4;
+  yane.scale.z = 0.82;
+  yane.position.set(HX, 2.41, HZ);
+  g.add(yane);
+  const mune = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 0.3),
+    new THREE.MeshLambertMaterial({ color: 0x1c1710 }));
+  mune.position.set(HX, 3.06, HZ);
+  g.add(mune);
+  // 濡れ縁（東の縁先。田と月を眺める腰かけ）
+  const en = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.09, 2.0), MAT.wallDk);
+  en.position.set(14.42, 0.32, HZ);
+  g.add(en);
+  // 障子のほの灯（東面＝小道の側へ。留守ではない、というほのめかし）
+  const shoji = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.78),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.4 }));
+  shoji.rotation.y = -Math.PI / 2;
+  shoji.position.set(14.68, 0.95, HZ + 0.42);
+  g.add(shoji);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffcf8e,
+    transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.set(1.6, 1.6, 1);
+  halo.position.set(14.45, 1.0, HZ + 0.42);
+  g.add(halo);
+  // 蓑と笠（東の壁。編笠を上に、蓑を下に掛ける）
+  const mino = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 8),
+    new THREE.MeshLambertMaterial({ color: 0x33291a, emissive: 0x060503 }));
+  mino.scale.x = 0.42;
+  mino.position.set(14.6, 1.02, HZ - 0.55);
+  g.add(mino);
+  const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.16, 9),
+    new THREE.MeshLambertMaterial({ color: 0x4a3d24, emissive: 0x070503 }));
+  kasa.scale.x = 0.5;
+  kasa.position.set(14.6, 1.48, HZ - 0.55);
+  g.add(kasa);
+
+  // 柿の木二本（庭の隅と小道のわき）。実は秋にだけ色づく＝四季の衣替えに相乗り
+  function kakiTree(x, z, s){
+    const t = new THREE.Group();
+    const kan = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 1.9, 6), MAT.wallDk);
+    kan.position.y = 0.95;
+    kan.rotation.z = (rnd() - 0.5) * 0.16;
+    t.add(kan);
+    [[0.3, 1.8, 0.1, -0.9], [-0.28, 1.7, -0.1, 0.95]].forEach(e => {
+      const eda = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.9, 5), MAT.wallDk);
+      eda.position.set(e[0], e[1], e[2]);
+      eda.rotation.z = e[3];
+      t.add(eda);
+    });
+    const haM = new THREE.MeshLambertMaterial({ color: 0x17251b });
+    for (let i = 0; i < 4; i++){
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), haM);
+      b.position.set((rnd() - 0.5) * 1.5, 2.0 + rnd() * 0.7, (rnd() - 0.5) * 1.3);
+      b.scale.setScalar((0.8 + rnd() * 0.5) * s);
+      t.add(b);
+    }
+    t.position.set(x, 0, z);
+    g.add(t);
+    return t;
+  }
+  kakiTree(18.5, 13.3, 1.1);
+  kakiTree(12.5, 6.6, 0.9);
+  const kakiM = new THREE.MeshLambertMaterial({ color: 0xb35a1e, emissive: 0x2a1004 });
+  const MI = [];
+  [[18.5, 13.3, 1.1], [12.5, 6.6, 0.9]].forEach(k => {
+    for (let i = 0; i < 9; i++){
+      MI.push([k[0] + (rnd() - 0.5) * 1.6 * k[2], 1.9 + rnd() * 0.9 * k[2],
+               k[1] + (rnd() - 0.5) * 1.4 * k[2], 0, 0, 0, 0.09, 0.09, 0.09]);
+    }
+  });
+  const kaki = kitaInst(new THREE.SphereGeometry(1, 6, 5), kakiM, MI);
+  kaki.visible = (SHIKI.current === 'aki');
+  SHIKI.extra.push(s => { kaki.visible = (s === 'aki'); });
+  g.add(kaki);
+
+  // 小柴垣（野宮と同じ作法。東の南寄りだけ空けて、小道からの入りにする）
+  const shibaM = new THREE.MeshLambertMaterial({ map: TEX.shiba });
+  const HEI = [                            // [中心x, 中心z, 長さ, z沿いか]
+    [16.25, 14.4, 6.1, 0],                 // 北
+    [16.25,  7.0, 6.1, 0],                 // 南
+    [19.3, 10.7, 7.6, 1],                  // 西（庵の裏）
+    [13.3, 11.95, 5.1, 1]                  // 東（z7.0〜9.4 を空けて木戸がわり）
+  ];
+  const heiBody = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.62, 0.17), shibaM, HEI.length);
+  const heiTop  = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.05, 0.22), MAT.bamboo, HEI.length);
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
+        vv = new THREE.Vector3(), sc = new THREE.Vector3();
+  HEI.forEach((k, i) => {
+    eu.set(0, k[3] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
+    m4.compose(vv.set(k[0], 0.31, k[1]), q0, sc.set(k[2], 1, 1));
+    heiBody.setMatrixAt(i, m4);
+    m4.compose(vv.set(k[0], 0.645, k[1]), q0, sc.set(k[2] + 0.1, 1, 1));
+    heiTop.setMatrixAt(i, m4);
+  });
+  heiBody.instanceMatrix.needsUpdate = true;
+  heiTop.instanceMatrix.needsUpdate = true;
+  g.add(heiBody, heiTop);
+
+  // 標（入りのわき。南＝小道の側へ面を向ける）
+  const hyou = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.05, 0.24),
+    new THREE.MeshLambertMaterial({ color: 0x343a46 }));
+  hyou.position.set(13.0, 0.53, 8.75);
+  g.add(hyou);
+  const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 1.0),
+    new THREE.MeshLambertMaterial({ map: hyouTexture('落柿舎', '去来の草庵'), emissive: 0x141620 }));
+  hyouMen.rotation.y = Math.PI;
+  hyouMen.position.set(13.0, 0.53, 8.625);
+  g.add(hyouMen);
+
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, shoji: shoji, halo: halo, kaki: kaki };
+})();
+
+/* ㊸ 小倉山の中腹の多宝塔 ― 常寂光寺の見立て。
+   堂の影は「近づくと現れる質量」、灯は fog:false（宿の灯と同じ作法）で
+   霧の指数則に呑ませない。山肌の高さは峰の式から起こして据える */
+const tahoto = (function(){
+  const g = new THREE.Group();
+  const TX = 8.0, TZ = 36.5;
+  const q = 1 - Math.pow((TX - 14) / 34, 2) - Math.pow((TZ - 52) / 21.08, 2);
+  const TY = 14.28 * Math.sqrt(Math.max(0, q)) - 0.25;   // 山肌にわずかに沈める
+  const yaneM = new THREE.MeshLambertMaterial({ color: 0x212a3a, emissive: 0x060810 });
+  const kabeM = new THREE.MeshLambertMaterial({ color: 0x2c3140, emissive: 0x070810 });
+  const shita = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.5, 0.92), kabeM);
+  shita.position.set(TX, TY + 0.25, TZ);
+  const yane1 = new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.42, 4), yaneM);
+  yane1.rotation.y = Math.PI / 4;
+  yane1.position.set(TX, TY + 0.68, TZ);
+  const kame = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), kabeM);   // 亀腹（上層の白い椀）
+  kame.scale.y = 0.5;
+  kame.position.set(TX, TY + 0.9, TZ);
+  const yane2 = new THREE.Mesh(new THREE.ConeGeometry(0.72, 0.36, 4), yaneM);
+  yane2.rotation.y = Math.PI / 4;
+  yane2.position.set(TX, TY + 1.2, TZ);
+  const sorin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5),
+    new THREE.MeshLambertMaterial({ color: 0x6a5a30, emissive: 0x141006 }));
+  sorin.position.set(TX, TY + 1.6, TZ);
+  g.add(shita, yane1, kame, yane2, sorin);
+  // 塔の灯（南面の連子窓ひとつぶん）
+  const mado = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.2),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.55, fog: false }));
+  mado.rotation.y = Math.PI;
+  mado.position.set(TX, TY + 0.3, TZ - 0.47);
+  const hi = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
+    transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  hi.scale.set(1.5, 1.5, 1);
+  hi.position.set(TX, TY + 0.45, TZ - 0.52);
+  g.add(mado, hi);
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, hi: hi, mado: mado, y: +TY.toFixed(2) };
+})();
+
+/* ㊹ 愛宕山の千日詣り ― 文月晦日の宵、山肌をつづら折りに登る提灯の列。
+   千日分の御利益を頂きに夜通し愛宕さんへ登る夏の行事。列は頂の
+   火伏の常夜灯（㉙）へ向かって、消えては麓からまた続く。
+   小倉山（手前の峰・高さ14.3）に麓が隠れるので、列は y20 あたりから上に敷く */
+const sennichi = (function(){
+  const N = 34;
+  const path = [];                 // [行程の位相, 揺らぎ] を控えて毎フレーム位置を起こす
+  let seed = 731;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++) path.push([i / N, rnd() * Math.PI * 2]);
+  const surf = (x, z) => {
+    const q = 1 - Math.pow((x - 34) / 58, 2) - Math.pow((z - 74) / 34.8, 2);
+    return 34.8 * Math.sqrt(Math.max(0, q));
+  };
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  const mat = new THREE.PointsMaterial({ map: TEX.glow, color: 0xffcf9e, size: 0.66,
+    sizeAttenuation: true, transparent: true, opacity: 0.7,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const p = new THREE.Points(geo, mat);
+  p.renderOrder = 2;               // 稜線板・峰の後に描く（送り火と同じ戒め）
+  p.frustumCulled = false;         // 位置を毎フレーム書くため境界球が使えない
+  let drift = 0;
+  function step(dt, el){
+    drift = (drift + dt * 0.004) % 1;         // 列はゆっくり登り続ける
+    const a = geo.attributes.position.array;
+    for (let i = 0; i < N; i++){
+      const t = (path[i][0] + drift) % 1;
+      const rho = 0.82 - t * 0.62;                                // 中腹 → 頂ちかく
+      const ang = -0.38 + Math.sin(t * Math.PI * 5.6) * 0.26;     // つづら折り（南東の面）
+      const x = 34 + 58 * rho * Math.sin(ang);
+      const z = 74 - 34.8 * rho * Math.cos(ang);
+      a[i*3]   = x - 0.4;
+      a[i*3+1] = surf(x, z) + 0.4;
+      a[i*3+2] = z - 0.7;                     // 面から手前へ浮かせて深度に呑ませない
+    }
+    geo.attributes.position.needsUpdate = true;
+    mat.opacity = 0.62 + Math.sin(el * 2.1) * 0.1;
+  }
+  step(0.016, 0);
+  const g = new THREE.Group();
+  g.add(p);
+  scene.add(g);
+  return { group: g, step: step, N: N };
+})();
+
+/* ㊺ 鳥居形の送り火と広沢の池の灯篭流し ― 葉月十六日の宵。
+   鳥居形は曼荼羅山の見立て＝小倉山の西の肩の斜面をキャンバスにする
+   （如意ヶ嶽の「大」と同じ手）。同じ晩、広沢の池には灯篭が流れ、
+   北東の遠い稜線にも左大文字と舟形がかすかに灯る */
+const toriigata = (function(){
+  const gg = new THREE.Group();              // 全体（世界座標のまま）
+  const tor = new THREE.Group();             // 鳥居形だけ山肌へ移す
+  let seed = 1616;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const jig = () => (rnd() - 0.5) * 0.26;
+  const W = 5.8, H = 5.0;
+  const pts = [];
+  for (let i = 0; i < 9; i++){ const t = i / 8; pts.push([(-0.5 + t) * W + jig(), 0.94 * H + jig()]); }
+  for (let i = 0; i < 7; i++){ const t = i / 6; pts.push([(-0.36 + t * 0.72) * W + jig(), 0.70 * H + jig()]); }
+  [-0.30, 0.30].forEach(px => {
+    for (let i = 0; i < 6; i++){ const t = i / 5; pts.push([px * W + jig(), t * 0.66 * H + jig()]); }
+  });
+  const A = [], B = [];
+  pts.forEach((p2, i) => (i % 2 ? A : B).push(p2));
+  const mk = arr => {
+    const pos = new Float32Array(arr.length * 3);
+    arr.forEach((p2, i) => { pos[i*3] = p2[0]; pos[i*3+1] = p2[1]; pos[i*3+2] = 0; });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ map: TEX.glow, color: 0xff8f3e, size: 1.15,
+      sizeAttenuation: true, transparent: true, opacity: 0.75,
+      depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const p2 = new THREE.Points(geo, mat);
+    p2.renderOrder = 2;                      // 峰と稜線板の後に描く
+    tor.add(p2);
+    return mat;
+  };
+  const matA = mk(A), matB = mk(B);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xff7c30,
+    transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending,
+    depthWrite: false, fog: false }));
+  glow.scale.set(10, 8, 1);
+  glow.position.set(0, 2.4, 0);
+  glow.renderOrder = 2;
+  tor.add(glow);
+  // 小倉山の西の肩（表面 y≈8.8 の斜面）に立て、広沢の池の汀へ面を向ける
+  tor.position.set(29.2, 9.6, 38.3);
+  tor.rotation.y = -1.91;
+  gg.add(tor);
+  // 広沢の池の灯篭流し（北の汀から放たれ、月の道の方角へ流れてゆく）
+  const NN = 12, ndata = [];
+  for (let i = 0; i < NN; i++) ndata.push({ u: rnd(), lane: rnd() * 2 - 1, spd: 0.55 + rnd() * 0.5 });
+  const ngeo = new THREE.BufferGeometry();
+  ngeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NN * 3), 3));
+  const nagashi = new THREE.Points(ngeo, new THREE.PointsMaterial({ map: TEX.glow,
+    color: 0xffc37a, size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0.55,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  nagashi.frustumCulled = false;             // 位置を毎フレーム書くため境界球が使えない
+  gg.add(nagashi);
+  // 遠い送り火（左大文字と舟形の見立て）。左大文字＝北東の低い稜線の上、
+  // 舟形＝北北東の奥（北山の稜線板の手前）。低く置くと遍照寺山（h4.25＋木立）に
+  // 呑まれて汀から見えない ―― 稜線より少し上に掲げるのが肝
+  const tooka = [];
+  [[-56, 12.3, 58.8, 2.6, 0.16], [-46, 24, 100, 2.4, 0.13]].forEach(k => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xff9350,
+      transparent: true, opacity: k[4], blending: THREE.AdditiveBlending,
+      depthWrite: false, fog: false }));
+    s.scale.set(k[3], k[3] * 0.7, 1);
+    s.position.set(k[0], k[1], k[2]);
+    s.renderOrder = 2;
+    s.userData = { base: k[4] };
+    gg.add(s); tooka.push(s);
+  });
+  function step(dt, el){
+    matA.opacity = 0.68 + Math.sin(el * 6.2) * 0.18 + Math.sin(el * 12.7) * 0.06;
+    matB.opacity = 0.68 + Math.sin(el * 7.3 + 2.0) * 0.18 + Math.sin(el * 10.9 + 1) * 0.06;
+    glow.material.opacity = 0.06 + Math.sin(el * 1.5) * 0.02;
+    tooka.forEach((s, k) => {
+      s.material.opacity = s.userData.base + Math.sin(el * (2.1 + k * 0.7) + k * 2.4) * 0.04;
+    });
+    const a = ngeo.attributes.position.array;
+    for (let i = 0; i < NN; i++){
+      const d = ndata[i];
+      d.u += dt * d.spd / 75;
+      if (d.u > 1){ d.u = 0; d.lane = Math.random() * 2 - 1; }
+      const z = 21.3 - d.u * 10.6;
+      const allow = 8 * Math.sqrt(Math.max(0, 1 - Math.pow((z - 16) / 7, 2))) * 0.86;
+      a[i*3]   = -15 + d.lane * allow * 0.8 + d.u * 1.2 + Math.sin(el * 0.5 + i) * 0.12;
+      a[i*3+1] = 0.06;
+      a[i*3+2] = z;
+    }
+    ngeo.attributes.position.needsUpdate = true;
+    nagashi.material.opacity = 0.5 + Math.sin(el * 2.3) * 0.08;
+  }
+  step(0.016, 0);
+  gg.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(gg);
+  return { group: gg, tor: tor, matA: matA, matB: matB, glow: glow,
+           nagashi: nagashi, tooka: tooka, step: step, count: pts.length };
+})();
+
+/* ㊻ 人力車 ― 渡月橋の北詰に停め置き。梶棒を下ろし、
+   小さな提灯をひとつ提げて客待ちの風情（嵐山の橋の袂の定番） */
+const jinrikisha = (function(){
+  const g = new THREE.Group();
+  const kuro = new THREE.MeshLambertMaterial({ color: 0x14161c });   // 黒塗りの車体
+  const shu  = new THREE.MeshLambertMaterial({ color: 0x8e3628 });   // 緋毛氈
+  // 車輪（大きな二輪。輻は細い棒をまとめて一描画）
+  const wheelGeo = new THREE.TorusGeometry(0.5, 0.036, 8, 20);
+  [-1, 1].forEach(s => {
+    const w = new THREE.Mesh(wheelGeo, kuro);
+    w.rotation.y = Math.PI / 2;
+    w.position.set(s * 0.58, 0.5, 0);
+    g.add(w);
+  });
+  const SPK = [];
+  [-1, 1].forEach(s => {
+    for (let i = 0; i < 4; i++) SPK.push([s * 0.58, 0.5, 0, i * Math.PI / 4, 0, 0, 1, 0.96, 1]);
+  });
+  g.add(kitaInst(new THREE.BoxGeometry(0.02, 1, 0.03), kuro, SPK));
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 6), kuro);
+  axle.rotation.z = Math.PI / 2;
+  axle.position.y = 0.5;
+  g.add(axle);
+  // 車体（座と背、畳んだ幌、足のせ）
+  g.add(kitaInst(KITA_BOX, kuro, [
+    [0, 0.72, -0.05, 0, 0, 0, 0.72, 0.3, 0.58],        // 座
+    [0, 1.06, -0.32, -0.12, 0, 0, 0.72, 0.5, 0.07],    // 背
+    [0, 0.36, 0.38, 0, 0, 0, 0.4, 0.04, 0.3],          // 踏み板
+    [0, 1.22, -0.38, -0.5, 0, 0, 0.76, 0.06, 0.1],     // 幌（畳んで背の後ろに三段）
+    [0, 1.3, -0.43, -0.9, 0, 0, 0.76, 0.06, 0.1],
+    [0, 1.34, -0.5, -1.3, 0, 0, 0.76, 0.06, 0.1],
+    [0, 0.16, 1.92, 0, 0, Math.PI / 2, 0.02, 0.78, 0.04]   // 梶棒の先の横木（z 軸まわりに倒して x 沿いに）
+  ]));
+  const mosen = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.06, 0.54), shu);
+  mosen.position.set(0, 0.9, -0.05);
+  g.add(mosen);
+  // 梶棒（下ろして休ませる）
+  g.add(kitaInst(new THREE.CylinderGeometry(0.022, 0.022, 1.75, 6), kuro, [
+    [-0.33, 0.42, 1.1, 1.42, 0, 0, 1, 1, 1],
+    [ 0.33, 0.42, 1.1, 1.42, 0, 0, 1, 1, 1]
+  ]));
+  // 提灯（右の梶棒に提げる。ゆらゆらは毎フレーム側で）
+  const choG = new THREE.Group();
+  const cho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color: 0xffd28a }));
+  cho.scale.set(0.62, 0.78, 0.62);
+  cho.position.y = -0.14;
+  choG.add(cho);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
+    transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.set(1.0, 1.0, 1);
+  halo.position.y = -0.14;
+  choG.add(halo);
+  choG.position.set(0.36, 0.62, 1.45);
+  g.add(choG);
+  g.position.set(-4.1, 0, -85.7);
+  g.rotation.y = -2.84;                      // 梶棒を橋の袂へ向けて停める
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, choG: choG, halo: halo };
+})();
+
+/* ㊼ 保津川下りの舟 ― 西の早瀬から岩のあいだを縫って下ってくる。
+   桁下は南の橋脚間（z-109.2）を直角にくぐる＝屋形舟と同じ作法。
+   橋の下では船頭が棹を寝かせる（本物の下り舟の仕草）。
+   中之島の州は北の水路をまわって霧の向こうへ */
+const kudari = (function(){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
+  const boat = new THREE.Group();
+  boat.add(kitaInst(KITA_BOX, wood, [
+    [0, 0.10, 0, 0, 0, 0, 0.92, 0.14, 3.6],            // 底
+    [-0.48, 0.26, 0, 0, 0, 0, 0.09, 0.3, 3.5],         // 舷（左）
+    [0.48, 0.26, 0, 0, 0, 0, 0.09, 0.3, 3.5],          // 舷（右）
+    [0, 0.28, -1.72, 0, 0, 0, 0.8, 0.22, 0.14],        // 艫
+    [0, 0.32, 1.74, 0.35, 0, 0, 0.8, 0.2, 0.14]        // 舳（わずかに反らす）
+  ]));
+  const silk = new THREE.MeshLambertMaterial({ color: 0x14161f });
+  // 船頭（艫に立って棹をさす）
+  const sendo = new THREE.Group();
+  const sBody = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.15, 1.0, 7), silk);
+  sBody.position.y = 0.5;
+  const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), silk);
+  sHead.position.y = 1.12;
+  sendo.add(sBody, sHead);
+  sendo.position.set(0.18, 0.28, -1.45);
+  const sao = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 2.7, 6), MAT.bamboo);
+  sao.position.set(0.34, 0.9, -1.3);
+  sao.rotation.z = 0.4;
+  // 客の影（うずくまる三人）
+  boat.add(kitaInst(new THREE.SphereGeometry(0.22, 7, 6), silk, [
+    [-0.16, 0.42, -0.2, 0, 0, 0, 1, 1.25, 1],
+    [ 0.14, 0.42,  0.5, 0, 0, 0, 1, 1.25, 1],
+    [-0.10, 0.42,  1.0, 0, 0, 0, 1, 1.25, 1]
+  ]));
+  const cho = new THREE.Mesh(GEO.lantern, new THREE.MeshBasicMaterial({ color: 0xffd28a }));
+  cho.scale.set(0.6, 0.75, 0.6);
+  cho.position.set(0, 0.75, 1.62);
+  const choHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc37a,
+    transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+  choHalo.scale.set(0.9, 0.9, 1);
+  choHalo.position.set(0, 0.8, 1.62);
+  boat.add(sendo, sao, cho, choHalo);
+  g.add(boat);
+  const curve = new THREE.CatmullRomCurve3([
+    [58, -103.5], [45, -107], [30, -108.8], [10, -109.2],
+    [-10, -109.2], [-22, -106.5], [-33, -97.5], [-56, -93.5]
+  ].map(p2 => new THREE.Vector3(p2[0], 0, p2[1])), false, 'catmullrom', 0.3);
+  const T = 210, RUN = 130;                  // 百三十秒かけて下り、しばらく間を置く
+  function step(dt, el){
+    const ph = el % T;
+    if (ph > RUN){ boat.visible = false; return; }
+    boat.visible = true;
+    const u = ph / RUN;
+    const pos = curve.getPointAt(u);
+    boat.position.set(pos.x, -0.06 + Math.sin(el * 1.1) * 0.03, pos.z);
+    const tan = curve.getTangentAt(u);
+    boat.rotation.y = Math.atan2(tan.x, tan.z);
+    boat.rotation.z = Math.sin(el * 0.9) * 0.02;
+    const duck = Math.max(0, 1 - Math.abs(pos.x) / 5);          // 橋の下では棹を寝かせる
+    sao.rotation.z = 0.4 + Math.sin(el * 1.5) * 0.25 * (1 - duck) + duck * 0.85;
+    choHalo.material.opacity = 0.26 + Math.sin(el * 7 + 1) * 0.06;
+  }
+  step(0.016, 0);
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  scene.add(g);
+  return { group: g, boat: boat, curve: curve, T: T, RUN: RUN, step: step,
+           state: function(){
+             return { visible: boat.visible,
+                      pos: boat.position.toArray().map(v => +v.toFixed(2)) };
+           } };
+})();
+
+/* ㊽ 鹿威し ― 鐘楼の庭の隅。水がたまり、こぼれて、こおんとひとつ。
+   受け口（西＝水盤の側）が上がって待ち、傾いて水を吐き、
+   跳ね戻った尻が当たり石を打つ。当たりの瞬間に音（strikeShishi・9b） */
+const shishiodoshi = (function(){
+  const g = new THREE.Group();
+  const CX = 17.9, CZ = -50.9;
+  const stoneM = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 0.34, 10), stoneM);
+  hachi.position.set(CX - 0.72, 0.17, CZ);
+  const mizu = new THREE.Mesh(new THREE.CircleGeometry(0.34, 12),
+    new THREE.MeshBasicMaterial({ color: 0x39465e }));
+  mizu.rotation.x = -Math.PI / 2;
+  mizu.position.set(CX - 0.72, 0.345, CZ);
+  // 支柱二本と、振り子になる竹筒
+  const hashiraG = new THREE.Group();
+  [-0.13, 0.13].forEach(dz => {
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.6, 6), MAT.bamboo);
+    h.position.set(CX - 0.28, 0.28, CZ + dz);
+    hashiraG.add(h);
+  });
+  const yoku = new THREE.Group();
+  const tsutsu = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 1.0, 7), MAT.bamboo);
+  tsutsu.rotation.z = Math.PI / 2;
+  tsutsu.position.x = -0.06;                 // 受け口の側をやや長く
+  yoku.add(tsutsu);
+  yoku.position.set(CX - 0.28, 0.56, CZ);
+  yoku.rotation.z = -0.28;
+  const ate = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 0), stoneM);
+  ate.position.set(CX + 0.30, 0.12, CZ);
+  // こぼれる水の糸（吐いているあいだだけ、ほの白く）
+  const ito = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.4),
+    new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xbfd4ea, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  ito.position.set(CX - 0.78, 0.6, CZ);
+  g.add(hachi, mizu, hashiraG, yoku, ate, ito);
+  let lastPh = -1;
+  function step(dt, el, strike){
+    const ph = el % 12.0;
+    let rot;
+    if (ph < 8.8){
+      rot = -0.28 + Math.sin(el * 0.9) * 0.008;                   // 受け口を上げて水を待つ
+      ito.material.opacity += (0 - ito.material.opacity) * 0.2;
+    } else if (ph < 9.3){
+      rot = -0.28 + (ph - 8.8) / 0.5 * 0.62;                      // かたんと傾いて
+      ito.material.opacity += (0.3 - ito.material.opacity) * 0.5; // 水を吐く
+    } else if (ph < 9.9){
+      rot = 0.34;
+      ito.material.opacity += (0.22 - ito.material.opacity) * 0.3;
+    } else if (ph < 10.25){
+      rot = 0.34 - (ph - 9.9) / 0.35 * 0.62;                      // 跳ね戻って
+      ito.material.opacity += (0 - ito.material.opacity) * 0.4;
+    } else {
+      const u = ph - 10.25;
+      rot = -0.28 + Math.sin(u * 26) * 0.05 * Math.exp(-u * 5);   // こおん、と震えが残る
+      if (lastPh >= 0 && lastPh < 10.25 && strike) strike();
+      ito.material.opacity += (0 - ito.material.opacity) * 0.3;
+    }
+    yoku.rotation.z = rot;
+    lastPh = ph;
+  }
+  scene.add(g);
+  return { group: g, yoku: yoku, step: step,
+           state: function(){ return { rot: +yoku.rotation.z.toFixed(3) }; } };
+})();
+
 /* 月の道を「立った場所と月を結ぶ線」に乗せ直す（池ごとに呼ぶ）。
    水鏡は見る人ごとに位置が変わる ―― 置きっぱなしの一本だと、
    汀を歩いたときに月と別のところで光ってしまう。
@@ -5402,7 +5957,11 @@ const WALK_ZONES = [
   { x0: 10.4,  x1: 13.6,  z0:  25.2, z1:  19.7 },   // 西の庭（心経宝塔の下まで）
   /* 大沢池と観月台（㊶）。五大堂の東を北へ抜けて、水の上の床に立つ */
   { x0: -3.2,  x1: -1.8,  z0:  26.9, z1:  23.4 },   // 五大堂の東の小道
-  { x0: -4.6,  x1: -1.2,  z0:  29.2, z1:  26.9 }    // 観月台の床（0.45m 高い）
+  { x0: -4.6,  x1: -1.2,  z0:  29.2, z1:  26.9 },   // 観月台の床（0.45m 高い）
+  /* 落柿舎（㊷）。田のへりの小道を西へ、柴垣の切れ目から庭先へ */
+  { x0: 1.7,   x1: 14.4,  z0:   8.3, z1:   7.4 },   // 田のへりの小道（畦の南側）
+  { x0: 13.6,  x1: 18.8,  z0:  10.3, z1:   7.4 },   // 庵の庭の南
+  { x0: 13.6,  x1: 14.6,  z0:  14.0, z1:   7.4 }    // 縁先（柿の木の下まで）
 ];
 /* 参道の勾配 SANDO と sandoFloor は 5b（橋の定数群）で定義済み */
 function inWalkable(x, z){
@@ -5868,6 +6427,10 @@ function kuPick(){
   const toki = HAIKU.toki || {};
   if (rideActive() && toki.fune)   return { key:'fune',    ku:toki.fune,    ba:toki.fune.ba };
   if (FX.okuribi && toki.okuribi)  return { key:'okuribi', ku:toki.okuribi, ba:toki.okuribi.ba };
+  // 落柿舎のそば＝去来の一句（歩いて庵を訪ねた人だけに掛かる）
+  if (walkMode && FX.rakushisha && toki.rakushisha &&
+      Math.hypot(camera.position.x - 16.2, camera.position.z - 11.2) < 8)
+    return { key:'rakushisha', ku:toki.rakushisha, ba:toki.rakushisha.ba };
   const st  = TOUR[kuStopIdx()];
   // at を持つ特別の一首は、その停留では四季の句より先に掛かる
   const at = Object.keys(toki).find(k => toki[k].at === st.kanji);
@@ -6080,7 +6643,9 @@ const SND = {
   sasa : true,    // 笹の葉ずれ（竹林の小径だけ）
   kane : true,    // 遠くの鐘（50〜110秒にひとつ。天龍寺の境内では近く響く）
   higu : true,    // 蜩（ひぐらし）。川に近づくほど山の声が届く
-  furin: true     // 風鈴（茶店の軒。近くにいるときだけ）
+  furin: true,    // 風鈴（茶店の軒。近くにいるときだけ）
+  kawazu: true,   // 田の蛙（木戸の先の夏の夜。北の田でだけ満ちる）
+  shishi: true    // 鹿威し（鐘楼の庭。近くにいるとき、こおんとひとつ）
 };
 let AC = null;                // AudioContext。初回の操作で作る
 const sndNodes = {};
@@ -6136,6 +6701,36 @@ function strikeShoro(){
   ng.gain.exponentialRampToValueAtTime(0.0004, t + 0.22);
   src.connect(bp); bp.connect(ng); ng.connect(sndNodes.shoroBus);
   src.start(t); src.stop(t + 0.3);
+  return true;
+}
+
+/* 鹿威し：乾いた竹の一打。鐘楼の庭（17.9,-50.9）の近くでだけ聞こえる。
+   振りの当たりに合わせて毎フレーム側（㊽）から呼ばれる */
+function strikeShishi(){
+  if (!AC || !SND.on || !SND.shishi || AC.state !== 'running') return false;
+  const d = Math.hypot(camera.position.x - 17.9, camera.position.z + 50.9);
+  const amp = Math.max(0, 1 - d / 24);
+  if (amp <= 0.02) return false;
+  const t = AC.currentTime, a = amp * amp;
+  // 竹の乾いた当たり（ごく短いノイズ）
+  const src = AC.createBufferSource(); src.buffer = sndNodes.noise;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 2.4;
+  const ng = AC.createGain();
+  ng.gain.setValueAtTime(0.5 * a, t);
+  ng.gain.exponentialRampToValueAtTime(0.0004, t + 0.09);
+  src.connect(bp); bp.connect(ng); ng.connect(sndNodes.master);
+  src.start(t); src.stop(t + 0.12);
+  // 筒の低い響き（こおん、の余韻）
+  [[640, 0.16, 0.34], [1280, 0.05, 0.2]].forEach(p => {
+    const o = AC.createOscillator();
+    o.frequency.value = p[0] * (1 + (Math.random() - 0.5) * 0.01);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(p[1] * a, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+    o.connect(g); g.connect(sndNodes.master);
+    o.start(t); o.stop(t + p[2] + 0.1);
+  });
   return true;
 }
 
@@ -6283,6 +6878,47 @@ function buildSound(){
     setTimeout(series, (3 + vi * 9 + Math.random() * 6) * 1000);
   });
 
+  // ── 田の蛙：木戸の先でだけ満ちる夏の夜の合唱（ゲッゲッ…と間遠に掛け合う） ──
+  const kawazuBus = AC.createGain(); kawazuBus.gain.value = 0; kawazuBus.connect(master);
+  sndNodes.kawazuBus = kawazuBus;
+  [{ f: 840, trem: 23, pan: -0.6, amp: 0.055 },
+   { f: 1010, trem: 27, pan: 0.55, amp: 0.045 },
+   { f: 700, trem: 19, pan: 0.1, amp: 0.05 }].forEach((v, vi) => {
+    const o = AC.createOscillator(); o.frequency.value = v.f;
+    const o2 = AC.createOscillator(); o2.frequency.value = v.f * 2.02;   // 鼻にかかる上音
+    const o2g = AC.createGain(); o2g.gain.value = 0.35;
+    const trm = AC.createGain(); trm.gain.value = 0.5;
+    const to = AC.createOscillator(); to.frequency.value = v.trem;
+    const tg = AC.createGain(); tg.gain.value = 0.5;
+    to.connect(tg); tg.connect(trm.gain); to.start();
+    const env = AC.createGain(); env.gain.value = 0;
+    o.connect(trm); o2.connect(o2g); o2g.connect(trm); trm.connect(env);
+    o.start(); o2.start();
+    let tail = env;
+    if (AC.createStereoPanner){
+      const pan = AC.createStereoPanner(); pan.pan.value = v.pan;
+      env.connect(pan); tail = pan;
+    }
+    tail.connect(kawazuBus);
+    const gero = () => {
+      let next;
+      if (SND.on && SND.kawazu && AC.state === 'running'){
+        const t = AC.currentTime;
+        const n = 2 + Math.floor(Math.random() * 4);     // ゲッゲッ…と二〜五声
+        for (let k = 0; k < n; k++){
+          const s = t + k * (0.42 + Math.random() * 0.1);
+          env.gain.setValueAtTime(0, s);
+          env.gain.linearRampToValueAtTime(v.amp, s + 0.03);
+          env.gain.setValueAtTime(v.amp, s + 0.24);
+          env.gain.linearRampToValueAtTime(0, s + 0.34);
+        }
+        next = n * 0.52 + 1.6 + Math.random() * 4.5;
+      } else next = 1.0;
+      setTimeout(gero, next * 1000);
+    };
+    setTimeout(gero, (1.5 + vi * 2.7 + Math.random() * 3) * 1000);
+  });
+
   // ── 風鈴：茶店の軒で、風の気まぐれにちりん。ときどき二度鳴り ──
   const furinBus = AC.createGain(); furinBus.gain.value = 0; furinBus.connect(master);
   sndNodes.furinBus = furinBus;
@@ -6356,6 +6992,9 @@ function updateSoundMix(){
   const fd = Math.hypot(x - 10.8, z + 82.4);
   const fg = Math.max(0, 1 - fd / 26);
   const furinT = SND.furin ? 0.6 * fg * fg : 0;
+  // 蛙：木戸の先の田でだけ。木戸ごしにもかすかに届く
+  const kz = Math.min(1, Math.max(0, (z + 2) / 9));
+  const kawazuT = SND.kawazu ? 0.85 * kz * kz : 0;
   // 鐘：天龍寺の境内と念仏寺の野にいるあいだは近く、すこし明るく響く
   //（念仏寺の鐘は本堂の北脇の三宝の鐘）
   //（鐘楼の庭 z-49〜-58.4 も境内のうち。撞く鐘の足もとなので近く響く）
@@ -6368,6 +7007,7 @@ function updateSoundMix(){
   sndNodes.sasaG.gain.value    += (sasaT  - sndNodes.sasaG.gain.value)    * k;
   sndNodes.higuBus.gain.value  += (higuT  - sndNodes.higuBus.gain.value)  * k;
   sndNodes.furinBus.gain.value += (furinT - sndNodes.furinBus.gain.value) * k;
+  sndNodes.kawazuBus.gain.value += (kawazuT - sndNodes.kawazuBus.gain.value) * k;
   sndNodes.kaneBus.gain.value  += (kaneG  - sndNodes.kaneBus.gain.value)  * k;
   sndNodes.kaneLp.frequency.value += (kaneF - sndNodes.kaneLp.frequency.value) * k;
 }
@@ -6843,6 +7483,37 @@ function update(dt){
     osawa.daiHalo.material.opacity = 0.26 + Math.sin(elapsed * 2.7 + 1.5) * 0.05;
   }
 
+  // ㊷ 落柿舎：障子のほの灯（北の群れと同じく、近づいたときだけ描く）
+  rakushisha.group.visible = FX.rakushisha && kitaNear;
+  if (rakushisha.group.visible){
+    rakushisha.shoji.material.opacity = 0.38 + Math.sin(elapsed * 1.9 + 0.4) * 0.05;
+    rakushisha.halo.material.opacity = 0.18 + Math.sin(elapsed * 2.6 + 1.1) * 0.04;
+  }
+  // ㊸ 小倉山の多宝塔：灯のまたたき
+  tahoto.group.visible = FX.tahoto && kitaNear;
+  if (tahoto.group.visible){
+    tahoto.hi.material.opacity = 0.26 + Math.sin(elapsed * 2.8 + 2.2) * 0.06;
+    tahoto.mado.material.opacity = 0.5 + Math.sin(elapsed * 1.6 + 0.8) * 0.07;
+  }
+  // ㊹ 千日詣り：提灯の列がつづら折りを登り続ける（文月晦日の宵だけ）
+  sennichi.group.visible = FX.sennichi;
+  if (FX.sennichi) sennichi.step(dt, elapsed);
+  // ㊺ 鳥居形と灯篭流し（葉月十六日の宵だけ。試灯は __machiya.FX.toriigata）
+  toriigata.group.visible = FX.toriigata;
+  if (FX.toriigata) toriigata.step(dt, elapsed);
+  // ㊻ 人力車：提灯がゆらゆら
+  jinrikisha.group.visible = FX.jinrikisha;
+  if (FX.jinrikisha){
+    jinrikisha.choG.rotation.z = Math.sin(elapsed * 1.15) * 0.09;
+    jinrikisha.halo.material.opacity = 0.22 + Math.sin(elapsed * 3.3 + 0.7) * 0.05;
+  }
+  // ㊼ 保津川下りの舟（運行の合間は上流で舟を休める）
+  kudari.group.visible = FX.kudari;
+  if (FX.kudari) kudari.step(dt, elapsed);
+  // ㊽ 鹿威し：たまって、こぼれて、こおん
+  shishiodoshi.group.visible = FX.shishi;
+  if (FX.shishi) shishiodoshi.step(dt, elapsed, strikeShishi);
+
   // ㊳ 鐘楼の庭：常夜灯のまたたきと、撞木の振り・鐘の震え・除夜の数え
   shoro.group.visible = FX.shoro;
   if (FX.shoro){
@@ -7118,6 +7789,13 @@ window.__machiya = {
   daikakuji: daikakuji, // 大覚寺の赤入れ用
   hirosawa: hirosawa,   // 広沢の池の赤入れ用
   osawa: osawa,         // 大沢池と観月台の赤入れ用
+  rakushisha: rakushisha,   // 落柿舎の赤入れ用（kaki.visible は四季と連動）
+  tahoto: tahoto,           // 多宝塔の灯の赤入れ用（y = 山肌の高さ）
+  sennichi: sennichi,       // 千日詣りの試灯（FX.sennichi=true と合わせて）
+  toriigata: toriigata,     // 鳥居形と灯篭流しの試灯（FX.toriigata=true と合わせて）
+  jinrikisha: jinrikisha,   // 人力車の赤入れ用
+  kudari: kudari,           // 保津川下りの舟（state() で現在地と運行の有無）
+  shishi: shishiodoshi,     // 鹿威し（state() で振りの角）
   /* 嵯峨野の北の検証口：群れが出ているか、月の道が本当に月の方位へ寝ているか。
      zure は月の道の向きと「池から見た月の方位」のずれ（度）。0 に近いほど正しい */
   kita: function(){
@@ -7175,6 +7853,7 @@ window.__machiya = {
           sasa : +sndNodes.sasaG.gain.value.toFixed(4),
           higu : +sndNodes.higuBus.gain.value.toFixed(4),
           furin: +sndNodes.furinBus.gain.value.toFixed(4),
+          kawazu: +sndNodes.kawazuBus.gain.value.toFixed(4),
           kane : +sndNodes.kaneBus.gain.value.toFixed(4),
           kaneLp: Math.round(sndNodes.kaneLp.frequency.value)
         } : null
@@ -7182,7 +7861,8 @@ window.__machiya = {
     },
     level: sndLevel,
     kane: function(){ return strikeKane(); },
-    furin: function(){ return sndNodes.strikeFurin ? sndNodes.strikeFurin() : false; }
+    furin: function(){ return sndNodes.strikeFurin ? sndNodes.strikeFurin() : false; },
+    shishi: function(){ return strikeShishi(); }
   }
 };
 
