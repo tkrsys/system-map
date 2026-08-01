@@ -356,7 +356,7 @@
   </div>
 </div>
 
-<div class="hint">← → で通りから渡月橋までめぐる　／　町屋や橋をクリックでも選べます</div>
+<div class="hint">← → で天龍寺から塔の舞台までめぐる　／　橋や山をクリックでも選べます</div>
 
 <div class="kaji">
   <button id="btn-prev" aria-label="前の町屋へ">◀</button>
@@ -453,31 +453,31 @@ const HOUSES = DATA.systems.filter(s => s.machiya).slice(0, 7).map((s, i) => ({
 }));
 
 /* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色。
-   道順どおり、竹の小径の途中に天龍寺 → 川端 → 橋 → 山 → 塔の十二停留 */
+   巡りは名所のみの五停留 ―― 町屋はシステムの入り口ではなくなり、景色として残る。
+   ku は歳時記（haiku.json）の詠み場番号。十二停留のころの番号をそのまま保つ */
 const SPOTS = [
-  { kanji:'捌', view:true, name:'天龍寺',
+  { kanji:'壱', ku:'捌', view:true, name:'天龍寺',
     desc:'竹の小径のなかほど、山門をくぐると曹源池のほとり。池面に月と方丈の灯がゆれ、庭は川向こうの嵐山を借りて静かに暮れている',
     tags:['曹源池庭園','借景の嵐山','夢窓疎石'],
     pos:[9.3, 1.62, -63.0], tgt:[26, 4.2, -85] },
-  { kanji:'玖', view:true, name:'桂川のほとり',
+  { kanji:'弐', ku:'玖', view:true, name:'桂川のほとり',
     desc:'町並みが尽き、竹の小径を抜けると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
     tags:['竹林の小径','桂川','鵜飼の篝火'],
     pos:[1.7, 1.62, -80.5], tgt:[3, 1.3, -103] },
-  { kanji:'拾', view:true, name:'渡月橋',
+  { kanji:'参', ku:'拾', view:true, name:'渡月橋',
     desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
     tags:['渡月橋','月の名の橋'],
     pos:[0, 2.88, -105], tgt:[26, 6, -140] },
-  { kanji:'拾壱', view:true, name:'嵐山',
+  { kanji:'肆', ku:'拾壱', view:true, name:'嵐山',
     desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
     tags:['嵐山','宿の灯'],
     pos:[2.2, 1.62, -124.8], tgt:[38, 20, -157] },
-  { kanji:'拾弐', view:true, name:'塔の舞台',
+  { kanji:'伍', ku:'拾弐', view:true, name:'塔の舞台',
     desc:'石段をのぼると、塔のたもとの見晴らし台。渡月橋と月の道、来た道の提灯の列が眼下にひらける',
     tags:['法輪寺の見立て','見晴らし'],
     pos:[-13, 6.82, -134.5], tgt:[2, 0.5, -104] }
 ];
-const NH = HOUSES.length;
-const TOUR = HOUSES.concat(SPOTS);
+const TOUR = SPOTS;
 
 /* 川辺の演出の個別開閉（赤入れで気に入らないものだけ false に。__machiya.FX からも切替可） */
 const FX = {
@@ -6592,25 +6592,19 @@ function updateKane(dt){
 // 大晦日の宵はひとりでに除夜の鐘（送り火と同じ日付の作法）
 if (new Date().getMonth() === 11 && new Date().getDate() === 31) KANE.joya = true;
 
-/* 歩いて近づいた家・名所を控える（点列と提灯の明るさが歩きに追随する）。
+/* 歩いて近づいた名所を控える（点列が歩きに追随する）。
    札は出さない ―― 散歩中は景色が主役、画面の真ん中を塞がない */
 let walkShownPoi = -2;
 function updateWalkPoi(){
-  let poi = -1, margin = 0;
-  let bh = -1, bhd = Infinity;
-  HOUSES.forEach((h, i) => {
-    const d = Math.hypot(camera.position.x - h.side * 2.5, camera.position.z - h.z);
-    if (d < bhd){ bhd = d; bh = i; }
-  });
+  let poi = -1;
   let bs = -1, bsd = Infinity;
-  for (let i = NH; i < TOUR.length; i++){
+  for (let i = 0; i < TOUR.length; i++){
     const p = stops[i].pos;
     const d = Math.hypot(camera.position.x - p.x, camera.position.z - p.z);
     if (d < bsd){ bsd = d; bs = i; }
   }
-  margin = (walkShownPoi === bh || walkShownPoi === bs) ? 0.9 : 0;
-  if (bhd < 5.2 + margin) poi = bh;
-  else if (bsd < 6.0 + margin) poi = bs;
+  const margin = (walkShownPoi === bs) ? 0.9 : 0;
+  if (bsd < 6.0 + margin) poi = bs;
   if (poi === walkShownPoi) return;
   walkShownPoi = poi;
   if (poi >= 0){ idx = poi; paintDots(); }
@@ -6850,8 +6844,26 @@ let kuT    = 0;
 if (!HAIKU || !HAIKU.ku) kuBtn.style.display = 'none';
 tzEl.setAttribute('aria-hidden', 'true');
 
-/* 居どころ＝散歩と舟の最中はいちばん近い停留、巡りの最中はいまの停留 */
-function kuStopIdx(){ return (walkMode || rideActive()) ? nearestStopIdx() : idx; }
+/* 詠み場 ― 巡りの停留からは消えた七軒も、歳時記の上では詠み場として残す。
+   そぞろ歩きで町屋の前を通れば、従来どおりその家の句が掛かる。
+   ku は haiku.json の番号（十二停留のころのまま＝ファイルは編集しない） */
+const KU_BA = HOUSES.map((h, i) => ({
+  ku: KANJI7[i], ba: h.name,
+  pos: new THREE.Vector3(-h.side * 1.35, 1.62, h.z + 3.2)
+})).concat(SPOTS.map(s => ({
+  ku: s.ku, ba: s.kanji + '　' + s.name,
+  pos: new THREE.Vector3(s.pos[0], s.pos[1], s.pos[2])
+})));
+/* 居どころ＝散歩と舟の最中はいちばん近い詠み場、巡りの最中はいまの停留 */
+function kuBaIdx(){
+  if (!walkMode && !rideActive()) return HOUSES.length + idx;
+  let best = 0, bd = Infinity;
+  KU_BA.forEach((k, i) => {
+    const d = k.pos.distanceTo(camera.position);
+    if (d < bd){ bd = d; best = i; }
+  });
+  return best;
+}
 
 function kuPick(){
   if (!HAIKU || !HAIKU.ku) return null;
@@ -6863,14 +6875,15 @@ function kuPick(){
   if (walkMode && FX.rakushisha && toki.rakushisha &&
       Math.hypot(camera.position.x - 16.2, camera.position.z - 11.2) < 8)
     return { key:'rakushisha', ku:toki.rakushisha, ba:toki.rakushisha.ba };
-  const st  = TOUR[kuStopIdx()];
-  // at を持つ特別の一首は、その停留では四季の句より先に掛かる
-  const at = Object.keys(toki).find(k => toki[k].at === st.kanji);
-  if (at) return { key: at, ku: toki[at], ba: toki[at].ba || (st.kanji + '　' + st.name) };
-  const set = HAIKU.ku[st.kanji];
+  const st  = KU_BA[kuBaIdx()];
+  // at を持つ特別の一首は、その詠み場では四季の句より先に掛かる。
+  // 場の名はいまの停留表記で（json 側の旧番号には引きずられない）
+  const at = Object.keys(toki).find(k => toki[k].at === st.ku);
+  if (at) return { key: at, ku: toki[at], ba: st.ba };
+  const set = HAIKU.ku[st.ku];
   const one = set && set[SHIKI.current];
   if (!one || !one.ku) return null;
-  return { key: st.kanji + '/' + SHIKI.current, ku: one, ba: st.kanji + '　' + st.name };
+  return { key: st.ku + '/' + SHIKI.current, ku: one, ba: st.ba };
 }
 
 function kuPaint(force){
@@ -6977,7 +6990,7 @@ window.addEventListener('keyup', e => {
 /* 町屋・川・橋・山をクリックして選ぶ（レール時）／タップで歩き・なぞって見回す（散歩時） */
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
-const clickRoots = houseGroups.concat([tenryuji.group, unryu.group, river, bridgeGroup, mtGroup]);
+const clickRoots = [tenryuji.group, unryu.group, river, bridgeGroup, mtGroup];
 function setNdc(cx, cy){
   const r = renderer.domElement.getBoundingClientRect();
   ndc.x =  ((cx - r.left) / r.width)  * 2 - 1;
@@ -6988,13 +7001,11 @@ function railPick(){
   if (!hit) return -1;
   let o = hit.object, target = -1;
   while (o){
-    const hi = houseGroups.indexOf(o);
-    if (hi >= 0)                { target = hi;     break; }
-    if (o === tenryuji.group)   { target = NH;     break; }
-    if (o === unryu.group)      { target = NH;     break; }
-    if (o === river)            { target = NH + 1; break; }
-    if (o === bridgeGroup)      { target = NH + 2; break; }
-    if (o === mtGroup)          { target = NH + 3; break; }
+    if (o === tenryuji.group)   { target = 0; break; }
+    if (o === unryu.group)      { target = 0; break; }
+    if (o === river)            { target = 1; break; }
+    if (o === bridgeGroup)      { target = 2; break; }
+    if (o === mtGroup)          { target = 3; break; }
     o = o.parent;
   }
   return target;
@@ -7013,6 +7024,21 @@ renderer.domElement.addEventListener('pointerdown', ev => {
     ray.setFromCamera(ndc, camera);
     // 舫った舟はどこからでも乗り込める
     if (FX.fune && ray.intersectObject(funaasobi.boat, true)[0]){ enterRide(); return; }
+    // 町屋は停留ではなくなった ―― 巡りから触れたら、そぞろ歩きに入って店先へ寄る。
+    // 名所の当たりと遠近を比べ、手前にあるほうを採る（橋ごしの町屋に横取りさせない）
+    const hh = ray.intersectObjects(houseGroups, true)[0];
+    const sh = ray.intersectObjects(clickRoots, true)[0];
+    if (hh && (!sh || hh.distance <= sh.distance)){
+      let o = hh.object;
+      while (o && houseGroups.indexOf(o) === -1) o = o.parent;
+      const hi = houseGroups.indexOf(o);
+      if (hi >= 0){
+        const h = HOUSES[hi];
+        setWalk(true);
+        WALK.target = { x: h.side * 1.55, z: h.z };
+        return;
+      }
+    }
     const t = railPick();
     if (t >= 0 && t !== idx) goTo(t, true);
     return;
@@ -7541,14 +7567,13 @@ function update(dt){
   else if (walkMode) updateWalk(dt);
   else updateCamera(dt);
 
-  // 提灯：ゆらぐ灯り。停留中の一軒だけ明るく
+  // 提灯：ゆらぐ灯り（町屋は停留ではなくなったので、一軒だけ明るくする気配りは畳んだ）
   houseGroups.forEach((g, i) => {
     const u = g.userData;
     const flick = 0.82 + Math.sin(elapsed * 3.1 + i * 1.7) * 0.09
                        + Math.sin(elapsed * 7.9 + i * 3.3) * 0.05;
-    const focus = (i === idx && phase === 'dwell') ? 1.45 : 1.0;
-    u.halo.material.opacity = 0.5 * flick * focus;
-    u.pool.material.opacity = 0.20 * flick * focus;
+    u.halo.material.opacity = 0.5 * flick;
+    u.pool.material.opacity = 0.20 * flick;
     u.lantern.scale.set(1, 1.28 + Math.sin(elapsed * 2.2 + i) * 0.015, 1);
     // 暖簾が風に揺れる
     u.noren.forEach((p, k) => {
@@ -8037,7 +8062,7 @@ function update(dt){
 
 /* ============================================================
    10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
-   ?tour=1 を付ければ従来どおり壱の町屋から自動で巡る（案内用に残す）
+   ?tour=1 を付ければ壱の天龍寺から名所を自動で巡る（案内用に残す）
    ============================================================ */
 /* 池の北縁（方丈の前庭）の西寄りに立ち、南をのぞむ。
    塔の舞台がほぼど真ん中、月が右上、川端の茶店の傘が中央下、竹林が左手に
@@ -8047,7 +8072,7 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
   camera.lookAt(curTgt);
-  idx = NH;                       // 点列は「捌 天龍寺」を灯しておく
+  idx = 0;                        // 点列は「壱 天龍寺」を灯しておく
   setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
   paintDots();
   const subEl = document.querySelector('.t-sub');
@@ -8160,7 +8185,7 @@ window.__machiya = {
       enterHref: elEnt.getAttribute('href')
     };
   },
-  /* 停留中の対象が本当に画面の中に写っているか（町屋は看板・暖簾・提灯、名所は橋・峰・舟を投影） */
+  /* 停留中の対象が本当に画面の中に写っているか（名所の橋・峰・舟・池を投影） */
   aim: function(){
     const v = new THREE.Vector3();
     const proj = o => {
@@ -8174,31 +8199,17 @@ window.__machiya = {
         dist: +dist.toFixed(2)
       };
     };
-    if (idx >= NH){
-      return {
-        idx: idx, name: TOUR[idx].name,
-        bridge : proj(new THREE.Vector3(0, deckY(0.5), (BRIDGE_Z0 + BRIDGE_Z1) / 2)),
-        peak   : proj(new THREE.Vector3(MTS[0].cx, MTS[0].r * MTS[0].sy, MTS[0].cz + MTS[0].r * MTS[0].sz * 0.5)),
-        kagari : proj(boats[0].position),
-        touro  : proj(touros[2].g.position),
-        pond   : proj(new THREE.Vector3(tenryuji.pond.x, 0.05, tenryuji.pond.z)),
-        hojo   : proj(new THREE.Vector3(13.4, 2.0, -61.5)),
-        nagashi: nagashiTouro.length ? proj(nagashiTouro[0].position) : null,
-        walker : walkers.length ? proj(walkers[0].position) : null
-      };
-    }
-    const g = houseGroups[idx];
-    g.updateMatrixWorld(true);
-    const parts = {
-      sign   : g.userData.sign,
-      noren  : g.userData.norenRoot,
-      lantern: g.userData.lantern
+    return {
+      idx: idx, name: TOUR[idx].name,
+      bridge : proj(new THREE.Vector3(0, deckY(0.5), (BRIDGE_Z0 + BRIDGE_Z1) / 2)),
+      peak   : proj(new THREE.Vector3(MTS[0].cx, MTS[0].r * MTS[0].sy, MTS[0].cz + MTS[0].r * MTS[0].sz * 0.5)),
+      kagari : proj(boats[0].position),
+      touro  : proj(touros[2].g.position),
+      pond   : proj(new THREE.Vector3(tenryuji.pond.x, 0.05, tenryuji.pond.z)),
+      hojo   : proj(new THREE.Vector3(13.4, 2.0, -61.5)),
+      nagashi: nagashiTouro.length ? proj(nagashiTouro[0].position) : null,
+      walker : walkers.length ? proj(walkers[0].position) : null
     };
-    const out = { idx: idx, name: HOUSES[idx].name };
-    Object.keys(parts).forEach(k => {
-      out[k] = parts[k] ? proj(parts[k]) : null;
-    });
-    return out;
   },
   /* 画面中央から光線を飛ばし、狙った町屋に当たるか */
   centerHit: function(){
