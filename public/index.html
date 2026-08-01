@@ -356,7 +356,7 @@
   </div>
 </div>
 
-<div class="hint">← → で天龍寺から塔の舞台までめぐる　／　橋や山をクリックでも選べます</div>
+<div class="hint">← → で大覚寺から塔の舞台までめぐる　／　名所をクリックでも選べます</div>
 
 <div class="kaji">
   <button id="btn-prev" aria-label="前の町屋へ">◀</button>
@@ -453,26 +453,38 @@ const HOUSES = DATA.systems.filter(s => s.machiya).slice(0, 7).map((s, i) => ({
 }));
 
 /* 通りを抜けた先の名所（散策の停留所）。view:true は町屋ではなく景色。
-   巡りは名所のみの五停留 ―― 町屋はシステムの入り口ではなくなり、景色として残る。
-   ku は歳時記（haiku.json）の詠み場番号。十二停留のころの番号をそのまま保つ */
+   巡りは名所のみ、道順どおり北の大覚寺から塔の舞台までの八停留。
+   ku は歳時記（haiku.json）の詠み場の名。十二停留のころの番号と、増補の三所 */
 const SPOTS = [
-  { kanji:'壱', ku:'捌', view:true, name:'天龍寺',
+  { kanji:'壱', ku:'大覚寺', view:true, name:'大覚寺',
+    desc:'嵯峨御所とよばれた門跡寺院。五大堂の観月台から大沢池をのぞめば、龍頭鷁首の舟がうかび、庭湖石と島々に月あかりがやどる',
+    tags:['大沢池','観月台','龍頭鷁首'],
+    pos:[-2.9, 2.07, 28.0], tgt:[-11.5, 1.3, 31.3] },
+  { kanji:'弐', ku:'野宮', view:true, name:'野宮神社',
+    desc:'竹の路地の奥、皮つきの黒木鳥居と小柴垣にかこまれた斎王ゆかりの宮。絨毯の苔が月に濡れ、お亀石を撫でれば願いが叶うと伝わる',
+    tags:['黒木鳥居','小柴垣','お亀石'],
+    pos:[9.2, 1.62, -42.0], tgt:[18.6, 2.0, -40.6] },
+  { kanji:'参', ku:'化野', view:true, name:'愛宕念仏寺出張所',
+    desc:'古い仁王門をくぐると、羅漢の群れが月の下にならぶ石の野。青白い供え灯のあいだを鬼火がただよい、参道の先に本堂の灯だけが暖かい',
+    tags:['千二百羅漢','千灯供養','鬼火'],
+    pos:[-11.0, 1.62, -62.0], tgt:[-25.5, 1.8, -67.5] },
+  { kanji:'肆', ku:'捌', view:true, name:'天龍寺',
     desc:'竹の小径のなかほど、山門をくぐると曹源池のほとり。池面に月と方丈の灯がゆれ、庭は川向こうの嵐山を借りて静かに暮れている',
     tags:['曹源池庭園','借景の嵐山','夢窓疎石'],
     pos:[9.3, 1.62, -63.0], tgt:[26, 4.2, -85] },
-  { kanji:'弐', ku:'玖', view:true, name:'桂川のほとり',
+  { kanji:'伍', ku:'玖', view:true, name:'桂川のほとり',
     desc:'町並みが尽き、竹の小径を抜けると、ふいに川端へ出る。月あかりが水面にゆれ、夏の宵は鵜飼の篝火が川面をわたる',
     tags:['竹林の小径','桂川','鵜飼の篝火'],
     pos:[1.7, 1.62, -80.5], tgt:[3, 1.3, -103] },
-  { kanji:'参', ku:'拾', view:true, name:'渡月橋',
+  { kanji:'陸', ku:'拾', view:true, name:'渡月橋',
     desc:'桂川にかかる木の欄干の橋。「くまなき月の渡るに似る」――月が橋を渡るようだと詠まれて、この名が付いたと伝わる',
     tags:['渡月橋','月の名の橋'],
     pos:[0, 2.88, -105], tgt:[26, 6, -140] },
-  { kanji:'肆', ku:'拾壱', view:true, name:'嵐山',
+  { kanji:'漆', ku:'拾壱', view:true, name:'嵐山',
     desc:'橋を渡りきって山を仰ぐ。中腹に宿の灯がぽつり、ぽつり。山影と川音のなか、来た道の提灯を振り返る',
     tags:['嵐山','宿の灯'],
     pos:[2.2, 1.62, -124.8], tgt:[38, 20, -157] },
-  { kanji:'伍', ku:'拾弐', view:true, name:'塔の舞台',
+  { kanji:'捌', ku:'拾弐', view:true, name:'塔の舞台',
     desc:'石段をのぼると、塔のたもとの見晴らし台。渡月橋と月の道、来た道の提灯の列が眼下にひらける',
     tags:['法輪寺の見立て','見晴らし'],
     pos:[-13, 6.82, -134.5], tgt:[2, 0.5, -104] }
@@ -4202,6 +4214,15 @@ const adashino = (function(){
   kakoiHa.instanceMatrix.needsUpdate = true;
   g.add(kakoiHa);
 
+  // 遠くの停留（塔の舞台）から野を指したクリックも拾えるよう、見えない当たり箱を
+  // 野いっぱいに立てる（材質 visible:false＝描画0で raycast だけ受ける。舟・月と同じ手）
+  const hitBox = new THREE.Mesh(
+    new THREE.BoxGeometry(15.7, 6.5, 18.7),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hitBox.position.set(-16.45, 3.25, -66.85);
+  g.add(hitBox);
+
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   // 今回足した群れ（仁王・本堂・三宝の鐘）は境界球で包んで、野を向いていないときは描かない。
   // 羅漢と囲いの藪は本番で検証済みの見え方をそのまま残す（常時描画のまま）
@@ -6308,11 +6329,15 @@ function updateCamera(dt){
     const e = smooth(t);
     // 通りの真ん中をふくらんで進む（ベジェ）。長い戻りは屋根の上、
     // 塔の舞台（高所）への出入りは石段の上を高めに飛んで、丘に潜らない。
-    // 天龍寺は土塀と竹の内側＝出入りは竹の梢を越えて飛び、境内を上から見せる
+    // 塀と竹に囲われた一角（天龍寺・野宮・化野・大覚寺）への出入りは梢を越えて飛ぶ
     const span = Math.abs(fromPos.z - s.pos.z);
     const hi = Math.max(fromPos.y, s.pos.y) > 5;
-    const tera = p => p.x > 7.3 && p.z > -77 && p.z < -58;
-    const arcY = span > 60 ? 12 : (hi ? 11 : ((tera(fromPos) || tera(s.pos)) ? 13.5 : 1.6));
+    const kakoi = p =>
+      (p.x >  7.3 && p.z > -77 && p.z < -58) ||   // 天龍寺の境内
+      (p.x >  7.3 && p.z > -48 && p.z < -33) ||   // 野宮の社叢
+      (p.x < -8.0 && p.z > -77 && p.z < -57) ||   // 化野の囲いの内
+      (p.z > 17.5);                                // 大覚寺と大沢池
+    const arcY = span > 60 ? 12 : (hi ? 11 : ((kakoi(fromPos) || kakoi(s.pos)) ? 13.5 : 1.6));
     ctrl.set(0, arcY, (fromPos.z + s.pos.z) / 2);
     const u = 1 - e;
     camera.position.set(
@@ -6990,7 +7015,8 @@ window.addEventListener('keyup', e => {
 /* 町屋・川・橋・山をクリックして選ぶ（レール時）／タップで歩き・なぞって見回す（散歩時） */
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
-const clickRoots = [tenryuji.group, unryu.group, river, bridgeGroup, mtGroup];
+const clickRoots = [daikakuji.group, nonomiya.group, nonomiya.hyouG, adashino.group,
+                    tenryuji.group, unryu.group, river, bridgeGroup, mtGroup];
 function setNdc(cx, cy){
   const r = renderer.domElement.getBoundingClientRect();
   ndc.x =  ((cx - r.left) / r.width)  * 2 - 1;
@@ -7001,11 +7027,16 @@ function railPick(){
   if (!hit) return -1;
   let o = hit.object, target = -1;
   while (o){
-    if (o === tenryuji.group)   { target = 0; break; }
-    if (o === unryu.group)      { target = 0; break; }
-    if (o === river)            { target = 1; break; }
-    if (o === bridgeGroup)      { target = 2; break; }
-    if (o === mtGroup)          { target = 3; break; }
+    // 距離ゲートで隠れている群れは、当たっても選ばれない（見えない寺には飛ばない）
+    if (o === daikakuji.group){ target = daikakuji.group.visible ? 0 : -1; break; }
+    if (o === nonomiya.group) { target = nonomiya.group.visible  ? 1 : -1; break; }
+    if (o === nonomiya.hyouG) { target = 1; break; }
+    if (o === adashino.group) { target = adashino.group.visible  ? 2 : -1; break; }
+    if (o === tenryuji.group) { target = 3; break; }
+    if (o === unryu.group)    { target = 3; break; }
+    if (o === river)          { target = 4; break; }
+    if (o === bridgeGroup)    { target = 5; break; }
+    if (o === mtGroup)        { target = 6; break; }
     o = o.parent;
   }
   return target;
@@ -8062,7 +8093,7 @@ function update(dt){
 
 /* ============================================================
    10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
-   ?tour=1 を付ければ壱の天龍寺から名所を自動で巡る（案内用に残す）
+   ?tour=1 を付ければ壱の大覚寺から名所を自動で巡る（案内用に残す）
    ============================================================ */
 /* 池の北縁（方丈の前庭）の西寄りに立ち、南をのぞむ。
    塔の舞台がほぼど真ん中、月が右上、川端の茶店の傘が中央下、竹林が左手に
@@ -8072,7 +8103,7 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
   camera.lookAt(curTgt);
-  idx = 0;                        // 点列は「壱 天龍寺」を灯しておく
+  idx = 3;                        // 点列は「肆 天龍寺」を灯しておく
   setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
   paintDots();
   const subEl = document.querySelector('.t-sub');
