@@ -2474,6 +2474,13 @@ const butai = (function(){
     transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false }));
   toGlow.scale.set(2.4, 1.7, 1);
   toGlow.position.set(0, 6.8, tiers[0][0] / 2 + 0.3); tou.add(toGlow);
+  // 遠くからでも塔を二度たたいて捌へ来られるよう、見えない当たり箱を塔に重ねる
+  // （材質 visible:false＝描画 0 のまま raycast だけ受ける。化野の野・舟・月と同じ手。
+  //   群れを直になぞらないので、butai のスプライトが raycast に出てこない）
+  const touHit = new THREE.Mesh(new THREE.BoxGeometry(5.9, 9.5, 5.9),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  touHit.position.set(0, 9.25, 0);        // 亀腹の下（y4.5）から相輪の宝珠（y14.0）まで
+  tou.add(touHit);
   tou.position.set(TX, 0, TZ);
   g.add(tou);
 
@@ -2494,7 +2501,8 @@ const butai = (function(){
   });
 
   scene.add(g);
-  return { group: g, halos: halos, glowSprites: [hojuGlow, toGlow], topY: baseY + 2.1 };
+  return { group: g, halos: halos, glowSprites: [hojuGlow, toGlow], topY: baseY + 2.1,
+           touHit: touHit };
 })();
 
 /* ============================================================
@@ -7165,6 +7173,8 @@ window.addEventListener('pointerup', ev => {
   setNdc(ev.clientX, ev.clientY);
   ray.setFromCamera(ndc, camera);
   if (FX.fune && ray.intersectObject(funaasobi.boat, true)[0]){ enterRide(); return; }
+  // 塔は二度たたきの的（下の ㊾ の節）＝一度きりの押しでは歩き出さない
+  if (ray.intersectObject(butai.touHit, false)[0]) return;
   const hit = ray.intersectObjects(houseGroups, true)[0];
   if (hit){
     let o = hit.object;
@@ -7181,7 +7191,8 @@ window.addEventListener('pointerup', ev => {
 });
 
 /* ㊾ 月の都への口 ― 空の三日月をすばやく二度たたくと月面へ、
-   月面では地球を二度たたくと地上へ。なぞり（見回し）は数に入れない */
+   月面では地球を二度たたくと地上へ。なぞり（見回し）は数に入れない。
+   おなじ作法で、丘の上の三重塔を二度たたくと捌「塔の舞台」へ渡る */
 const DBL = { t: -1, x: 0, y: 0, dx: 0, dy: 0 };
 renderer.domElement.addEventListener('pointerdown', ev => {
   DBL.dx = ev.clientX; DBL.dy = ev.clientY;
@@ -7194,11 +7205,14 @@ renderer.domElement.addEventListener('pointerup', ev => {
     DBL.t = -1;
     setNdc(ev.clientX, ev.clientY);
     ray.setFromCamera(ndc, camera);
-    if (!TSUKI.on && TSUKI.phase === 'idle' && FX.tsukiusagi){
-      if (ray.intersectObject(tsukimen.moonHit, false)[0]) enterTsuki();
-    } else if (TSUKI.on){
+    if (TSUKI.on){
       if (ray.intersectObject(tsukimen.earthHit, false)[0]) exitTsuki();
+      return;
     }
+    if (TSUKI.phase !== 'idle') return;          // 月白の幕の間は取り合わない
+    if (FX.tsukiusagi && ray.intersectObject(tsukimen.moonHit, false)[0]){ enterTsuki(); return; }
+    // 捌 塔の舞台 ― 塔を二度たたくと石段の上へ渡る（もう立っているなら動かさない）
+    if (ray.intersectObject(butai.touHit, false)[0] && (walkMode || idx !== 7)) goTo(7, true);
     return;
   }
   DBL.t = now; DBL.x = ev.clientX; DBL.y = ev.clientY;
@@ -7659,8 +7673,10 @@ document.addEventListener('visibilitychange', () => {
    足しても、この一箇所を通るので自動で朝夜に乗る。
    ============================================================ */
 const TOKI = {
-  k: 0,                 // 0=宵 / 1=暁。転換のあいだは途中の値
-  to: 0,                // めざす値
+  // 入口は暁で開ける（下の tokiSky() が起動時に一度塗る）。宵へは野宮に参れば還る。
+  // ここを 0 に戻せば、もとの「宵から始まる町」に戻せる
+  k: 1,                 // 0=宵 / 1=暁。転換のあいだは途中の値
+  to: 1,                // めざす値
   phase: 'idle',        // idle ／ gassho（手を合わせている間）／ utsuri（移ろい）
   t: 0,
   at: null,             // いま祈っている場所
