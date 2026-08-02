@@ -57,33 +57,13 @@
       "machiya": true
     },
     {
-      "id": "gyoseiho",
-      "name": "行政法 統合ポータル",
+      "id": "tkrsys-laws",
+      "name": "法令ガイド",
       "kind": "hou",
-      "url": "https://gyoseiho-guide.vercel.app",
-      "desc": "行政手続法・行政不服審査法・行政事件訴訟法・国家賠償／損失補償 の四法統合",
-      "tags": ["四法統合", "e-Gov"],
+      "url": "https://tkrsys-laws.vercel.app",
+      "desc": "民法・行政法・社会保険法の三法域552条を三段階解説。行政書士・社労士試験対策",
+      "tags": ["三法域統合", "552条", "e-Gov"],
       "icon": "gyosei",
-      "machiya": true
-    },
-    {
-      "id": "minpo",
-      "name": "民法ガイド",
-      "kind": "hou",
-      "url": "https://minpo-guide.vercel.app",
-      "desc": "民法6分野・約200条を三段階解説。行政書士試験対策",
-      "tags": ["200条", "三段解説"],
-      "icon": "minpo",
-      "machiya": true
-    },
-    {
-      "id": "kenkou-hoken",
-      "name": "健康保険法ガイド",
-      "kind": "hou",
-      "url": "https://kenkou-hoken-guide.vercel.app",
-      "desc": "健康保険法 全125条 完全解説。社労士試験対策・実務参照",
-      "tags": ["全125条", "e-Gov"],
-      "icon": "kenkou",
       "machiya": true
     },
     {
@@ -103,7 +83,8 @@
       "url": "https://tkrsys-tools.vercel.app",
       "desc": "心因性発熱をしずめる体験型3Dと、やさしい読み物。ひとり立ちの小さな道具の置き場",
       "tags": ["3D体験", "読み物"],
-      "icon": "tools"
+      "icon": "tools",
+      "machiya": true
     },
     {
       "id": "my-screen",
@@ -112,7 +93,8 @@
       "url": "https://my-screen-theta.vercel.app",
       "desc": "時計・阪急嵐山線の次発・天気・リンク集を、スマホの一枚に",
       "tags": ["スマホ", "個人用"],
-      "icon": "myscreen"
+      "icon": "myscreen",
+      "machiya": true
     }
   ]
 }
