@@ -6203,6 +6203,36 @@ function exitTsukiInstant(){
     TSUKI.saved = null;
   }
 }
+
+/* 塔の二度たたき（下の ㊾ の節）― 月の都と同じ月白の幕で、旅路を経ずに渡る。
+   幕が閉じ切ったところで fn（着地）を呼び、そのまま幕を引く */
+const WARP = { phase: 'idle', t: 0, F: 0.85, fn: null };   // idle / in / out
+function warpTo(fn){
+  if (WARP.phase !== 'idle' || TSUKI.phase !== 'idle') return false;
+  WARP.phase = 'in'; WARP.t = 0; WARP.fn = fn;
+  return true;
+}
+function cancelWarp(){          // 幕の途中で別の移動が入ったら行き先を取り下げ、幕だけ引く
+  if (WARP.phase !== 'in') return;
+  WARP.fn = null;
+  WARP.t = Math.max(0, WARP.F - WARP.t);   // いまの白さのまま、引きの続きから
+  WARP.phase = 'out';
+}
+function updateWarp(dt){
+  if (WARP.phase === 'in'){
+    WARP.t += dt;
+    tsukifadeEl.style.opacity = Math.min(1, WARP.t / WARP.F);
+    if (WARP.t >= WARP.F){
+      const fn = WARP.fn;
+      WARP.fn = null; WARP.phase = 'out'; WARP.t = 0;
+      if (fn) fn();
+    }
+  } else if (WARP.phase === 'out'){
+    WARP.t += dt;
+    tsukifadeEl.style.opacity = Math.max(0, 1 - WARP.t / WARP.F);
+    if (WARP.t >= WARP.F){ WARP.phase = 'idle'; WARP.t = 0; }
+  }
+}
 function updateTsuki(dt){
   const F = 0.85;                                 // 幕のひと呼吸
   if (TSUKI.phase === 'in1'){
@@ -6366,8 +6396,9 @@ const dollyDir = new THREE.Vector3();
 
 const smooth = x => x * x * (3 - 2 * x);
 
-function goTo(i, byUser){
+function goTo(i, byUser, snap){
   if (TSUKI.phase !== 'idle') exitTsukiInstant();   // 月の都からは幕を待たずに帰って合流
+  cancelWarp();                  // 幕のワープ待ちがあれば行き先を取り下げる（幕の下の着地では素通り）
   if (rideActive()){             // 点列などから呼ばれたら舟を下りてレールへ
     setRideOff('rail');
     hintEl.textContent = HINT_RAIL;
@@ -6384,6 +6415,14 @@ function goTo(i, byUser){
   hideFuda();
   paintDots();
   if (byUser) auto = false, syncAutoBtn();
+  if (snap){                     // 月白の幕の下で着地＝旅路（travel）を経ずにその場から停留に立つ
+    const s = stops[idx];
+    camera.position.copy(s.pos);
+    curTgt.copy(s.tgt);
+    camera.lookAt(curTgt);
+    phase = 'dwell'; dwellT = 0;
+    showFuda();
+  }
 }
 
 function updateCamera(dt){
@@ -7165,6 +7204,7 @@ window.addEventListener('pointermove', ev => {
 });
 window.addEventListener('pointerup', ev => {
   if (RIDE.on || TSUKI.on){ pDown = null; pDrag = false; return; }
+  if (WARP.phase !== 'idle'){ pDown = null; pDrag = false; return; }   // 幕の間は歩かせない
   if (!walkMode || !pDown) return;
   const wasDrag = pDrag;
   pDown = null; pDrag = false;
@@ -7192,7 +7232,7 @@ window.addEventListener('pointerup', ev => {
 
 /* ㊾ 月の都への口 ― 空の三日月をすばやく二度たたくと月面へ、
    月面では地球を二度たたくと地上へ。なぞり（見回し）は数に入れない。
-   おなじ作法で、丘の上の三重塔を二度たたくと捌「塔の舞台」へ渡る */
+   おなじ作法で、丘の上の三重塔を二度たたくと、月白の幕で捌「塔の舞台」へ渡る */
 const DBL = { t: -1, x: 0, y: 0, dx: 0, dy: 0 };
 renderer.domElement.addEventListener('pointerdown', ev => {
   DBL.dx = ev.clientX; DBL.dy = ev.clientY;
@@ -7209,10 +7249,11 @@ renderer.domElement.addEventListener('pointerup', ev => {
       if (ray.intersectObject(tsukimen.earthHit, false)[0]) exitTsuki();
       return;
     }
-    if (TSUKI.phase !== 'idle') return;          // 月白の幕の間は取り合わない
+    if (TSUKI.phase !== 'idle' || WARP.phase !== 'idle') return; // 月白の幕の間は取り合わない
     if (FX.tsukiusagi && ray.intersectObject(tsukimen.moonHit, false)[0]){ enterTsuki(); return; }
-    // 捌 塔の舞台 ― 塔を二度たたくと石段の上へ渡る（もう立っているなら動かさない）
-    if (ray.intersectObject(butai.touHit, false)[0] && (walkMode || idx !== 7)) goTo(7, true);
+    // 捌 塔の舞台 ― 塔を二度たたくと、月の都と同じ幕の転換で石段の上へ（もう立っているなら動かさない）
+    if (ray.intersectObject(butai.touHit, false)[0] && (walkMode || idx !== 7))
+      warpTo(() => goTo(7, true, true));
     return;
   }
   DBL.t = now; DBL.x = ev.clientX; DBL.y = ev.clientY;
@@ -7906,6 +7947,7 @@ function update(dt){
   else if (RIDE.on || RIDE.entering >= 0) updateRide(dt);
   else if (walkMode) updateWalk(dt);
   else updateCamera(dt);
+  if (WARP.phase !== 'idle') updateWarp(dt);              // 塔の二度たたきの幕（景色は下で生きたまま）
 
   // 提灯：ゆらぐ灯り（町屋は停留ではなくなったので、一軒だけ明るくする気配りは畳んだ）
   houseGroups.forEach((g, i) => {
@@ -8665,6 +8707,16 @@ window.__machiya = {
                yaw: +TSUKI.yaw.toFixed(3), pitch: +TSUKI.pitch.toFixed(3),
                cam: camera.position.toArray().map(n => +n.toFixed(2)),
                chiBtn: chiBtn.style.display !== 'none' };
+    }
+  },
+  /* 塔の二度たたきの検証口：set() で幕ごと呼び出し、state() で幕の現況（幕は step で送る） */
+  warp: {
+    set: function(){ return warpTo(function(){ goTo(7, true, true); }); },
+    state: function(){
+      return { phase: WARP.phase, t: +WARP.t.toFixed(2),
+               fade: +parseFloat(tsukifadeEl.style.opacity || 0).toFixed(2),
+               idx: idx, camPhase: phase,
+               cam: camera.position.toArray().map(n => +n.toFixed(2)) };
     }
   },
   /* 嵯峨野の北の検証口：群れが出ているか、月の道が本当に月の方位へ寝ているか。
