@@ -537,6 +537,7 @@ const FX = {
   osawa       : true,   // ㊶ 大沢池と五大堂の観月台（日本最古の庭池。菊ヶ島と天神島・名古曽の滝跡・龍頭鷁首の舟）
   rakushisha  : true,   // ㊷ 落柿舎（田の向こうの藁葺きの庵。壁に蓑と笠、秋には柿が色づく。近づくと去来の句）
   tahoto      : true,   // ㊸ 小倉山の中腹の多宝塔の灯（常寂光寺の見立て）
+  gojunoto    : true,   // ㊾' 書き割りの五重塔への隠しの口（二度たたきで渡る）
   sennichi    : false,  // ㊹ 愛宕山の千日詣り（文月晦日〜葉月朔日の宵にだけ自動点灯。下で日付判定）
   toriigata   : false,  // ㊺ 鳥居形の送り火と広沢の池の灯篭流し（葉月十六日の宵。下で日付判定）
   jinrikisha  : true,   // ㊻ 渡月橋の北詰の人力車（客待ちの停め置き）
@@ -5504,6 +5505,88 @@ const tahoto = (function(){
   return { group: g, hi: hi, mado: mado, y: +TY.toFixed(2) };
 })();
 
+/* ㊾' 五重塔のもと ― 東山の書き割りに描かれた五重塔を二度たたくと渡れる隠しの間。
+   月の都と同じ作法：ふだんは非表示（描画+0）、月白の幕で転換、なぞって見回し、
+   帰りは元の場所・元のモードへ。実物の塔は東の峰（送り火の山・cx-40,cz-172,r48）の
+   山肌に建てる＝立ち位置は峰の北斜面の高み。北を向けば渡月橋と町の灯を対岸から
+   見返し、振り返れば塔の影が書き割りの淡い稜線を背に立ち上がる */
+const goju = (function(){
+  const g = new THREE.Group();
+  // 東の峰（節㉙ mine の東の峰と同じ式）の山肌の高さ
+  const pkY = (x, z) => {
+    const q = 1 - Math.pow((x + 40) / 48, 2) - Math.pow((z + 172) / 28.8, 2);
+    return 21.12 * Math.sqrt(Math.max(0, q));
+  };
+  // 実物の五重塔 ― 三重塔（5f）と同じ書法で五層に。訪ねた人だけが見上げる
+  // （立ち位置から約13.5m＝五層が一望でき、初層の灯も届く間合い）
+  const TX = -67.0, TZ2 = -171.0;
+  const tou = new THREE.Group();
+  const kidan = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.9, 8.4),
+    new THREE.MeshLambertMaterial({ color: 0x232630 }));
+  kidan.position.y = 0.45; tou.add(kidan);
+  let baseY = 0.9;
+  const tiers = [
+    [6.6, 2.5, 5.4, 1.35], [5.8, 2.2, 4.8, 1.25], [5.0, 2.0, 4.2, 1.15],
+    [4.2, 1.85, 3.6, 1.05], [3.4, 1.7, 3.1, 1.0]
+  ];
+  tiers.forEach(t => {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(t[0], t[1], t[0]), MAT.wallDk);
+    body.position.y = baseY + t[1] / 2; tou.add(body);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(t[2], t[3], 4), MAT.roof);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = baseY + t[1] - 0.12 + t[3] / 2; tou.add(roof);
+    baseY += t[1] + t[3] * 0.52;
+  });
+  // 相輪
+  const sorinM = new THREE.MeshLambertMaterial({ color: 0x6a5a30, emissive: 0x0e0a04 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.6, 6), sorinM);
+  pole.position.y = baseY + 1.6; tou.add(pole);
+  for (let i = 0; i < 7; i++){
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.5 - i * 0.05, 0.5 - i * 0.05, 0.08, 8), sorinM);
+    ring.position.y = baseY + 0.7 + i * 0.34; tou.add(ring);
+  }
+  const hoju = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), sorinM);
+  hoju.position.y = baseY + 3.5; tou.add(hoju);
+  // 初層のあかり（北面＝立ち位置と町の側。板は +z 向きのままでよい）
+  const tobira = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.5), MAT.dark);
+  tobira.position.set(0, 0.9 + 0.95, 6.6 / 2 + 0.01); tou.add(tobira);
+  [-1.6, 1.6].forEach(x => {
+    const mado = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.72), MAT.inner);
+    mado.position.set(x, 0.9 + 1.05, 6.6 / 2 + 0.01); tou.add(mado);
+  });
+  const toGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow,
+    transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+  toGlow.scale.set(3.4, 2.2, 1);
+  toGlow.position.set(0, 2.1, 6.6 / 2 + 0.4); tou.add(toGlow);
+  const touY = pkY(TX, TZ2) - 0.4;                  // 山肌に少し沈めて据える
+  tou.position.set(TX, touY, TZ2);
+  g.add(tou);
+  // 立ち位置わきの灯篭ひとつ（舞台の隅の灯篭と同じ書法）
+  const stone2 = new THREE.MeshLambertMaterial({ color: 0x3a3f4c });
+  const tY = pkY(-57.0, -162.2);
+  const sao = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), stone2);
+  const hib = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.26, 0.3), MAT.inner);
+  const kasa = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.42), stone2);
+  sao.position.set(-57.0, tY + 0.26, -162.2);
+  hib.position.set(-57.0, tY + 0.65, -162.2);
+  kasa.position.set(-57.0, tY + 0.83, -162.2);
+  g.add(sao, hib, kasa);
+  // 帰りの的＝実物の塔をすっぽり包む見えない箱
+  const kaeriHit = new THREE.Mesh(new THREE.BoxGeometry(9.5, 27, 9.5),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  kaeriHit.position.set(TX, touY + 13, TZ2);
+  g.add(kaeriHit);
+  g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
+  g.visible = false;                                // ふだんは描かない（月面ステージと同じ）
+  scene.add(g);
+  // 入りの的＝書き割りに描かれた五重塔（板 440×77 at (0,20,-195)・テクスチャ 2048×360 の bx718 帯）
+  const eHit = new THREE.Mesh(new THREE.BoxGeometry(27, 45, 4),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  eHit.position.set(-65.7, 36.0, -193.5);
+  scene.add(eHit);
+  return { group: g, gojuHit: eHit, kaeriHit: kaeriHit, tou: tou };
+})();
+
 /* ㊹ 愛宕山の千日詣り ― 文月晦日の宵、山肌をつづら折りに登る提灯の列。
    千日分の御利益を頂きに夜通し愛宕さんへ登る夏の行事。列は頂の
    火伏の常夜灯（㉙）へ向かって、消えては麓からまた続く。
@@ -6233,6 +6316,89 @@ function updateWarp(dt){
     if (WARP.t >= WARP.F){ WARP.phase = 'idle'; WARP.t = 0; }
   }
 }
+
+/* ㊾' 五重塔のもと ― 書き割りの五重塔の中へ渡る隠しの間（造作は上の goju）。
+   月の都と同じ作法：月白の幕で渡り、なぞって見回し、帰りは元の場所・元のモードへ。
+   世界はそのまま（同じ夜空の下）なので、保存するのは居場所と歩き/巡りの別だけ。
+   峰の高みは霧の上＝滞在中だけ霧をうすめ、帰りに戻す */
+const GOJU = {
+  on: false, yaw: 0, pitch: 0,
+  saved: null, fog0: -1,
+  cam: { pos: new THREE.Vector3(-58.5, 19.1, -160.5),
+         tgt: new THREE.Vector3(0.0, 3.0, -102.0) }
+};
+function enterGoju(){
+  if (GOJU.on || TSUKI.phase !== 'idle' || WARP.phase !== 'idle') return false;
+  if (TOKI.phase !== 'idle') return false;            // 明けている・暮れている最中は渡らない（㊿）
+  if (!walkMode && !rideActive() && phase !== 'dwell') return false;   // 飛行の途中からは行かない
+  return warpTo(gojuArrive);
+}
+function gojuArrive(){
+  if (rideActive()) setRideOff('walk');               // 舟からは下りて渡る（月と同じ）
+  if (!walkMode && phase !== 'dwell') return;         // 幕の間に旅路へ入っていたら見送る
+  GOJU.saved = {
+    walk: walkMode, auto: auto,
+    pos: camera.position.clone(), tgt: curTgt.clone(),
+    hint: hintEl.textContent
+  };
+  auto = false; syncAutoBtn();
+  if (walkMode) setWalk(false);
+  GOJU.on = true; GOJU.yaw = 0; GOJU.pitch = 0;
+  GOJU.fog0 = scene.fog.density;
+  scene.fog.density = GOJU.fog0 * 0.30;               // 峰の空気は澄んでいる＝対岸の町まで見通す
+  goju.group.visible = true;
+  camera.position.copy(GOJU.cam.pos);
+  curTgt.copy(GOJU.cam.tgt);
+  camera.lookAt(curTgt);
+  hideFuda();
+  document.body.classList.add('tsuki-on');            // 操舵バーの畳み方は月と同じ
+  chiBtn.style.display = ''; chiBtn.textContent = '町へ帰る';
+  hintEl.textContent = '五重塔のもと　―　なぞって見回す（振り返れば塔）／塔を二度たたく・「町へ帰る」で元の場所へ';
+  layoutBottom();
+}
+function gojuWorldBack(){                             // 世界側の後片付け（帰り道の共通部）
+  GOJU.on = false;
+  goju.group.visible = false;
+  if (GOJU.fog0 >= 0){ scene.fog.density = GOJU.fog0; GOJU.fog0 = -1; }
+  document.body.classList.remove('tsuki-on');
+  chiBtn.style.display = 'none'; chiBtn.textContent = '地へ帰る';
+  layoutBottom();
+}
+function gojuLeaveRestore(){
+  if (!GOJU.saved) return;
+  const sv = GOJU.saved;
+  GOJU.saved = null;
+  gojuWorldBack();
+  camera.position.copy(sv.pos);
+  curTgt.copy(sv.tgt);
+  camera.lookAt(curTgt);
+  hintEl.textContent = sv.hint;
+  if (sv.walk){ setWalk(true); }
+  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; syncAutoBtn(); showFuda(); }
+}
+function exitGoju(){
+  if (!GOJU.on || WARP.phase !== 'idle' || TSUKI.phase !== 'idle') return false;
+  return warpTo(gojuLeaveRestore);
+}
+/* 点列・←→などから割り込まれたら、幕を待たずその高みから旅路に出る */
+function exitGojuInstant(){
+  if (!GOJU.on) return;
+  GOJU.saved = null;
+  gojuWorldBack();
+}
+function updateGoju(dt){
+  const cp = GOJU.cam.pos, ct = GOJU.cam.tgt;
+  camera.position.set(cp.x, cp.y + Math.sin(elapsed * 0.7) * 0.035, cp.z);
+  const bx = ct.x - cp.x, by = ct.y - cp.y, bz = ct.z - cp.z;
+  const yaw0 = Math.atan2(bx, bz), pit0 = Math.atan2(by, Math.hypot(bx, bz));
+  const yw = yaw0 + GOJU.yaw, pt = pit0 + GOJU.pitch;
+  curTgt.set(
+    camera.position.x + Math.sin(yw) * Math.cos(pt) * 10,
+    camera.position.y + Math.sin(pt) * 10,
+    camera.position.z + Math.cos(yw) * Math.cos(pt) * 10
+  );
+  camera.lookAt(curTgt);
+}
 function updateTsuki(dt){
   const F = 0.85;                                 // 幕のひと呼吸
   if (TSUKI.phase === 'in1'){
@@ -6396,9 +6562,10 @@ const dollyDir = new THREE.Vector3();
 
 const smooth = x => x * x * (3 - 2 * x);
 
-function goTo(i, byUser, snap){
+function goTo(i, byUser){
   if (TSUKI.phase !== 'idle') exitTsukiInstant();   // 月の都からは幕を待たずに帰って合流
-  cancelWarp();                  // 幕のワープ待ちがあれば行き先を取り下げる（幕の下の着地では素通り）
+  exitGojuInstant();             // 五重塔のもとからは、その高みから旅路に出る
+  cancelWarp();                  // 幕のワープ待ちがあれば行き先を取り下げる
   if (rideActive()){             // 点列などから呼ばれたら舟を下りてレールへ
     setRideOff('rail');
     hintEl.textContent = HINT_RAIL;
@@ -6415,14 +6582,6 @@ function goTo(i, byUser, snap){
   hideFuda();
   paintDots();
   if (byUser) auto = false, syncAutoBtn();
-  if (snap){                     // 月白の幕の下で着地＝旅路（travel）を経ずにその場から停留に立つ
-    const s = stops[idx];
-    camera.position.copy(s.pos);
-    curTgt.copy(s.tgt);
-    camera.lookAt(curTgt);
-    phase = 'dwell'; dwellT = 0;
-    showFuda();
-  }
 }
 
 function updateCamera(dt){
@@ -6997,6 +7156,7 @@ function kuPick(){
   if (!HAIKU || !HAIKU.ku) return null;
   const toki = HAIKU.toki || {};
   if (TSUKI.on && toki.tsuki)      return { key:'tsuki',   ku:toki.tsuki,   ba:toki.tsuki.ba };
+  if (GOJU.on && toki.goju)        return { key:'goju',    ku:toki.goju,    ba:toki.goju.ba };
   if (rideActive() && toki.fune)   return { key:'fune',    ku:toki.fune,    ba:toki.fune.ba };
   if (FX.okuribi && toki.okuribi)  return { key:'okuribi', ku:toki.okuribi, ba:toki.okuribi.ba };
   // 落柿舎のそば＝去来の一句（歩いて庵を訪ねた人だけに掛かる）
@@ -7148,7 +7308,8 @@ let pDown = null, pDrag = false;
 renderer.domElement.addEventListener('pointerdown', ev => {
   if (RIDE.entering >= 0) return;                  // 乗り込みの間だけ手を離す
   if (TSUKI.phase !== 'idle' && !TSUKI.on) return; // 月白の幕の間も手を離す
-  if (RIDE.on || TSUKI.on){                        // 舟上・月面＝なぞって見回すだけ
+  if (WARP.phase !== 'idle' && !GOJU.on) return;   // 五重塔ゆきの幕の間も手を離す
+  if (RIDE.on || TSUKI.on || GOJU.on){             // 舟上・月面・塔のもと＝なぞって見回すだけ
     pDown = { x: ev.clientX, y: ev.clientY };
     pDrag = false;
     return;
@@ -7181,13 +7342,17 @@ renderer.domElement.addEventListener('pointerdown', ev => {
   pDrag = false;
 });
 window.addEventListener('pointermove', ev => {
-  if (!pDown || (!walkMode && !RIDE.on && !TSUKI.on)) return;
+  if (!pDown || (!walkMode && !RIDE.on && !TSUKI.on && !GOJU.on)) return;
   const dx = ev.clientX - pDown.x, dy = ev.clientY - pDown.y;
   if (!pDrag && Math.hypot(dx, dy) > 7) pDrag = true;
   if (pDrag){
     if (TSUKI.on){
       TSUKI.yaw   = Math.max(-1.9, Math.min(1.9, TSUKI.yaw - dx * 0.0042));
       TSUKI.pitch = Math.max(-0.45, Math.min(0.62, TSUKI.pitch - dy * 0.0032));
+    } else if (GOJU.on){
+      // 塔のもと＝真後ろの塔（Δyaw約±3.1）まで振り返れ、宝珠まで見上げられる上限
+      GOJU.yaw   = Math.max(-3.4, Math.min(3.4, GOJU.yaw - dx * 0.0042));
+      GOJU.pitch = Math.max(-0.5, Math.min(1.45, GOJU.pitch - dy * 0.0032));
     } else if (RIDE.on){
       RIDE.yaw   = Math.max(-2.4, Math.min(2.4, RIDE.yaw - dx * 0.0042));
       RIDE.pitch = Math.max(-0.5, Math.min(0.5, RIDE.pitch - dy * 0.0032));
@@ -7203,7 +7368,7 @@ window.addEventListener('pointermove', ev => {
   }
 });
 window.addEventListener('pointerup', ev => {
-  if (RIDE.on || TSUKI.on){ pDown = null; pDrag = false; return; }
+  if (RIDE.on || TSUKI.on || GOJU.on){ pDown = null; pDrag = false; return; }
   if (WARP.phase !== 'idle'){ pDown = null; pDrag = false; return; }   // 幕の間は歩かせない
   if (!walkMode || !pDown) return;
   const wasDrag = pDrag;
@@ -7215,6 +7380,7 @@ window.addEventListener('pointerup', ev => {
   if (FX.fune && ray.intersectObject(funaasobi.boat, true)[0]){ enterRide(); return; }
   // 塔は二度たたきの的（下の ㊾ の節）＝一度きりの押しでは歩き出さない
   if (ray.intersectObject(butai.touHit, false)[0]) return;
+  if (FX.gojunoto && ray.intersectObject(goju.gojuHit, false)[0]) return;   // 書き割りの五重塔も同じ
   const hit = ray.intersectObjects(houseGroups, true)[0];
   if (hit){
     let o = hit.object;
@@ -7232,7 +7398,8 @@ window.addEventListener('pointerup', ev => {
 
 /* ㊾ 月の都への口 ― 空の三日月をすばやく二度たたくと月面へ、
    月面では地球を二度たたくと地上へ。なぞり（見回し）は数に入れない。
-   おなじ作法で、丘の上の三重塔を二度たたくと、月白の幕で捌「塔の舞台」へ渡る */
+   おなじ作法で、丘の上の三重塔を二度たたくと捌「塔の舞台」へ渡り、
+   東山の書き割りに描かれた五重塔を二度たたくと月白の幕でそのもとへ渡る（隠しの口） */
 const DBL = { t: -1, x: 0, y: 0, dx: 0, dy: 0 };
 renderer.domElement.addEventListener('pointerdown', ev => {
   DBL.dx = ev.clientX; DBL.dy = ev.clientY;
@@ -7249,16 +7416,22 @@ renderer.domElement.addEventListener('pointerup', ev => {
       if (ray.intersectObject(tsukimen.earthHit, false)[0]) exitTsuki();
       return;
     }
+    if (GOJU.on){
+      // 塔のもとでは、実物の塔をもう一度たたくと帰る（「町へ帰る」と同じ）
+      if (ray.intersectObject(goju.kaeriHit, false)[0]) exitGoju();
+      return;
+    }
     if (TSUKI.phase !== 'idle' || WARP.phase !== 'idle') return; // 月白の幕の間は取り合わない
     if (FX.tsukiusagi && ray.intersectObject(tsukimen.moonHit, false)[0]){ enterTsuki(); return; }
-    // 捌 塔の舞台 ― 塔を二度たたくと、月の都と同じ幕の転換で石段の上へ（もう立っているなら動かさない）
-    if (ray.intersectObject(butai.touHit, false)[0] && (walkMode || idx !== 7))
-      warpTo(() => goTo(7, true, true));
+    // 捌 塔の舞台 ― 塔を二度たたくと石段の上へ渡る（もう立っているなら動かさない）
+    if (ray.intersectObject(butai.touHit, false)[0] && (walkMode || idx !== 7)){ goTo(7, true); return; }
+    // ㊾' 書き割りの五重塔 ― 遠くの絵の塔を二度たたくと、月白の幕でそのもとへ渡る（隠しの口）
+    if (FX.gojunoto && ray.intersectObject(goju.gojuHit, false)[0]) enterGoju();
     return;
   }
   DBL.t = now; DBL.x = ev.clientX; DBL.y = ev.clientY;
 });
-chiBtn.addEventListener('click', () => exitTsuki());
+chiBtn.addEventListener('click', () => { if (GOJU.on) exitGoju(); else exitTsuki(); });
 
 /* ============================================================
    9b. 宵の音 ― Web Audio 合成（音源ファイル無し）
@@ -7944,10 +8117,11 @@ let elapsed = 0;
 function update(dt){
   elapsed += dt;
   if (TSUKI.phase !== 'idle') updateTsuki(dt);            // ㊾ 月の都（幕の間もここが手綱）
+  else if (GOJU.on) updateGoju(dt);                       // ㊾' 五重塔のもと（立ち姿と見回し）
   else if (RIDE.on || RIDE.entering >= 0) updateRide(dt);
   else if (walkMode) updateWalk(dt);
   else updateCamera(dt);
-  if (WARP.phase !== 'idle') updateWarp(dt);              // 塔の二度たたきの幕（景色は下で生きたまま）
+  if (WARP.phase !== 'idle') updateWarp(dt);              // 五重塔ゆきの幕（景色は下で生きたまま）
 
   // 提灯：ゆらぐ灯り（町屋は停留ではなくなったので、一軒だけ明るくする気配りは畳んだ）
   houseGroups.forEach((g, i) => {
@@ -8709,14 +8883,16 @@ window.__machiya = {
                chiBtn: chiBtn.style.display !== 'none' };
     }
   },
-  /* 塔の二度たたきの検証口：set() で幕ごと呼び出し、state() で幕の現況（幕は step で送る） */
-  warp: {
-    set: function(){ return warpTo(function(){ goTo(7, true, true); }); },
+  /* 五重塔の隠し口の検証口：set(true/false) で行き来（幕は step で送る）、state() で現況 */
+  goju: {
+    set: function(v){ return v ? enterGoju() : exitGoju(); },
     state: function(){
-      return { phase: WARP.phase, t: +WARP.t.toFixed(2),
+      return { on: GOJU.on, warp: WARP.phase,
                fade: +parseFloat(tsukifadeEl.style.opacity || 0).toFixed(2),
-               idx: idx, camPhase: phase,
-               cam: camera.position.toArray().map(n => +n.toFixed(2)) };
+               yaw: +GOJU.yaw.toFixed(3), pitch: +GOJU.pitch.toFixed(3),
+               fogD: +scene.fog.density.toFixed(4),
+               cam: camera.position.toArray().map(n => +n.toFixed(2)),
+               chi: chiBtn.style.display !== 'none' ? chiBtn.textContent : null };
     }
   },
   /* 嵯峨野の北の検証口：群れが出ているか、月の道が本当に月の方位へ寝ているか。
