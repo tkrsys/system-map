@@ -370,6 +370,7 @@
   <button id="btn-chi" style="display:none">地へ帰る</button>
   <button id="btn-kane" style="display:none">鐘を撞く</button>
   <button id="btn-joya" style="display:none" aria-pressed="false">除夜の鐘</button>
+  <button id="btn-inori" style="display:none">祈る</button>
 </div>
 
 <!-- 月の都（㊾）への転換の幕。不透明度は毎フレーム側で書く -->
@@ -541,7 +542,8 @@ const FX = {
   jinrikisha  : true,   // ㊻ 渡月橋の北詰の人力車（客待ちの停め置き）
   kudari      : true,   // ㊼ 保津川下りの舟（西の早瀬から数分おきに下ってくる）
   shishi      : true,   // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
-  tsukiusagi  : true    // ㊾ 月の都（月をダブルクリックで月面へ。餅つきの兎と、夜の日本列島が灯る地球）
+  tsukiusagi  : true,   // ㊾ 月の都（月をダブルクリックで月面へ。餅つきの兎と、夜の日本列島が灯る地球）
+  inori       : true    // ㊿ 祈りと参り（念仏寺の本堂で祈ると夜が明け、野宮の本殿に参ると宵に還る）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 //（鳥居形と広沢の池の灯篭流しも同じ晩の行事＝そろって灯る）
@@ -592,11 +594,16 @@ function resize(){
 window.addEventListener('resize', resize);
 resize();
 
-/* ---- 明かり ---- */
-scene.add(new THREE.AmbientLight(0x33405e, 0.62));
+/* ---- 明かり ----
+   暁（㊿）では、この二灯の色と強さ、月光の向きがそのまま朝の光に変わる。
+   素の値は AKARI_YORU に控えて、TOKI がそこから朝の値へ寄せる */
+const ambLight = new THREE.AmbientLight(0x33405e, 0.62);
+scene.add(ambLight);
 const moonLight = new THREE.DirectionalLight(0xb8cdf0, 0.40);
-moonLight.position.set(-8, 16, 6);
+moonLight.position.set(-8, 16, 6);      // 東（x 負）の高みから射す月あかり
 scene.add(moonLight);
+const AKARI_YORU = { amb: 0x33405e, ambI: 0.62, tsuki: 0xb8cdf0, tsukiI: 0.40,
+                     fog: 0x0a1424, fogD: 0.020, clear: 0x05080f };
 
 // 提灯の灯りは 3 灯だけを使い回す（近い町屋へ移動させる）
 const roamLights = [];
@@ -623,6 +630,14 @@ function tex(canvas, rx, ry){
   return t;
 }
 function hexStr(h){ return '#' + h.toString(16).padStart(6,'0'); }
+/* 色を混ぜる（k=0 で a、k=1 で b）。暁の塗り替えはすべてこれ一本で行う */
+function mixHex(a, b, k){
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  return (Math.round(ar + (br - ar) * k) << 16)
+       | (Math.round(ag + (bg - ag) * k) << 8)
+       |  Math.round(ab + (bb - ab) * k);
+}
 
 /* 石畳 */
 function stoneTexture(){
@@ -988,17 +1003,28 @@ function hyouTexture(name, sub){
   }
   return tex(c);
 }
-/* 空（上は墨、下は町明かりの残照） */
-function skyTexture(){
+/* 空（宵は上が墨で下が町明かりの残照、暁は上に夜の名残の紺・下に地平の茜）。
+   scene.background に置いた板は画面の階調なので方角を持てない ―― 同じ画布を
+   塗り直して明るさだけ替え、東がどちらかは世界に置いた光の板（㊿）で見せる */
+const SKY = (function(){
   const c = cv(8, 512), g = c.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, 0, 512);
-  grd.addColorStop(0,    '#04060e');
-  grd.addColorStop(0.42, '#0a1226');
-  grd.addColorStop(0.76, '#132039');
-  grd.addColorStop(1,    '#25324b');
-  g.fillStyle = grd; g.fillRect(0, 0, 8, 512);
-  return tex(c);
-}
+  const STOP = [0, 0.42, 0.76, 1];
+  const YORU = [0x04060e, 0x0a1226, 0x132039, 0x25324b];
+  // 暁は「明け初め」で止める。上は夜の名残の藍、下ほど地平の茜へ。
+  // ここを明るくすると一気に「朝」になって、月あかり前提の景が総崩れになる
+  const AKE  = [0x0c1630, 0x27395f, 0x60687f, 0xcf9b78];
+  const t = tex(c);
+  function paint(k){
+    const grd = g.createLinearGradient(0, 0, 0, 512);
+    for (let i = 0; i < STOP.length; i++){
+      grd.addColorStop(STOP[i], hexStr(mixHex(YORU[i], AKE[i], k)));
+    }
+    g.fillStyle = grd; g.fillRect(0, 0, 8, 512);
+    t.needsUpdate = true;
+  }
+  paint(0);
+  return { tex: t, paint: paint, AKE: AKE };
+})();
 
 const TEX = {
   stone  : stoneTexture(),
@@ -1008,7 +1034,7 @@ const TEX = {
   glow   : glowTexture(),
   water  : waterTexture(),
   ridge  : ridgeTexture(),
-  sky    : skyTexture(),
+  sky    : SKY.tex,
   kodachi   : treelineTexture('#0c1420', 424242),
   kodachiFar: treelineTexture('#1b2836', 98765),
   take     : takeTexture(),
@@ -1028,8 +1054,8 @@ const TEX = {
    ============================================================ */
 scene.background = TEX.sky;
 
-// 星（霧の影響を受けない）
-(function stars(){
+// 星（霧の影響を受けない）。加算合成ではないので、暁の一括減光には手で載せる（㊿）
+const starsMat = (function stars(){
   const N = 420, pos = new Float32Array(N * 3);
   let seed = 99;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -1048,6 +1074,7 @@ scene.background = TEX.sky;
     transparent:true, opacity:0.85, fog:false, depthWrite:false
   });
   scene.add(new THREE.Points(geo, mat));
+  return mat;
 })();
 
 // 三日月（⑪月暈の輪をまとって呼吸する）
@@ -1062,6 +1089,8 @@ const moonFx = (function moon(){
     new THREE.MeshBasicMaterial({ color:0x0a1226, fog:false })
   );
   bite.position.set(2.0, 0.7, 0.05);
+  // 有明の月の色は TOKI が直に決める＝一括の塗り替えからは外す（㊿）
+  disc.material.userData.tokiSkip = bite.material.userData.tokiSkip = true;
   const halo = new THREE.Mesh(
     new THREE.PlaneGeometry(26, 26),
     new THREE.MeshBasicMaterial({ map:TEX.glow, transparent:true, opacity:0.42,
@@ -1080,7 +1109,33 @@ const moonFx = (function moon(){
   g.add(halo, disc, bite);
   g.position.set(42, 46, -152);    // 嵐山の頂の上に懸かる（渡月の名の由来の構図）
   scene.add(g);
-  return { halo: halo, ring: ring };
+  // 暁でも消さない ―― 夜明けの空に残る「有明の月」として色だけ褪せさせる。
+  // 月をダブルタップして月の都（㊾）へ行く口も、そのまま生かすため
+  return { halo: halo, ring: ring, disc: disc, bite: bite };
+})();
+
+/* ㊿ 暁の東の空 ― 祈って夜が明けるあいだだけ、東（x 負）の地平が茜と白に染む。
+   背景の空は画面の階調で方角を持てないので、方角はここで出す。
+   霧に呑ませない板（遠景と同じ作法）。素の明るさは TOKI が直に決めるので、
+   一括減光の対象からは外す（tokiSkip） */
+const akatsukiFx = (function(){
+  const g = new THREE.Group();
+  function band(color, w, h, y, z){
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: TEX.glow, color: color, transparent: true,
+        opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+        side: THREE.DoubleSide }));
+    m.material.userData.tokiSkip = true;
+    m.rotation.y = Math.PI / 2;         // 板の面を西（見る側）へ向ける
+    m.position.set(-150, y, z);
+    m.visible = false;
+    g.add(m);
+    return m;
+  }
+  const akane = band(0xff9d5a, 250, 46, 9,  -46);    // 地平ぎわの茜
+  const shiro = band(0xbfd2ee, 320, 104, 36, -46);   // その上の白み
+  scene.add(g);
+  return { akane: akane, shiro: shiro };
 })();
 
 // 東山＋五重塔（嵐山の三峰よりさらに奥の遠景へ）
@@ -6073,6 +6128,7 @@ const chiBtn = document.getElementById('btn-chi');
 
 function enterTsuki(){
   if (!FX.tsukiusagi || TSUKI.phase !== 'idle') return false;
+  if (TOKI.phase !== 'idle') return false;   // 明けている・暮れている最中は行かない（㊿）
   if (rideActive()) setRideOff('walk');
   if (!walkMode && phase !== 'dwell') return false;   // 飛行の途中からは行かない
   TSUKI.saved = {
@@ -7537,13 +7593,15 @@ function updateSoundMix(){
   // 川：通りでは側溝の水音がかすかに、z-30 から川の気配、川端 z-78 で満ちる
   const rv = Math.min(1, Math.max(0, (-z - 30) / 48));
   const kawaT = SND.kawa ? 0.05 + 0.20 * rv * rv : 0;
+  // 夜の声（虫と蜩）は明けるにつれて遠のく。川と鐘は朝も変わらず（㊿）
+  const yoru = 1 - TOKI.k;
   // 虫：通りで満ち、川端では控えめに
-  const mushiT = SND.mushi ? 1 - 0.75 * Math.min(1, Math.max(0, (-z - 48) / 32)) : 0;
+  const mushiT = SND.mushi ? (1 - 0.75 * Math.min(1, Math.max(0, (-z - 48) / 32))) * yoru : 0;
   // 笹：竹林（z-56〜-78）でだけ山なりに
   const sasaT = SND.sasa ? 0.14 * Math.max(0, 1 - Math.abs(-z - 67) / 13) : 0;
   // 蜩：山と川が近づくほど、対岸の声が届く
   const hf = Math.min(1, Math.max(0, (-z - 44) / 36));
-  const higuT = SND.higu ? 0.30 * hf : 0;
+  const higuT = SND.higu ? 0.30 * hf * yoru : 0;
   // 風鈴：茶店の軒（10.8, -82.4）の近くにいるときだけ
   const fd = Math.hypot(x - 10.8, z + 82.4);
   const fg = Math.max(0, 1 - fd / 26);
@@ -7584,6 +7642,241 @@ document.addEventListener('visibilitychange', () => {
   if (!AC || !SND.on) return;
   if (document.hidden) AC.suspend(); else AC.resume();
 });
+
+/* ============================================================
+   ㊿ 祈りと参り ― 時（とき）を動かす
+   愛宕念仏寺出張所の本堂の前で「祈る」と、送り終えた夜が明けていく。
+   野宮神社の本殿の前で「参る」と、日が落ちて宵に還る。
+   化野は千灯供養の野＝死者を送る場所なので、祈りの帰結は夜明け。
+   野宮は斎宮が伊勢へ下る前に潔斎した宮で、源氏の「賢木」も宵の場面。
+
+   明るさは真昼まで行かず「暁（夜明け）」で止める ―― この町は月あかりの
+   世界として組んであるので、竹の月漏れも水鏡も鬼火も、薄明かりのなかで
+   なら生きたまま残る。有明の月も薄く残すので、月の都（㊾）への口も塞がない。
+
+   仕掛けはひとつの数 TOKI.k（0=宵 / 1=暁）だけ。空・霧・明かり・月・東の空は
+   これを読み、灯りと地物は毎フレームの最後に一括で塗り替える。あとから景を
+   足しても、この一箇所を通るので自動で朝夜に乗る。
+   ============================================================ */
+const TOKI = {
+  k: 0,                 // 0=宵 / 1=暁。転換のあいだは途中の値
+  to: 0,                // めざす値
+  phase: 'idle',        // idle ／ gassho（手を合わせている間）／ utsuri（移ろい）
+  t: 0,
+  at: null,             // いま祈っている場所
+  near: null,           // 立っている祈り場（ボタンの出入りに使う）
+  dip: 0,               // 合掌のあいだ、ひと呼吸ぶん明かりが沈む
+  GASSHO: 1.5,          // 手を合わせている間（秒）
+  UTSURI: 8.0,          // 空が変わりきるまで（秒）
+  /* 赤入れ用の目盛り。__machiya.toki.tune を書き替えて set() で試着できる。
+     霧の色を明るくしすぎると嵐山が白い壁になって形を失う（見比べて決めた値） */
+  tune: { amb: 0.84, ambCol: 0x77809a, sun: 0.46, sunCol: 0xffb98c,
+          fog: 0.0208, fogCol: 0x4d5b74, clear: 0x4c5972, tint: 0.42,
+          akane: 0.52, shiro: 0.34 }
+};
+
+/* 祈り場。半径は「本堂・本殿の前に立った人だけ」に届く狭さで取る
+   （鐘楼の庭は 6.4m 圏なので、野宮の 5.2m 圏とは重ならない） */
+const INORI = [
+  { key:'ake', x:-25.0, z:-67.0, r:5.2, to:1, btn:'祈る', spot:'本堂の前',
+    hint:'本堂の前　／　「祈る」でひとつ手を合わせます',
+    utsuri:'東の空が白んでいきます　―　愛宕念仏寺出張所',
+    done:'夜が明けました　―　有明の月がまだ残っています',
+    already:'もう夜は明けております' },
+  { key:'kure', x:17.6, z:-42.0, r:5.2, to:0, btn:'参る', spot:'本殿の前',
+    hint:'本殿の前　／　「参る」でひとつ手を合わせます',
+    utsuri:'日が落ちて、宵が満ちてきます　―　野宮神社',
+    done:'宵に還りました　―　灯がひとつずつ点ります',
+    already:'まだ宵のうちです' }
+];
+
+const inoriBtn = document.getElementById('btn-inori');
+
+/* いま立っている祈り場（転換の最中かどうかは見ない） */
+function inoriSpot(){
+  if (!FX.inori || TSUKI.on || TSUKI.phase !== 'idle' || rideActive()) return null;
+  for (let i = 0; i < INORI.length; i++){
+    const p = INORI[i];
+    if (!(p.key === 'ake' ? FX.adashino : FX.nonomiya)) continue;
+    if (Math.hypot(camera.position.x - p.x, camera.position.z - p.z) < p.r) return p;
+  }
+  return null;
+}
+function syncInoriBtn(){
+  const show = !!TOKI.near && TOKI.phase === 'idle';
+  const was = inoriBtn.style.display !== 'none';
+  inoriBtn.style.display = show ? '' : 'none';
+  if (show) inoriBtn.textContent = TOKI.near.btn;
+  if (show !== was) layoutBottom();      // 段組みが変わるので札と手引きを置き直す
+}
+function showInoriHint(){
+  if (TOKI.phase !== 'idle') return;     // 転換のあいだの言葉は消さない
+  if (KANE.near) return;                 // 鐘楼の手引きとは取り合わない
+  if (TOKI.near) hintEl.textContent = TOKI.near.hint;
+  else hintEl.textContent = walkMode ? HINT_WALK : HINT_RAIL;
+}
+/* 手を合わせる。すでにその時分なら、鐘だけ鳴って景色は動かない */
+function inoru(){
+  if (TOKI.phase !== 'idle') return false;
+  const p = TOKI.near || inoriSpot();
+  if (!p) return false;
+  TOKI.at = p; TOKI.phase = 'gassho'; TOKI.t = 0;
+  strikeKane();                          // 合わせた手に、遠くの鐘がひとつ
+  hintEl.textContent = (Math.abs(TOKI.k - p.to) < 0.001) ? p.already : p.utsuri;
+  syncInoriBtn();
+  return true;
+}
+inoriBtn.addEventListener('click', () => inoru());
+
+/* 灯が消えた紙・炭の色（彩度を落として、すこし沈める） */
+function keshiIro(hex){
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  const l = r * 0.30 + g * 0.59 + b * 0.11;
+  const m = v => Math.round((v * 0.28 + l * 0.72) * 0.80);
+  return (m(r) << 16) | (m(g) << 8) | m(b);
+}
+/* 夜の色に朝の光が差す＝もとの色を明るく、わずかに暖かく。
+   四季の衣替え（SHIKI）が塗り替えた色にも、そのまま上乗せできる */
+function akeIro(hex, k){
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  const gain = 1 + TOKI.tune.tint * k;
+  return (Math.min(255, Math.round(r * gain * (1 + 0.06 * k))) << 16)
+       | (Math.min(255, Math.round(g * gain * (1 + 0.01 * k))) << 8)
+       |  Math.min(255, Math.round(b * gain * (1 - 0.06 * k)));
+}
+
+/* 灯りと地物を一度だけ集める。
+   ・灯り＝加算合成の光とスプライト（提灯の照り返し・篝火・鬼火・蛍・星…）
+   ・紙の灯＝加算ではない暖色の板（提灯の身・障子・戸の灯）
+   ・地物＝Lambert の面（屋根・壁・山・苔・土…）
+   月の都（㊾）の中身は地上の朝夜に乗せない＝先に印を付けて外す */
+const tokiMats = (function(){
+  tsukimen.group.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null;
+    if (ms) ms.forEach(m => { if (m) m.userData.tokiSkip = true; });
+  });
+  const lamps = [], kami = [], lands = [], seen = new Set();
+  scene.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null;
+    if (!ms) return;
+    ms.forEach(m => {
+      if (!m || m.userData.tokiSkip || seen.has(m)) return;
+      seen.add(m);
+      if (m.blending === THREE.AdditiveBlending || o.isSprite){
+        lamps.push({ m: m, base: m.opacity, wrote: NaN });
+        return;
+      }
+      if (m.isMeshLambertMaterial){
+        lands.push({ m: m, base: m.color.getHex(), wrote: -1,
+                     baseE: m.emissive ? m.emissive.getHex() : 0, wroteE: -1 });
+        return;
+      }
+      // 加算ではない暖色の板＝紙ごしの灯り（提灯の身・障子・虫籠窓・火袋・炎の身）。
+      // 敷居は 0xD0 まで下げる ―― 虫籠窓の灯 0xd89a4e が 0xE0 では漏れた
+      if (m.isMeshBasicMaterial && m.color){
+        const h = m.color.getHex(), r = (h >> 16) & 255, b = h & 255;
+        if (r >= 0xD0 && b <= r * 0.88 || o.geometry === GEO.lantern){
+          kami.push({ m: m, base: h, wrote: -1 });
+        }
+      }
+    });
+  });
+  lamps.push({ m: starsMat, base: starsMat.opacity, wrote: NaN });   // 星は加算ではないので手で
+  return { lamps: lamps, kami: kami, lands: lands };
+})();
+
+/* 毎フレームの最後に一度だけ塗り替える。
+   演出の側が毎フレーム opacity や色を書き直すので、「前に自分が書いた値と
+   違っていたら、それが素の値」という見分け方で、素と塗りを取り違えない */
+function tokiPaint(){
+  const k = TOKI.k, f = 1 - k;
+  const L = tokiMats.lamps;
+  for (let i = 0; i < L.length; i++){
+    const r = L[i];
+    if (r.m.opacity !== r.wrote) r.base = r.m.opacity;
+    r.m.opacity = r.base * f;
+    r.wrote = r.m.opacity;
+  }
+  const K = tokiMats.kami;
+  for (let i = 0; i < K.length; i++){
+    const r = K[i], cur = r.m.color.getHex();
+    if (cur !== r.wrote) r.base = cur;
+    const nx = mixHex(r.base, keshiIro(r.base), k);
+    r.m.color.setHex(nx); r.wrote = nx;
+  }
+  const D = tokiMats.lands;
+  for (let i = 0; i < D.length; i++){
+    const r = D[i], cur = r.m.color.getHex();
+    if (cur !== r.wrote) r.base = cur;
+    const nx = akeIro(r.base, k);
+    r.m.color.setHex(nx); r.wrote = nx;
+    if (r.m.emissive){
+      const ce = r.m.emissive.getHex();
+      if (ce !== r.wroteE) r.baseE = ce;
+      const ne = mixHex(r.baseE, 0x000000, k);
+      r.m.emissive.setHex(ne); r.wroteE = ne;
+    }
+  }
+  // 提灯の点光源は素の強さを持たない（毎フレーム決め直される）ので、その場で掛ける
+  for (let i = 0; i < roamLights.length; i++) roamLights[i].intensity *= f;
+}
+
+/* 空・霧・明かり・月・東の空。k が動いた時と、合掌のひと呼吸の間だけ呼ぶ */
+function tokiSky(){
+  const k = TOKI.k, T = TOKI.tune, Y = AKARI_YORU;
+  const d = 1 - TOKI.dip * 0.14;                  // 合掌のあいだ、明かりがすこし沈む
+  SKY.paint(k);
+  if (!TSUKI.on){                                  // 月の都では霧を休ませている＝触らない
+    scene.fog.color.setHex(mixHex(Y.fog, T.fogCol, k));
+    scene.fog.density = Y.fogD + (T.fog - Y.fogD) * k;
+  }
+  renderer.setClearColor(mixHex(Y.clear, T.clear, k), 1);
+  ambLight.color.setHex(mixHex(Y.amb, T.ambCol, k));
+  ambLight.intensity = (Y.ambI + (T.amb - Y.ambI) * k) * d;
+  moonLight.color.setHex(mixHex(Y.tsuki, T.sunCol, k));
+  moonLight.intensity = (Y.tsukiI + (T.sun - Y.tsukiI) * k) * d;
+  moonLight.position.set(-8 - 22 * k, 16 - 10 * k, 6 - 12 * k);   // 東の低みへ降りる
+  // 有明の月：色を褪せさせるだけで消さない。欠けぎわは明けていく空の色に寄せる
+  moonFx.disc.material.color.setHex(mixHex(0xFFE9BE, 0xE7ECF4, k));
+  moonFx.bite.material.color.setHex(mixHex(0x0a1226, SKY.AKE[1], k));
+  // 東の空（板は k が立ってから灯す＝宵のあいだは描かない）
+  akatsukiFx.akane.visible = akatsukiFx.shiro.visible = k > 0.004;
+  akatsukiFx.akane.material.opacity = T.akane * k;
+  akatsukiFx.shiro.material.opacity = T.shiro * k;
+}
+
+function updateToki(dt){
+  const here = inoriSpot();
+  if (here !== TOKI.near){ TOKI.near = here; syncInoriBtn(); showInoriHint(); }
+
+  if (TOKI.phase === 'gassho'){
+    TOKI.t += dt;
+    TOKI.dip = Math.sin(Math.min(1, TOKI.t / TOKI.GASSHO) * Math.PI);
+    if (TOKI.t >= TOKI.GASSHO){
+      TOKI.dip = 0;
+      TOKI.t = 0;
+      if (Math.abs(TOKI.k - TOKI.at.to) < 0.001){    // すでにその時分＝景色は動かない
+        TOKI.phase = 'idle';
+        syncInoriBtn(); showInoriHint();
+      } else {
+        TOKI.to = TOKI.at.to;
+        TOKI.phase = 'utsuri';
+      }
+    }
+    tokiSky();
+  } else if (TOKI.phase === 'utsuri'){
+    const step = dt / TOKI.UTSURI;
+    TOKI.k = TOKI.to > TOKI.k ? Math.min(TOKI.to, TOKI.k + step)
+                              : Math.max(TOKI.to, TOKI.k - step);
+    tokiSky();
+    if (TOKI.k === TOKI.to){
+      TOKI.phase = 'idle';
+      hintEl.textContent = TOKI.at.done;
+      syncInoriBtn();
+    }
+  }
+}
+tokiSky();
 
 /* ============================================================
    10. 毎フレーム
@@ -8089,6 +8382,11 @@ function update(dt){
   cat.userData.tail.rotation.z = 0.6 + Math.sin(elapsed * 1.6) * 0.34;
   cat.rotation.y = ((HOUSES[2] || HOUSES[0]).side < 0 ? Math.PI / 2 : -Math.PI / 2)
                  + Math.sin(elapsed * 0.31) * 0.22;
+
+  // ㊿ 祈りと参り：時を進めてから、灯りと地物をまとめて塗り替える。
+  //    ここが毎フレームの最後の書き手＝上の演出が書いた素の値の上に朝夜が乗る
+  updateToki(dt);
+  tokiPaint();
 }
 
 /* ============================================================
@@ -8394,6 +8692,41 @@ window.__machiya = {
       return { segs: yabu.segs, kakiH: +(0.62 * yabu.kaki.scale.y).toFixed(2),
                kaki: yabu.kaki.visible, michi: yabu.michi.visible, ko: yabu.ko.visible,
                dobu: waterStripsYabu.map(m => m.visible), take: chikurin.N };
+    }
+  },
+  /* ㊿ 祈りと参りの検証口。
+     set(0)=宵／set(1)=暁／set(0.5)=途中 ―― 転換をとばして即その景色に。
+     inoru() はいまの場所で手を合わせる（ボタンを押すのと同じ）。
+     移ろいは実時間 8 秒なので、rAF が止まる環境では step(480) で手送りする */
+  toki: {
+    set: function(v){
+      TOKI.k = Math.max(0, Math.min(1, +v || 0));
+      TOKI.to = TOKI.k; TOKI.phase = 'idle'; TOKI.t = 0; TOKI.dip = 0;
+      tokiSky();
+      // 提灯の点光源は毎フレーム決め直される値なので、更新を一周（dt=0）回してから塗る。
+      // tokiPaint だけ呼ぶと灯りが消えたまま戻らず、測った絵が本番とずれる
+      update(0);
+      syncInoriBtn();
+      renderer.render(scene, camera);
+      return TOKI.k;
+    },
+    inoru: function(){ return inoru(); },
+    tune: TOKI.tune,
+    /* 暁の空の階調（上から下へ四段）。書き替えて set() で塗り直せる */
+    sora: SKY.AKE,
+    where: INORI.map(p => ({ key: p.key, x: p.x, z: p.z, r: p.r, to: p.to })),
+    state: function(){
+      return {
+        k: +TOKI.k.toFixed(3), phase: TOKI.phase,
+        near: TOKI.near ? TOKI.near.key : null,
+        btn: inoriBtn.style.display !== 'none' ? inoriBtn.textContent : null,
+        mats: { lamps: tokiMats.lamps.length, kami: tokiMats.kami.length,
+                lands: tokiMats.lands.length },
+        fog: +scene.fog.density.toFixed(4),
+        amb: +ambLight.intensity.toFixed(3),
+        sun: +moonLight.intensity.toFixed(3),
+        higashi: +akatsukiFx.akane.material.opacity.toFixed(3)
+      };
     }
   },
   /* 宵の音の計測口：state で混合値、level で出力RMS、kane で鐘を即打ち */
