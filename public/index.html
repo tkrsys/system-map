@@ -5659,24 +5659,147 @@ const tonai = (function(){
   taiki.position.copy(C);
   g.add(taiki);
 
-  // ── ゾハル：金の八面体。芯と、逆回りの線の殻 ──
+  // ── ゾハル：十字の身に、金の輪と青の核。guardian のログイン画面の造形を移す ──
+  // （あちらは MeshStandardMaterial＋スポットで金属を光らせているが、この間には
+  //   明かりがひとつも無い＝面ごとに色を分けた MeshBasic で、金の照りを直に塗る）
+  const ARM_Y = 0.66;                                // 横棒（と核・輪）の高さ
   const zoharG = new THREE.Group();
-  zoharG.position.set(C.x, C.y + 11.5, C.z);
-  const zoshin = new THREE.Mesh(new THREE.OctahedronGeometry(3.0),
-    new THREE.MeshBasicMaterial({ color: 0xdfae54, fog: false }));
-  const zosen = new THREE.Mesh(new THREE.OctahedronGeometry(3.65),
-    new THREE.MeshBasicMaterial({ color: 0xffd77a, wireframe: true, transparent: true,
-      opacity: 0.32, fog: false }));
+  // 丈3.05×2.2 ＝ 6.7m。地球の際すれすれに浮いて、上腕まで画角に収まる寸法
+  // （立ち位置・視線とあわせて ndc を総当たりで測って決めた。上端 0.91）
+  zoharG.position.set(C.x, C.y + 11.2, C.z);
+  zoharG.scale.setScalar(2.2);
+  const bas = (col, op) => new THREE.MeshBasicMaterial({ color: col, fog: false,
+    transparent: op !== undefined, opacity: op === undefined ? 1 : op });
+  // 身は闇に沈め、その外へ一回り大きい金の枠を回す（＝暗い十字に金の縁）。
+  // 面ごとに色を分けて、明かりの無い間でも角の立体を出す。[+x,-x,+y,-y,+z,-z]
+  const kin = [bas(0x33270f), bas(0x33270f), bas(0x40320f), bas(0x241b09), bas(0x2b2109), bas(0x241b09)];
+  const waku = [bas(0x8a6a24), bas(0x8a6a24), bas(0xb08a33), bas(0x6d5320), bas(0xa07a2c), bas(0x6d5320)];
+  const kinL = bas(0xe8cf86);                        // 明るい金（細い刻み・輪）
+  zoharG.add(new THREE.Mesh(new THREE.BoxGeometry(0.72, 3.05, 0.17), kin));
+  const arms = new THREE.Mesh(new THREE.BoxGeometry(2.06, 0.72, 0.16), kin);
+  arms.position.y = ARM_Y; zoharG.add(arms);
+  const e1 = new THREE.Mesh(new THREE.BoxGeometry(0.96, 3.28, 0.12), waku);
+  e1.position.z = -0.04; zoharG.add(e1);
+  const e2 = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.96, 0.11), waku);
+  e2.position.set(0, ARM_Y, -0.04); zoharG.add(e2);
+  const gr2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.9, 0.02), bas(0x1d1607));
+  gr2.position.z = 0.09; zoharG.add(gr2);
+  [1.06, -0.34, -0.78, -1.22].forEach(y => {         // 身に刻んだ細い金の線
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.035, 0.02), kinL);
+    l.position.set(0, y, 0.09); zoharG.add(l);
+  });
+  // 金の輪（表と裏）
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.034, 8, 40), kinL);
+  halo.position.set(0, ARM_Y, 0.12); zoharG.add(halo);
+  const halo2 = new THREE.Mesh(halo.geometry, halo.material);
+  halo2.position.set(0, ARM_Y, -0.12); zoharG.add(halo2);
+  // 核：青の菱形。うすい殻をかぶせて奥行きを出す
+  const gemMat = bas(0x4de8dc);
+  const shellMat = new THREE.MeshBasicMaterial({ color: 0x6ef2e6, transparent: true,
+    opacity: 0.26, depthWrite: false, fog: false });
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.145, 0), gemMat);
+  gem.scale.set(0.72, 1.5, 0.72); gem.position.set(0, ARM_Y, 0.17);
+  const gemShell = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), shellMat);
+  gemShell.scale.set(0.72, 1.5, 0.72); gemShell.position.set(0, ARM_Y, 0.17);
+  const gem2 = new THREE.Mesh(gem.geometry, gemMat);
+  gem2.scale.copy(gem.scale); gem2.position.set(0, ARM_Y, -0.17);
+  const shell2 = new THREE.Mesh(gemShell.geometry, shellMat);
+  shell2.scale.copy(gemShell.scale); shell2.position.set(0, ARM_Y, -0.17);
+  zoharG.add(gem, gemShell, gem2, shell2);
+  const gemKo = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0x7ff4ea,
+    transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  gemKo.scale.set(2.6, 2.6, 1);
+  gemKo.position.set(0, ARM_Y, 0.2); zoharG.add(gemKo);
+  // 傾いた三つの環が、核のまわりを別々に巡る
+  const gyro = [];
+  [ { r: 0.50, tube: 0.015, color: 0x86f0ff, op: 0.55, tilt: 1.25, spd: 0.55 },
+    { r: 0.63, tube: 0.012, color: 0xf7d98a, op: 0.45, tilt: 1.05, spd: -0.40 },
+    { r: 0.76, tube: 0.010, color: 0xaee8ff, op: 0.38, tilt: 0.85, spd: 0.28 }
+  ].forEach(d => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0, ARM_Y, 0.14); pivot.rotation.x = d.tilt;
+    pivot.add(new THREE.Mesh(new THREE.TorusGeometry(d.r, d.tube, 8, 64),
+      new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: d.op,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false })));
+    zoharG.add(pivot);
+    gyro.push({ pivot: pivot, spd: d.spd });
+  });
+  // 後光（放射状の光芒。身の後ろで静かに回る）
+  function raysTexture(){
+    const c2 = cv(256, 256), x = c2.getContext('2d');
+    x.translate(128, 128);
+    x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 30; i++){
+      x.save();
+      x.rotate((i / 30) * Math.PI * 2 + (rnd() - 0.5) * 0.18);
+      const len = 70 + rnd() * 52, w = 2 + rnd() * 5;
+      const gd = x.createLinearGradient(0, 0, 0, len);
+      gd.addColorStop(0, 'rgba(255,255,255,' + (0.3 + rnd() * 0.4).toFixed(2) + ')');
+      gd.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = gd;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w, len); x.lineTo(-w, len); x.closePath(); x.fill();
+      x.restore();
+    }
+    const core = x.createRadialGradient(0, 0, 0, 0, 0, 46);
+    core.addColorStop(0, 'rgba(255,255,255,0.8)'); core.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = core; x.beginPath(); x.arc(0, 0, 46, 0, Math.PI * 2); x.fill();
+    x.globalCompositeOperation = 'destination-in';
+    const fade = x.createRadialGradient(0, 0, 0, 0, 0, 124);
+    fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(0.7, 'rgba(0,0,0,1)');
+    fade.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = fade; x.fillRect(-128, -128, 256, 256);
+    return tex(c2);
+  }
+  const raysTex = raysTexture();
+  const raysMat = op => new THREE.MeshBasicMaterial({ map: raysTex, transparent: true,
+    opacity: op, blending: THREE.AdditiveBlending, depthWrite: false,
+    side: THREE.DoubleSide, fog: false });
+  const raysA = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.0), raysMat(0.07));
+  raysA.position.set(0, ARM_Y, -0.42); raysA.scale.set(0.56, 0.94, 1); zoharG.add(raysA);
+  const raysB = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.0), raysMat(0.045));
+  raysB.position.set(0, ARM_Y, -0.46); raysB.scale.set(0.50, 0.84, 1); zoharG.add(raysB);
+  // 光の粒が身のまわりを昇る
+  const PT_N = 120;
+  const ptState = [], ptPos = new Float32Array(PT_N * 3);
+  for (let i = 0; i < PT_N; i++){
+    ptState.push({ ang: rnd() * Math.PI * 2, rad: 0.55 + rnd() * 0.55,
+                   y: -1.55 + rnd() * 3.3, spd: 0.25 + rnd() * 0.5, vy: 0.05 + rnd() * 0.06 });
+  }
+  const ptGeo = new THREE.BufferGeometry();
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(ptPos, 3));
+  const zoharPts = new THREE.Points(ptGeo, new THREE.PointsMaterial({ color: 0xffe2a6,
+    size: 0.055, map: TEX.glow, transparent: true, opacity: 0.8,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, fog: false }));
+  zoharPts.frustumCulled = false;
+  zoharG.add(zoharPts);
+  // Α と Ω
+  function glyph(ch){
+    const c2 = cv(200, 200), x = c2.getContext('2d');
+    x.font = 'italic 120px Georgia, "Times New Roman", serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.shadowColor = 'rgba(255,214,140,0.9)'; x.shadowBlur = 26;
+    x.fillStyle = '#fff3d6';
+    x.fillText(ch, 100, 106);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(c2), transparent: true,
+      opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    sp.scale.set(0.5, 0.5, 1);
+    return sp;
+  }
+  const glyphA = glyph('Α'), glyphO = glyph('Ω');
+  glyphA.position.set(-0.72, ARM_Y + 0.05, 0.4);
+  glyphO.position.set(0.72, ARM_Y + 0.05, 0.4);
+  zoharG.add(glyphA, glyphO);
   const zoko = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffc76a,
-    transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-  zoko.scale.set(13, 13, 1);
-  zoharG.add(zoshin, zosen, zoko);
+    transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  zoko.scale.set(5.6, 7.0, 1);
+  zoko.position.set(0, ARM_Y, -0.5); zoharG.add(zoko);
   g.add(zoharG);
-  // 観測の帯：ゾハルから地球へ静かに降りる光
-  const obi = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 2.3, 4.6, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffe2a8, transparent: true, opacity: 0.07,
+  // 観測の帯：ゾハルの核から地球へ静かに降りる光。
+  // ⚠️単色の円錐は縁が立って「灰色の三角」に見えるので、ごく薄く・細く留める
+  const obi = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 1.15, 6.2, 14, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.028,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  obi.position.set(C.x, C.y + 9.2, C.z);
+  obi.position.set(C.x, C.y + 9.0, C.z);
   g.add(obi);
 
   // ── 上位存在＝モノリスの環。十二基が地球へ面を向けて浮かぶ ──
@@ -5846,13 +5969,18 @@ const tonai = (function(){
   });
   g.visible = false;                                 // ふだんは描かない
   scene.add(g);
-  return { group: g, C: C, zoharG: zoharG, zoshin: zoshin, zosen: zosen, zoko: zoko,
+  return { group: g, C: C, zoharG: zoharG, ARM_Y: ARM_Y, halo: halo, halo2: halo2,
+           gem: gem, gem2: gem2, gemShell: gemShell, shell2: shell2, gemKo: gemKo,
+           gyro: gyro, raysA: raysA, raysB: raysB,
+           zoharPts: zoharPts, ptState: ptState, ptPos: ptPos, PT_N: PT_N,
+           glyphA: glyphA, glyphO: glyphO, zoko: zoko,
            obi: obi, chikyu: chikyu, kans: kans, glyphMat: glyphMat, waT: waT, dust: dust,
            chikyuHit: chikyuHit,
            mados: mados, recMat: recMat, madoCam: madoCam, rts: rts, madoDefs: MADO_DEFS,
            layoutMado: layoutMado,
+           // 視線はゾハルの上腕まで入るよう、地球の中心よりわずかに上を見る
            cam: { pos: new THREE.Vector3(0, -164.5, -26),
-                  tgt: new THREE.Vector3(0, -168, -58) } };
+                  tgt: new THREE.Vector3(0, -166.2, -58) } };
 })();
 
 /* ㊹ 愛宕山の千日詣り ― 文月晦日の宵、山肌をつづら折りに登る提灯の列。
@@ -6670,7 +6798,7 @@ function tonaiArrive(){
   // 入るたび、観測されている面＝日本の灯の側を正面に据える（画で合わせ込んだ 135度）
   tonai.chikyu.rotation.y = 2.356;
   tonai.layoutMado();                                 // いまの画面の横縦比で窓の環を組み直す
-  MADO.tick = 0;
+  MADO.tick = 0; MADO.oto = 2.2;                      // 着いてすぐ、ひとつ音が置かれる
   scene.fog.density = 0;                              // 異次元に霧はない（帰りに戻す）
   camera.position.copy(tonai.cam.pos);
   curTgt.copy(tonai.cam.tgt);
@@ -6718,7 +6846,7 @@ function updateGoju(dt){
   if (naka) updateTonaiFx(dt);
 }
 /* 塔の内の営み：ゾハルの回転と息、環の歳差、地球の自転、塵の漂い、銘の明滅、観測の窓 */
-const MADO = { tick: 0 };
+const MADO = { tick: 0, oto: 6 };      // oto＝次の観測の律動までの秒
 function renderMado(i){
   const d = tonai.madoDefs[i];
   const cam2 = tonai.madoCam;
@@ -6743,13 +6871,32 @@ function renderMado(i){
 }
 function updateTonaiFx(dt){
   const t = elapsed;
-  tonai.zoshin.rotation.y += dt * 0.55;
-  tonai.zoshin.rotation.x = Math.sin(t * 0.23) * 0.12;
-  tonai.zosen.rotation.y -= dt * 0.21;
-  tonai.zosen.rotation.x = Math.cos(t * 0.19) * 0.10;
-  tonai.zoharG.position.y = tonai.C.y + 11.5 + Math.sin(t * 0.6) * 0.5;
-  tonai.zoko.material.opacity = 0.46 + Math.sin(t * 1.1) * 0.10;
-  tonai.obi.material.opacity = 0.06 + Math.sin(t * 0.8 + 1.2) * 0.022;
+  // ゾハル：身はゆっくり巡り（正面を見せる間が長い）、輪と核はそれぞれの速さで回る
+  tonai.zoharG.rotation.y = Math.sin(t * 0.085) * 0.62;
+  tonai.zoharG.position.y = tonai.C.y + 11.2 + Math.sin(t * 0.6) * 0.4;
+  tonai.halo.rotation.z  =  t * 0.5;
+  tonai.halo2.rotation.z = -t * 0.5;
+  tonai.gem.rotation.y   =  t * 0.85;  tonai.gemShell.rotation.y = -t * 0.35;
+  tonai.gem2.rotation.y  = -t * 0.85;  tonai.shell2.rotation.y   =  t * 0.35;
+  tonai.gemKo.material.opacity = 0.50 + Math.sin(t * 1.4) * 0.09;
+  tonai.gyro.forEach(g2 => { g2.pivot.rotation.y += g2.spd * dt; });
+  tonai.raysA.rotation.z += dt * 0.12;
+  tonai.raysB.rotation.z -= dt * 0.09;
+  tonai.glyphA.material.opacity = tonai.glyphO.material.opacity = 0.4 + Math.sin(t * 0.7) * 0.14;
+  // 光の粒が身のまわりを昇る（guardian の式と同じ。level は据え置き＝静かな待機の姿）
+  const ps = tonai.ptState, pp = tonai.ptPos;
+  for (let i = 0; i < tonai.PT_N; i++){
+    const s = ps[i];
+    s.ang += s.spd * dt;
+    s.y += s.vy * dt * 3;
+    if (s.y > 1.8) s.y = -1.6;
+    pp[i*3]     = Math.cos(s.ang) * s.rad * 0.92;
+    pp[i*3 + 1] = s.y;
+    pp[i*3 + 2] = Math.sin(s.ang) * s.rad * 0.55 + 0.08;
+  }
+  tonai.zoharPts.geometry.attributes.position.needsUpdate = true;
+  tonai.zoko.material.opacity = 0.30 + Math.sin(t * 1.1) * 0.07;
+  tonai.obi.material.opacity = 0.026 + Math.sin(t * 0.8 + 1.2) * 0.010;
   tonai.chikyu.rotation.y += dt * 0.045;              // 観測されながら静かに自転する
   tonai.kans.rotation.y += dt * 0.012;                // 上位存在の環はごくゆっくり巡る
   tonai.glyphMat.opacity = 0.38 + Math.sin(t * 1.35) * 0.13;
@@ -6763,6 +6910,9 @@ function updateTonaiFx(dt){
     m.pv.rotation.y = m.rotY + Math.sin(t * 0.21 + m.phi) * 0.035;
   });
   tonai.recMat.opacity = (Math.sin(t * 2.6) > -0.2) ? 0.8 : 0.12;   // RECの点滅
+  // 観測の律動：7〜13秒にひとつ、澄んだ音が置かれる（音を灯していれば）
+  MADO.oto -= dt;
+  if (MADO.oto <= 0){ strikeKansoku(); MADO.oto = 7 + Math.random() * 6; }
   MADO.tick++;
   if (MADO.tick % 6 === 0){                           // 6フレームにひと窓＝監視らしい間欠（負荷も半分）
     renderMado(((MADO.tick / 6) | 0) % tonai.rts.length);
@@ -7827,7 +7977,8 @@ const SND = {
   furin: true,    // 風鈴（茶店の軒。近くにいるときだけ）
   kawazu: true,   // 田の蛙（木戸の先の夏の夜。北の田でだけ満ちる）
   shishi: true,   // 鹿威し（鐘楼の庭。近くにいるとき、こおんとひとつ）
-  mochi : true    // 餅つき（月の都。杵が落ちるたび、ぺったん）
+  mochi : true,   // 餅つき（月の都。杵が落ちるたび、ぺったん）
+  tonai : true    // 塔の内（上つ次元の底鳴りと倍音の環と観測の律動）
 };
 let AC = null;                // AudioContext。初回の操作で作る
 const sndNodes = {};
@@ -8181,6 +8332,81 @@ function buildSound(){
   const sfb = AC.createGain(); sfb.gain.value = 0.42;
   const swet = AC.createGain(); swet.gain.value = 0.3;
   shoroLp.connect(sdly); sdly.connect(sfb); sfb.connect(sdly); sdly.connect(swet); swet.connect(master);
+
+  /* ── 塔の内（㊾''）の音 ― 上つ次元のたたずまい ──
+     町の音がすべて虫や水という「生きもの・自然」でできているのに対して、
+     ここは一つも自然の音を使わない。純な正弦の重なりと、整数比の倍音だけ。
+     人の作れない正確さこそが、未知の文明の手ざわりになる。四層で組む。 */
+  const tonaiBus = AC.createGain(); tonaiBus.gain.value = 0; tonaiBus.connect(master);
+  sndNodes.tonaiBus = tonaiBus;
+
+  // ① 底鳴り：空洞の質量。55Hz を根に、完全五度と一オクターブを重ねる
+  const droneG = AC.createGain(); droneG.gain.value = 0.30; droneG.connect(tonaiBus);
+  sndNodes.tonaiDrone = droneG;
+  [[55, 1.0], [82.5, 0.42], [110, 0.30], [27.5, 0.5]].forEach((p, i) => {
+    const o = AC.createOscillator();
+    o.type = 'sine'; o.frequency.value = p[0];
+    const g = AC.createGain(); g.gain.value = p[1] * 0.5;
+    // ごくゆっくりした息づかい（周期がそれぞれ素なので、うねりが繰り返さない）
+    const lfo = AC.createOscillator(); lfo.frequency.value = 0.031 + i * 0.017;
+    const lg = AC.createGain(); lg.gain.value = p[1] * 0.22;
+    lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    o.connect(g); g.connect(droneG); o.start();
+  });
+
+  // ② 倍音の環：整数比の澄んだ音を五本。それぞれ別の周期で満ち欠けし、
+  //    和音がゆっくり移ろう（人の手では合わせられない正確さの音）
+  const harmG = AC.createGain(); harmG.gain.value = 0.055; harmG.connect(tonaiBus);
+  sndNodes.tonaiHarm = harmG;
+  [[220, 23], [330, 31], [440, 19], [660, 41], [880, 29], [1320, 37]].forEach((p, i) => {
+    const o = AC.createOscillator();
+    o.type = 'sine'; o.frequency.value = p[0];
+    const g = AC.createGain(); g.gain.value = 0;
+    const lfo = AC.createOscillator(); lfo.frequency.value = 1 / p[1];
+    const lg = AC.createGain(); lg.gain.value = 0.5 / (1 + i * 0.55);
+    const off = AC.createConstantSource(); off.offset.value = 0.5 / (1 + i * 0.55);
+    lfo.connect(lg); lg.connect(g.gain); off.connect(g.gain);
+    lfo.start(); off.start();
+    o.connect(g); g.connect(harmG); o.start();
+  });
+
+  // ③ 揺らぎ：高いところで薄く鳴る帯。機械の呼吸のような気配
+  const shimG = AC.createGain(); shimG.gain.value = 0.05; shimG.connect(tonaiBus);
+  sndNodes.tonaiShim = shimG;
+  const shBp = AC.createBiquadFilter();
+  shBp.type = 'bandpass'; shBp.frequency.value = 3400; shBp.Q.value = 4.5;
+  const shLfo = AC.createOscillator(); shLfo.frequency.value = 0.043;
+  const shLg = AC.createGain(); shLg.gain.value = 900;
+  shLfo.connect(shLg); shLg.connect(shBp.frequency); shLfo.start();
+  const shn = noiseSrc(); shn.connect(shBp); shBp.connect(shimG); shn.start();
+
+  // ④ 観測の律動：数秒にひとつ、澄んだ音がひとつ置かれて長く伸びる（strikeKansoku）
+  const pulseBus = AC.createGain(); pulseBus.gain.value = 1; pulseBus.connect(tonaiBus);
+  sndNodes.tonaiPulse = pulseBus;
+  const pdly = AC.createDelay(3.0); pdly.delayTime.value = 1.13;
+  const pfb = AC.createGain(); pfb.gain.value = 0.55;
+  const pwet = AC.createGain(); pwet.gain.value = 0.5;
+  pulseBus.connect(pdly); pdly.connect(pfb); pfb.connect(pdly); pdly.connect(pwet);
+  pwet.connect(tonaiBus);
+}
+
+/* 観測の律動：倍音列から一音を選んで置く。減衰が長く、こだまが整数拍で返る */
+function strikeKansoku(){
+  if (!AC || !SND.on || !SND.tonai || AC.state !== 'running') return false;
+  const t = AC.currentTime;
+  const scale = [220, 330, 440, 550, 660, 880];      // 基音の整数比だけで組んだ音列
+  const f0 = scale[(Math.random() * scale.length) | 0];
+  [[1, 1, 5.5], [2, 0.34, 4.2], [3, 0.16, 3.0], [4.2, 0.07, 2.2]].forEach(p => {
+    const o = AC.createOscillator();
+    o.type = 'sine'; o.frequency.value = f0 * p[0];
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.085 * p[1], t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+    o.connect(g); g.connect(sndNodes.tonaiPulse);
+    o.start(t); o.stop(t + p[2] + 0.1);
+  });
+  return true;
 }
 
 /* 場所で聞こえ方が変わる（毎フレーム。灯していない間は何もしない） */
@@ -8197,12 +8423,17 @@ function updateSoundMix(){
     return;
   }
   if (GOJU.on && GOJU.naka){
-    // 塔の内は異次元＝地上の音はひとつも届かない（鐘さえも）
+    // 塔の内は異次元＝地上の音はひとつも届かない（鐘さえも）。代わりに上つ次元の音
     const k2 = 0.06;
     ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus','kaneBus'].forEach(n => {
       sndNodes[n].gain.value += (0 - sndNodes[n].gain.value) * k2;
     });
+    const tb = sndNodes.tonaiBus;
+    tb.gain.value += ((SND.tonai ? 1 : 0) - tb.gain.value) * 0.05;   // ゆっくり満ちる
     return;
+  }
+  if (sndNodes.tonaiBus && sndNodes.tonaiBus.gain.value > 0.0005){
+    sndNodes.tonaiBus.gain.value += (0 - sndNodes.tonaiBus.gain.value) * 0.10;   // 出ると引く
   }
   const z = camera.position.z, x = camera.position.x;
   // 川：通りでは側溝の水音がかすかに、z-30 から川の気配、川端 z-78 で満ちる
@@ -9276,8 +9507,10 @@ window.__machiya = {
   goju: {
     set: function(v){ return v ? enterGoju() : exitGoju(); },
     naka: function(v){ return v ? enterTonai() : exitTonai(); },
+    oto: strikeKansoku,        // 観測の律動を今すぐひとつ（音を灯してから）
     state: function(){
       return { on: GOJU.on, naka: GOJU.naka, warp: WARP.phase,
+               oto: sndNodes.tonaiBus ? +sndNodes.tonaiBus.gain.value.toFixed(3) : null,
                fade: +parseFloat(tsukifadeEl.style.opacity || 0).toFixed(2),
                yaw: +GOJU.yaw.toFixed(3), pitch: +GOJU.pitch.toFixed(3),
                fogD: +scene.fog.density.toFixed(4),
@@ -9386,7 +9619,22 @@ window.__machiya = {
     level: sndLevel,
     kane: function(){ return strikeKane(); },
     furin: function(){ return sndNodes.strikeFurin ? sndNodes.strikeFurin() : false; },
-    shishi: function(){ return strikeShishi(); }
+    shishi: function(){ return strikeShishi(); },
+    /* 塔の内の音の赤入れ口：四層の大きさを耳で決める（音を灯してから）
+       drone=底鳴り／harm=倍音の環／shim=揺らぎ。oto() で観測の律動をひとつ */
+    tonai: function(v){
+      if (!AC) return null;
+      if (v){
+        if (v.drone !== undefined) sndNodes.tonaiDrone.gain.value = v.drone;
+        if (v.harm  !== undefined) sndNodes.tonaiHarm.gain.value  = v.harm;
+        if (v.shim  !== undefined) sndNodes.tonaiShim.gain.value  = v.shim;
+      }
+      return { bus  : +sndNodes.tonaiBus.gain.value.toFixed(3),
+               drone: +sndNodes.tonaiDrone.gain.value.toFixed(3),
+               harm : +sndNodes.tonaiHarm.gain.value.toFixed(3),
+               shim : +sndNodes.tonaiShim.gain.value.toFixed(3) };
+    },
+    oto: function(){ return strikeKansoku(); }
   }
 };
 
