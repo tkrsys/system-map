@@ -5755,6 +5755,84 @@ const tonai = (function(){
   dust.frustumCulled = false;
   g.add(dust);
 
+  // ── 観測の窓：世界の場面場面をとらえた監視の映像が宙に漂う ──
+  // 中身は本物＝WebGLRenderTarget へ世界を低い頻度で描き込む（順繰りの更新は
+  // updateTonaiFx。コマ落ちがそのまま監視映像らしさになる）。走査線と銘は上掛けの一枚
+  // at は窓の浮かぶ位置：立ち位置(0,-164.5,-26)から地球(0,-168,-58)を望む視界の中で、
+  // 地球の円錐(±12度)とゾハル(上15度)を避けて囲む＝どの画角でも「モニタの環」に見える
+  const MADO_DEFS = [
+    { na: '橋', eye: [6.5, 4.6, -95],   mi: [0, 1.6, -107],     at: [-7.2, -160.6, -44.5] },
+    { na: '池', eye: [12.5, 3.6, -56],  mi: [-16, 1.2, -70],    at: [7.4, -161.0, -44.0] },
+    { na: '通', eye: [2.4, 3.4, -16],   mi: [-0.5, 1.6, -42],   at: [-7.6, -169.6, -47.5] },
+    { na: '臺', eye: [-5.5, 9.5, -121], mi: [-16.5, 8.5, -137], at: [7.8, -169.3, -46.5] },
+    { na: '苑', eye: [-2.0, 4.2, 22],   mi: [-8.5, 0.6, 29.5],  at: [0, -162.6, -4.5], kita: true }
+  ];
+  function madoOverlayTexture(na){
+    const c2 = cv(256, 200), gg = c2.getContext('2d');
+    gg.strokeStyle = 'rgba(140,200,220,0.55)'; gg.lineWidth = 3;
+    gg.strokeRect(6, 6, 244, 158);                    // 窓の枠
+    gg.strokeStyle = 'rgba(140,200,220,0.22)'; gg.lineWidth = 1;
+    gg.strokeRect(11, 11, 234, 148);
+    gg.strokeStyle = 'rgba(190,230,240,0.8)'; gg.lineWidth = 2;
+    [[8,8,1,1],[248,8,-1,1],[8,162,1,-1],[248,162,-1,-1]].forEach(k => {   // 四隅の爪
+      gg.beginPath();
+      gg.moveTo(k[0] + k[2] * 15, k[1]); gg.lineTo(k[0], k[1]); gg.lineTo(k[0], k[1] + k[3] * 15);
+      gg.stroke();
+    });
+    gg.fillStyle = 'rgba(0,0,0,0.16)';                // 走査線（窓の中だけ）
+    for (let y = 9; y < 161; y += 3) gg.fillRect(8, y, 240, 1);
+    gg.fillStyle = 'rgba(10,14,22,0.85)'; gg.fillRect(6, 168, 244, 26);   // 銘板
+    gg.strokeStyle = 'rgba(140,200,220,0.4)'; gg.lineWidth = 1;
+    gg.strokeRect(6, 168, 244, 26);
+    gg.fillStyle = 'rgba(190,230,240,0.92)';
+    gg.font = '17px "Shippori Mincho", serif';
+    gg.textAlign = 'left'; gg.textBaseline = 'middle';
+    gg.fillText('観測窓　─　' + na, 14, 182);
+    return tex(c2);
+  }
+  const madoCam = new THREE.PerspectiveCamera(52, 256 / 160, 0.5, 300);
+  const rts = [], mados = [];
+  const recMat = new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true,
+    opacity: 0.8, fog: false });
+  const tachiba = new THREE.Vector3(0, -164.5, -26);  // 立ち位置＝窓が面を向ける先
+  const ASP0 = 16 / 9;                                // at を決めたときの画面の横縦比
+  MADO_DEFS.forEach((d, i) => {
+    const rt = new THREE.WebGLRenderTarget(256, 160,
+      { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    rt.texture.generateMipmaps = false;
+    rts.push(rt);
+    const pv = new THREE.Group();
+    pv.position.set(d.at[0], d.at[1], d.at[2]);
+    pv.lookAt(tachiba);                               // +z＝映像の面が立ち位置を向く
+    const feed = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 4.0),
+      new THREE.MeshBasicMaterial({ map: rt.texture, fog: false }));
+    const kake = new THREE.Mesh(new THREE.PlaneGeometry(6.71, 5.24),
+      new THREE.MeshBasicMaterial({ map: madoOverlayTexture(d.na), transparent: true,
+        depthWrite: false, fog: false }));
+    kake.position.set(0, -0.39, 0.03);                // 窓の中心と銘板ぶんの下がり
+    const rec = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), recMat);
+    rec.position.set(2.86, 1.72, 0.05);
+    pv.add(feed, kake, rec);
+    g.add(pv);
+    mados.push({ pv: pv, at: d.at.slice(), baseY: d.at[1], rotY: pv.rotation.y, phi: i * 1.37 });
+  });
+  /* 画面の横縦比に合わせて窓の環をすぼめる。縦画面は横の視野が狭く、
+     16:9 のつもりで置いた左右の窓が画面の外へ出てしまう（実測 ndc±1.6）。
+     ndc は 1/横縦比 で効くので、横のへだたりを同じ比で詰め、
+     窓どうしが重ならないよう板ごと小さくする */
+  function layoutMado(){
+    const asp = camera.aspect || ASP0;
+    const k = Math.min(1, asp / ASP0);
+    mados.forEach(m => {
+      const dx = (m.at[0] - tachiba.x) * k;
+      m.pv.position.set(tachiba.x + dx, m.at[1], m.at[2]);
+      m.pv.scale.setScalar(0.45 + 0.55 * k);
+      m.pv.lookAt(tachiba);
+      m.rotY = m.pv.rotation.y;
+    });
+  }
+  layoutMado();
+
   // ── 帰りの的＝観測されている地球そのもの（月の都の地球と同じ作法） ──
   const chikyuHit = new THREE.Mesh(new THREE.SphereGeometry(8.6, 12, 8),
     new THREE.MeshBasicMaterial({ visible: false }));
@@ -5771,6 +5849,8 @@ const tonai = (function(){
   return { group: g, C: C, zoharG: zoharG, zoshin: zoshin, zosen: zosen, zoko: zoko,
            obi: obi, chikyu: chikyu, kans: kans, glyphMat: glyphMat, waT: waT, dust: dust,
            chikyuHit: chikyuHit,
+           mados: mados, recMat: recMat, madoCam: madoCam, rts: rts, madoDefs: MADO_DEFS,
+           layoutMado: layoutMado,
            cam: { pos: new THREE.Vector3(0, -164.5, -26),
                   tgt: new THREE.Vector3(0, -168, -58) } };
 })();
@@ -6587,6 +6667,10 @@ function tonaiArrive(){
   GOJU.naka = true; GOJU.yaw = 0; GOJU.pitch = 0;
   goju.group.visible = false;
   tonai.group.visible = true;
+  // 入るたび、観測されている面＝日本の灯の側を正面に据える（画で合わせ込んだ 135度）
+  tonai.chikyu.rotation.y = 2.356;
+  tonai.layoutMado();                                 // いまの画面の横縦比で窓の環を組み直す
+  MADO.tick = 0;
   scene.fog.density = 0;                              // 異次元に霧はない（帰りに戻す）
   camera.position.copy(tonai.cam.pos);
   curTgt.copy(tonai.cam.tgt);
@@ -6611,6 +6695,12 @@ function tonaiLeave(){
   hintEl.textContent = '五重塔のもと　―　なぞって見回す（振り返れば塔）／塔を二度たたくと中へ・「町へ帰る」で元の場所へ';
   layoutBottom();
 }
+/* 画面の向きが変わったら、観測の窓の環を新しい横縦比で組み直す。
+   上の resize() には足せない（tonai も GOJU もこの節より後の定義＝
+   起動時の一回目で TDZ になる。const は typeof でも守れない）ので、
+   聞き手をここで別に足す */
+window.addEventListener('resize', () => { if (GOJU.naka) tonai.layoutMado(); });
+
 function updateGoju(dt){
   const naka = GOJU.naka;
   const cp = naka ? tonai.cam.pos : GOJU.cam.pos;
@@ -6627,7 +6717,30 @@ function updateGoju(dt){
   camera.lookAt(curTgt);
   if (naka) updateTonaiFx(dt);
 }
-/* 塔の内の営み：ゾハルの回転と息、環の歳差、地球の自転、塵の漂い、銘の明滅 */
+/* 塔の内の営み：ゾハルの回転と息、環の歳差、地球の自転、塵の漂い、銘の明滅、観測の窓 */
+const MADO = { tick: 0 };
+function renderMado(i){
+  const d = tonai.madoDefs[i];
+  const cam2 = tonai.madoCam;
+  cam2.position.set(d.eye[0], d.eye[1], d.eye[2]);
+  cam2.lookAt(d.mi[0], d.mi[1], d.mi[2]);
+  const fd = scene.fog.density;
+  scene.fog.density = GOJU.fog0 >= 0 ? GOJU.fog0 : fd;   // 窓の中の世界には霧がある
+  tonai.group.visible = false;                            // 窓の中に窓は映さない
+  // 嵯峨野の北の群れの距離ゲートは x と z だけで測るので、地下の立ち位置はたまたま
+  // 圏内に入っている（＝いまは灯ったまま）。その偶然に頼ると立ち位置を動かした日に
+  // 素の地面だけが映るので、北を映す窓のときは手で灯してから描く
+  const kita = d.kita ? [sagano.group, daikakuji.group, hirosawa.group,
+                         osawa.group, rakushisha.group, tahoto.group] : null;
+  let was = null;
+  if (kita){ was = kita.map(o => o.visible); kita.forEach(o => { o.visible = true; }); }
+  renderer.setRenderTarget(tonai.rts[i]);
+  renderer.render(scene, cam2);
+  renderer.setRenderTarget(null);
+  if (kita) kita.forEach((o, k) => { o.visible = was[k]; });
+  tonai.group.visible = true;
+  scene.fog.density = fd;
+}
 function updateTonaiFx(dt){
   const t = elapsed;
   tonai.zoshin.rotation.y += dt * 0.55;
@@ -6644,6 +6757,16 @@ function updateTonaiFx(dt){
   tonai.waT[1].rotation.y -= dt * 0.034;
   tonai.waT[2].rotation.y += dt * 0.021;
   tonai.dust.rotation.y += dt * 0.006;
+  // 観測の窓：漂いとまばたき、そして順繰りに世界を描き込む
+  tonai.mados.forEach(m => {
+    m.pv.position.y = m.baseY + Math.sin(t * 0.5 + m.phi) * 0.35;
+    m.pv.rotation.y = m.rotY + Math.sin(t * 0.21 + m.phi) * 0.035;
+  });
+  tonai.recMat.opacity = (Math.sin(t * 2.6) > -0.2) ? 0.8 : 0.12;   // RECの点滅
+  MADO.tick++;
+  if (MADO.tick % 6 === 0){                           // 6フレームにひと窓＝監視らしい間欠（負荷も半分）
+    renderMado(((MADO.tick / 6) | 0) % tonai.rts.length);
+  }
 }
 function updateTsuki(dt){
   const F = 0.85;                                 // 幕のひと呼吸
@@ -9133,6 +9256,7 @@ window.__machiya = {
   kudari: kudari,           // 保津川下りの舟（state() で現在地と運行の有無）
   shishi: shishiodoshi,     // 鹿威し（state() で振りの角）
   tsukimen: tsukimen,       // 月の都の赤入れ用（chikyu.rotation.y で日本の向きを直せる）
+  tonai: tonai,             // 塔の内の赤入れ用（madoDefs で観測の窓の構図を直せる）
   /* 月の都の検証口：set(true/false) で行き来（幕は step で送る）、state() で現況 */
   tsuki: {
     set: function(v){ return v ? enterTsuki() : exitTsuki(); },
