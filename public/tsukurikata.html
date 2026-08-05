@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>京の夜を歩く地図は、どうやって作ったのか ― とくり堂</title>
+<style>
+  :root{
+    --sumi:#08080F; --yozora:#0d1220;
+    --akari:#FFD78A; --akari-strong:#FFE5A8; --kogane:#E8B95B;
+    --shu:#E04A47; --ai-light:#6BA0CC; --moegi:#A8C078; --fuji:#A08CC8;
+    --kinari:#E8DFC8; --sub:#9AA3B4; --line:rgba(232,185,91,0.22);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #16203a 0%, var(--yozora) 45%, var(--sumi) 100%);
+    background-attachment:fixed;
+    color:var(--kinari);
+    font-family:-apple-system,"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+    line-height:1.95; font-size:16px;
+    -webkit-font-smoothing:antialiased;
+    padding:0 20px 90px;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  .mincho{font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN",serif}
+
+  /* ── 表紙 ── */
+  header{padding:clamp(48px,11vw,96px) 0 clamp(30px,6vw,48px);text-align:center}
+  .eyebrow{font-size:.72rem;letter-spacing:.34em;color:var(--kogane);margin-bottom:20px}
+  h1{
+    font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN",serif;
+    font-size:clamp(1.6rem,5.6vw,2.5rem); font-weight:600; line-height:1.55;
+    letter-spacing:.04em; color:var(--akari-strong);
+    text-shadow:0 0 26px rgba(255,215,138,.28);
+  }
+  .lead{
+    margin:26px auto 0; max-width:33rem; color:var(--sub); font-size:.98rem; text-align:left;
+  }
+  .lead b{color:var(--kinari);font-weight:600}
+  .tsuki{
+    display:block;width:56px;height:56px;margin:0 auto 26px;border-radius:50%;
+    background:radial-gradient(circle at 36% 34%, #FFF3D2 0%, #FFD78A 42%, rgba(255,215,138,0) 72%);
+    box-shadow:0 0 44px 10px rgba(255,215,138,.22);
+  }
+
+  /* ── 節 ── */
+  section{margin-top:clamp(46px,9vw,74px)}
+  h2{
+    font-family:"Yu Mincho","游明朝","Hiragino Mincho ProN",serif;
+    font-size:clamp(1.18rem,3.6vw,1.5rem); font-weight:600; letter-spacing:.05em;
+    color:var(--akari); line-height:1.6;
+    padding-bottom:12px; margin-bottom:22px;
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:12px;
+  }
+  h2 .no{
+    font-size:.72rem; letter-spacing:.2em; color:var(--kogane); opacity:.85;
+    flex:none; padding-top:2px;
+  }
+  h3{
+    font-size:1rem; font-weight:700; color:var(--akari-strong);
+    margin:30px 0 10px; letter-spacing:.03em;
+  }
+  p{margin:0 0 15px}
+  p:last-child{margin-bottom:0}
+  strong{color:var(--akari-strong);font-weight:700}
+  .dim{color:var(--sub);font-size:.9rem}
+
+  /* ── 数字の札 ── */
+  .kazu{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin:22px 0;
+  }
+  .kazu div{
+    background:rgba(14,20,36,.72); border:1px solid var(--line); border-radius:3px;
+    padding:16px 14px; text-align:center;
+  }
+  .kazu b{
+    display:block; font-family:"Yu Mincho","游明朝",serif;
+    font-size:1.62rem; color:var(--akari-strong); line-height:1.3; letter-spacing:.02em;
+  }
+  .kazu span{display:block;font-size:.76rem;color:var(--sub);margin-top:4px;line-height:1.6}
+
+  /* ── 流れの図 ── */
+  .nagare{display:flex;flex-direction:column;gap:0;margin:24px 0}
+  .nagare .step{
+    background:rgba(14,20,36,.72); border:1px solid var(--line); border-radius:3px;
+    padding:13px 16px;
+  }
+  .nagare .step b{display:block;color:var(--akari-strong);font-size:.95rem}
+  .nagare .step span{display:block;font-size:.8rem;color:var(--sub);line-height:1.65}
+  .nagare .ya{text-align:center;color:var(--kogane);font-size:.8rem;line-height:1.9;opacity:.8}
+
+  /* ── 会話 ── */
+  .hanashi{margin:20px 0;border-left:2px solid var(--line);padding-left:18px}
+  .hanashi .me,.hanashi .ai{margin-bottom:14px;font-size:.94rem}
+  .hanashi .me b{color:var(--moegi)}
+  .hanashi .ai b{color:var(--ai-light)}
+  .hanashi > div:last-child{margin-bottom:0}
+
+  /* ── 手順 ── */
+  ol.tejun{list-style:none;counter-reset:t;margin:22px 0}
+  ol.tejun li{
+    counter-increment:t; position:relative; padding:14px 0 14px 52px;
+    border-bottom:1px dashed rgba(232,185,91,.16);
+  }
+  ol.tejun li:last-child{border-bottom:none}
+  ol.tejun li::before{
+    content:counter(t); position:absolute; left:0; top:14px;
+    width:32px;height:32px;line-height:32px;text-align:center;
+    font-family:"Yu Mincho",serif; font-size:1rem;
+    color:var(--sumi); background:var(--kogane); border-radius:50%;
+  }
+  ol.tejun b{display:block;color:var(--akari-strong);font-size:1rem}
+  ol.tejun span{font-size:.9rem;color:var(--sub);line-height:1.75}
+
+  /* ── 表 ── */
+  .hyou{width:100%;border-collapse:collapse;margin:20px 0;font-size:.9rem}
+  .hyou th,.hyou td{border:1px solid var(--line);padding:11px 12px;text-align:left;vertical-align:top}
+  .hyou th{background:rgba(232,185,91,.09);color:var(--akari);font-weight:600;white-space:nowrap}
+  .hyou td:first-child{white-space:nowrap;color:var(--kinari);font-weight:600}
+
+  /* ── 注意の箱 ── */
+  .hako{
+    background:rgba(224,74,71,.08); border:1px solid rgba(224,74,71,.36);
+    border-radius:3px; padding:18px 20px; margin:22px 0;
+  }
+  .hako h3{margin-top:0;color:#F0918E}
+  .hako p:last-child{margin-bottom:0}
+  .hako-ao{background:rgba(107,160,204,.08);border-color:rgba(107,160,204,.34)}
+  .hako-ao h3{color:var(--ai-light)}
+
+  ul.tama{list-style:none;margin:14px 0}
+  ul.tama li{position:relative;padding-left:20px;margin-bottom:9px;font-size:.94rem}
+  ul.tama li::before{content:"・";position:absolute;left:2px;color:var(--kogane)}
+
+  a{color:var(--akari);text-decoration:none;border-bottom:1px solid rgba(232,185,91,.4)}
+  a:hover{color:var(--akari-strong)}
+
+  footer{
+    margin-top:clamp(56px,10vw,88px); padding-top:26px; border-top:1px solid var(--line);
+    color:var(--sub); font-size:.8rem; text-align:center; line-height:2;
+  }
+  .modoru{
+    display:inline-block; margin-top:16px; padding:10px 18px;
+    border:1px solid var(--line); border-radius:2px; font-size:.82rem; letter-spacing:.1em;
+  }
+
+  @media (min-width:620px){
+    .nagare{flex-direction:row;align-items:stretch;gap:0}
+    .nagare .step{flex:1}
+    .nagare .ya{display:flex;align-items:center;padding:0 8px}
+  }
+  /* 狭い画面では表を段組みにする（区分を見出し行に立てて、中身に幅を全部渡す） */
+  @media (max-width:540px){
+    .hyou, .hyou tbody, .hyou tr, .hyou th, .hyou td{display:block;width:100%}
+    .hyou tr:first-child{display:none}
+    .hyou tr{border:1px solid var(--line);margin-bottom:10px}
+    .hyou td{border:none;white-space:normal}
+    .hyou td:first-child{
+      white-space:normal; background:rgba(232,185,91,.09);
+      border-bottom:1px solid var(--line);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="tsuki"></span>
+  <p class="eyebrow">TKRSYS &nbsp;MAP &nbsp;— &nbsp;つ く り か た</p>
+  <h1>京の夜を歩く地図は、<br>どうやって作ったのか</h1>
+  <p class="lead">
+    <b>tkrsys-map.vercel.app</b> を開くと、京都・嵯峨野の夜の道に立っています。歩くと町屋の暖簾がかかっていて、くぐるとそれぞれのシステムに入る ―― という入口のページです。
+    「これ、どうやって作ったの？」とよく聞かれるので、<b>プログラミングをしたことがない人</b>に向けて、仕組みと作り方をまとめました。専門用語はできるだけ使いません。
+  </p>
+</header>
+
+<!-- ═══ 1 ═══ -->
+<section>
+  <h2><span class="no">壱</span>まず、結論から</h2>
+  <p>
+    あの町並みは、<strong>文章が書かれたファイル1枚</strong>でできています。写真も、動画も、音の録音も、1つも使っていません。
+  </p>
+  <div class="kazu">
+    <div><b>9,645</b><span>景色を作っている<br>文章の行数</span></div>
+    <div><b>0</b><span>使った写真・<br>音源ファイルの数</span></div>
+    <div><b>1</b><span>外から借りている<br>部品（three.js）</span></div>
+    <div><b>0<span style="font-size:.9rem"> 円</span></b><span>月々かかっている<br>費用</span></div>
+  </div>
+  <p>
+    月も、竹も、川の音も、ぜんぶ「こう描け」「こう鳴らせ」という<strong>指示の文章</strong>です。たとえば竹林は――
+  </p>
+  <div class="hako hako-ao">
+    <h3>竹林の書きかた（ざっくり）</h3>
+    <p class="dim" style="margin-bottom:8px">
+      「竹を256本、高さは9.2〜13.4メートルのあいだでばらつかせて、道の左右2.5〜6.7メートルの範囲に立てる。表面には節を1メートルおきに入れる」
+    </p>
+    <p>
+      ―― これだけです。だから<strong>「竹を倍に増やして」は、256という数字を512に直すだけ</strong>。写真を貼っていたら、こうはいきません。
+    </p>
+  </div>
+  <p>
+    木目、瓦、暖簾の文字、水面、苔。こうした模様も画像ではなく「線をこの向きにこう引く」という手順が<strong>26通り</strong>書いてあるだけです。音も同じで、鈴虫は「サイン波を細かく震わせたもの」、寺の鐘は「きれいに割り切れない6つの音を重ねて減衰させたもの」。<strong>その場で合成しています</strong>。
+  </p>
+</section>
+
+<!-- ═══ 2 ═══ -->
+<section>
+  <h2><span class="no">弐</span>では、その9,645行は誰が書いたのか</h2>
+  <p>
+    <strong>私は1行も書いていません。</strong>全部、日本語で頼んで、AIに書いてもらいました。
+  </p>
+  <p>
+    使っているのは <strong>Claude Code</strong> という道具です。ふつうのAIチャットとの違いは、<strong>パソコンの中のファイルを直接読んで、直して、保存できる</strong>ところ。「ここをこうして」と言うと、実際にファイルが書き換わります。
+  </p>
+
+  <h3>実際のやりとり①　竹藪の道</h3>
+  <div class="hanashi">
+    <div class="me"><b>私 ▸</b> （嵯峨野の竹林の写真を見せて）この竹藪の道みたいにしたい</div>
+    <div class="ai"><b>AI ▸</b> 3案あります。<br>
+      A案＝両側に竹の垣根を足すだけ（安い・写真の雰囲気の7割は出る）<br>
+      B案＝道そのものを土と砂利に作り直す（中くらい・いちばん似る）<br>
+      C案＝写真どおり道をS字に曲げる（高い。今の作りは道が<u>まっすぐ前提</u>なので、歩ける範囲も自動の進路も全部作り直しになります）
+    </div>
+    <div class="me"><b>私 ▸</b> Bで。Cは割に合わないから外す</div>
+    <div class="ai"><b>AI ▸</b> （実装して）…できました。ただ土を敷いたら、<strong>藪の下に町の石畳の巨大な石が1枚だけ白く残って</strong>「舗装が続いている」ように見えます。幅を広げて隠しました。</div>
+  </div>
+
+  <h3>実際のやりとり②　寂しい方角</h3>
+  <div class="hanashi">
+    <div class="me"><b>私 ▸</b> 歩ける範囲のなかに、景色が空っぽで寂しいところがある</div>
+    <div class="ai"><b>AI ▸</b> 上から見た図を描きました。空白は4方向です。北＝町の木戸の先／北西＝入口の右手／西＝川上／東＝川下。遠くの山を足す案と、境目に建物を置く案があります。</div>
+    <div class="me"><b>私 ▸</b> 全部やって</div>
+  </div>
+
+  <p>
+    見てのとおり、<strong>私がやっているのは「どうしたいか」を言うことと、「これでいい」と決めることだけ</strong>です。「どう書くか」はAIの仕事。ケアプランでたとえるなら、<strong>私がアセスメントと方針を決め、AIが書類の清書をしている</strong>ような分担です。
+  </p>
+</section>
+
+<!-- ═══ 3 ═══ -->
+<section>
+  <h2><span class="no">参</span>毎回この5歩でやっている</h2>
+  <ol class="tejun">
+    <li>
+      <b>言う</b>
+      <span>ふわっとで構いません。「塔にのぼりたい」「舟に乗りたい」でも通じます。専門用語は要りません。</span>
+    </li>
+    <li>
+      <b>「どこに影響する？」と聞く</b>
+      <span>直すと何が壊れうるかを、先に言わせます。これを飛ばすと、直したはずの別の場所が静かに壊れます。</span>
+    </li>
+    <li>
+      <b>2〜3案を並べさせて、選ぶ</b>
+      <span>ここが一番大事。1案しか出させないと「AIが決めた形」になります。長所と短所を並べさせれば、素人でも判断できます。上の竹藪のC案を外したのがこれです。</span>
+    </li>
+    <li>
+      <b>書かせる</b>
+      <span>ここは全部おまかせ。数分から数十分。</span>
+    </li>
+    <li>
+      <b>自分の目で確かめてから、出す</b>
+      <span>「できました」を信じないこと。次の節がそれです。</span>
+    </li>
+  </ol>
+</section>
+
+<!-- ═══ 4 ═══ -->
+<section>
+  <h2><span class="no">肆</span>いちばんの落とし穴は「できたつもり」</h2>
+  <p>
+    AIは<strong>自信たっぷりに間違えます</strong>。悪気はなく、本人（？）も気づいていません。実際に起きたことを2つ。
+  </p>
+
+  <div class="hako">
+    <h3>その一　送り火が灯らない</h3>
+    <p>
+      8月16日だけ東山に「大」の字を灯す仕掛けを入れたのに、灯りません。AIも私も最初は「点け忘れ」を疑いましたが、真因は<strong>手前にある別の山が、そこに立ちはだかっていた</strong>ことでした。3Dの世界では、手前のものが後ろのものを隠します。人間なら「山の陰だ」と一目で分かる話に、丸一時間かかりました。
+    </p>
+  </div>
+  <div class="hako">
+    <h3>その二　東と西が逆だった</h3>
+    <p>
+      しばらく作ってから、<strong>町全体が実際の京都と左右反対</strong>になっていることに気づきました。渡月橋も嵐山も、あるべき方角の逆側にあった。作り直しです。<strong>方角のような「最初に検算しておくべきこと」は、後から効いてきます。</strong>
+    </p>
+  </div>
+
+  <p>
+    そこで、この地図には<strong>「点検口」</strong>を最初に作ってあります。画面の明るさを数値で読み出したり、狙ったものが本当に画面に映っているかを機械的に答えさせたりする仕掛けです。「池に月が映っています」ではなく<strong>「池の面の明るさが31から98に上がった」</strong>と数字で言わせる。目で見るのと数字で見るの、両方でやっと信用できます。
+  </p>
+</section>
+
+<!-- ═══ 5 ═══ -->
+<section>
+  <h2><span class="no">伍</span>世界に出るまで1〜2分</h2>
+  <p>できあがったファイルが、どうやってみなさんのスマホに届くのか。登場するのは2つだけです。</p>
+
+  <div class="nagare">
+    <div class="step"><b>私のパソコン</b><span>ファイルを直す</span></div>
+    <div class="ya">▼</div>
+    <div class="step"><b>GitHub</b><span>原稿の保管庫。<br>いつでも前の版に戻せる</span></div>
+    <div class="ya">▼</div>
+    <div class="step"><b>Vercel</b><span>保管庫を見張っていて、<br>変わったら自動で世界に配る</span></div>
+    <div class="ya">▼</div>
+    <div class="step"><b>みなさんの画面</b><span>1〜2分後には<br>もう新しくなっている</span></div>
+  </div>
+
+  <p>
+    <strong>GitHub</strong>は「原稿の保管庫」。上書き保存ではなく、直すたびに履歴が残るので、失敗しても前の日に戻せます。<strong>Vercel</strong>は「配達係」。保管庫を見張っていて、中身が変わると自動で世界中に配り直します。私は<strong>公開のボタンを押していません</strong>――保存したら勝手に届いています。
+  </p>
+  <p class="dim">
+    どちらも個人利用なら無料です。この地図の維持費は月0円。住所（URL）が <span style="color:var(--kinari)">tkrsys-map.vercel.app</span> と長いのは、独自の住所を買っていないからです。
+  </p>
+</section>
+
+<!-- ═══ 6 ═══ -->
+<section>
+  <h2><span class="no">陸</span>どれくらいの時間でできたか</h2>
+  <p>
+    嘘のような話ですが、この3Dの町並みを据えたのは<strong>2026年7月25日</strong>。竹林も、天龍寺も、屋形舟も、月の都も、そこから<strong>10日間・45回の更新</strong>で積み上がりました。
+  </p>
+  <div class="kazu">
+    <div><b>10<span style="font-size:.9rem"> 日</span></b><span>3Dを据えてから<br>今の形になるまで</span></div>
+    <div><b>45<span style="font-size:.9rem"> 回</span></b><span>その間に直した回数<br>（1日3〜11回）</span></div>
+    <div><b>8</b><span>巡れる名所の数<br>（大覚寺〜塔の舞台）</span></div>
+    <div><b>51</b><span>景色の演出を<br>個別に消せるスイッチ</span></div>
+  </div>
+  <p>
+    1回ぶんは「思いつき1つ」です。夜、30分から2時間。<strong>大きく作らず、小さく足していく</strong>。これはAIと組むときの鉄則で、大きく頼むほど、間違いの発見が遅れて手戻りが大きくなります。
+  </p>
+</section>
+
+<!-- ═══ 7 ═══ -->
+<section>
+  <h2><span class="no">漆</span>AIに任せること、任せないこと</h2>
+  <p>ここは、同じ仕事をしている方にいちばん伝えたいところです。</p>
+  <table class="hyou">
+    <tr><th>区分</th><th>中身</th></tr>
+    <tr>
+      <td style="color:var(--moegi)">🟢 任せる</td>
+      <td>コードを書く・直す／原因を調べる／図を描く／案を並べる／同じ作業のくり返し／下調べ</td>
+    </tr>
+    <tr>
+      <td style="color:var(--kogane)">🟡 下ごしらえまで</td>
+      <td>文章の下書き（言い回しは自分で直す）／制度や用語の確認（<strong>介護保険の用語は必ず自分で裏を取る</strong>。それらしい嘘を書きます）</td>
+    </tr>
+    <tr>
+      <td style="color:var(--shu)">🔴 任せない</td>
+      <td>何を作るか／美しいかどうかの判断／利用者の情報を扱う設計／公開してよいかの決定</td>
+    </tr>
+  </table>
+  <p>
+    赤の一行目が肝心です。<strong>「何を作るか」を人が持っているうちは、AIは道具のままでいてくれます。</strong>
+  </p>
+</section>
+
+<!-- ═══ 8 ═══ -->
+<section>
+  <h2><span class="no">捌</span>まねするなら、この順番で</h2>
+  <ul class="tama">
+    <li><strong>いきなり3Dはやらないこと。</strong>私も最初は文字だけの一覧表からでした。</li>
+    <li><strong>最初の一歩は「紙1枚」。</strong>「加算の要件を早見表にして」「この手順をチェックリストにして」。これならその日のうちに形になります。</li>
+    <li><strong>個人情報は絶対に入れない。</strong>試すときは架空の事例で。氏名・生年月日・住所は、練習であっても打ち込まない。</li>
+    <li><strong>「できました」を信じない。</strong>必ず自分の目で開いて確かめる。ここだけは代われません。</li>
+    <li><strong>作ったものを、誰かに見せる。</strong>これが一番続きます。この地図も、見せる相手がいたから8つの名所まで伸びました。</li>
+  </ul>
+  <p>
+    プログラミングの知識は、正直なところ<strong>ほとんど要りませんでした</strong>。代わりに要ったのは、日々の仕事とまったく同じもの――<strong>「何に困っているかを言葉にする力」と「これでいいと決める責任」</strong>です。それはもう、みなさんが持っています。
+  </p>
+</section>
+
+<footer>
+  <div>とくり堂　―　令和八年 葉月</div>
+  <a class="modoru" href="./">京 の 通 り へ 戻 る</a>
+</footer>
+
+</div>
+</body>
+</html>
