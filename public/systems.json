@@ -1,9 +1,9 @@
 {
-  "_comment": "とくり堂の単一の出典。ここを直せば 御絵図(ezu.html) と 京町屋3D(index.html) の両方に反映される。machiya:true の先頭七件が通りの七軒。順番＝通し番号（壱弐参…）",
+  "_comment": "とくり堂の単一の出典。ここを直せば 御絵図(ezu.html) と 京町屋3D(index.html) の両方に反映される。machiya:true の先頭七件まで（いまは六件）が通りの町屋。順番＝通し番号（壱弐参…）",
   "meta": {
-    "kaitei": "令和八年文月二十七日",
-    "stamp": ["令和八", "文月", "二十七日"],
-    "era": "令 和 八 年 文 月",
+    "kaitei": "令和八年神無月五日",
+    "stamp": ["令和八", "神無月", "五日"],
+    "era": "令 和 八 年 神 無 月",
     "sokoLine": "Next.js / App Router ・ Vercel ・ Neon PostgreSQL ・ Anthropic API ・ Claude Code",
     "ishizue": [
       { "label": "Next.js", "tone": "ai" },
@@ -20,7 +20,7 @@
   },
   "kinds": [
     { "id": "kaigo",  "label": "介護実務", "tan": "介護", "tou": "介護之灯", "en": "CARE PRACTICE", "iro": "朱" },
-    { "id": "hou",    "label": "法律学習", "tan": "法律", "tou": "法律之灯", "en": "LAW & GUIDE",   "iro": "藍" },
+    { "id": "hou",    "label": "学び",     "tan": "学び", "tou": "学びの灯", "en": "LEARNING",      "iro": "藍" },
     { "id": "kouken", "label": "後見制度", "tan": "後見", "tou": "後見之灯", "en": "GUARDIANSHIP",  "iro": "萌黄" },
     { "id": "dougu",  "label": "道具",     "tan": "道具", "tou": "道具之灯", "en": "TOOLS",         "iro": "藤" }
   ],
@@ -47,16 +47,6 @@
       "haseiFrom": "careplan"
     },
     {
-      "id": "helper-report",
-      "name": "ヘルパー活動報告書",
-      "kind": "kaigo",
-      "url": "https://helper-report.vercel.app",
-      "desc": "訪問支援の記録・PDF出力。福祉事業所向け",
-      "tags": ["PDF"],
-      "icon": "helper",
-      "machiya": true
-    },
-    {
       "id": "tkrsys-laws",
       "name": "法令ガイド",
       "kind": "hou",
@@ -67,6 +57,16 @@
       "machiya": true
     },
     {
+      "id": "contents",
+      "name": "教材ポータル",
+      "kind": "hou",
+      "url": "https://tkrsys-contents.vercel.app",
+      "desc": "解剖学・疾患別ケアガイド・こころの理解・適切なケアマネジメント手法・認定調査ガイドなど二十分野の学習サイト。ログイン不要",
+      "tags": ["二十分野", "教材の正本", "公開"],
+      "icon": "minpo",
+      "machiya": true
+    },
+    {
       "id": "guardian",
       "name": "後見月次報告",
       "kind": "kouken",
@@ -74,16 +74,6 @@
       "desc": "月次報告書の作成・管理と学びの教材。家庭裁判所への提出支援",
       "tags": ["家裁提出", "認証要"],
       "icon": "kouken",
-      "machiya": true
-    },
-    {
-      "id": "tools",
-      "name": "よろず道具箱",
-      "kind": "dougu",
-      "url": "https://tkrsys-tools.vercel.app",
-      "desc": "心因性発熱をしずめる体験型3Dと、やさしい読み物。ひとり立ちの小さな道具の置き場",
-      "tags": ["3D体験", "読み物"],
-      "icon": "tools",
       "machiya": true
     },
     {

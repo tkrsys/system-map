@@ -327,7 +327,7 @@
 <!-- 題字は掛け軸ふうの縦書きに。落款（朱印）が屋号を担う -->
 <div class="tate">
   <h1 class="t-main">京町屋を歩く</h1>
-  <div class="t-sub">七軒の灯をたずねて、渡月橋まで</div>
+  <div class="t-sub">六軒の灯をたずねて、渡月橋まで</div>
   <div class="t-toki" id="t-toki"></div>
   <div class="t-brand" aria-hidden="true">
     <span class="stamp"><i>り</i><i>と</i><i>堂</i><i>く</i></span>
@@ -417,12 +417,12 @@ if (typeof THREE === 'undefined') {
 }
 
 /* ============================================================
-   1. 七軒の町屋 ― 中身は systems.json から（御絵図と同じ単一の出典）
-   machiya:true の先頭七件が、並び順のまま通りに建つ
+   1. 通りの町屋（いまは六軒）― 中身は systems.json から（御絵図と同じ単一の出典）
+   machiya:true の先頭七件までが、並び順のまま通りに建つ
    ============================================================ */
 const KIND = {
   kaigo : { hex:0xE04A47, soft:0xFF9D7A, label:'介 護 実 務' },
-  hou   : { hex:0x6BA0CC, soft:0x8FBEE0, label:'法 律 学 習' },
+  hou   : { hex:0x6BA0CC, soft:0x8FBEE0, label:'学 び' },
   kouken: { hex:0xA8C078, soft:0xC2D89A, label:'後 見 制 度' },
   dougu : { hex:0xA08CC8, soft:0xC3B3E4, label:'道 具' }
 };
@@ -1403,7 +1403,7 @@ function buildMachiya(opt){
   return g;
 }
 
-/* 主役の七軒 */
+/* 主役の町屋（systems.json の並びどおり） */
 const houseGroups = HOUSES.map(h => buildMachiya({
   name: h.name, kanji: h.kanji, hex: KIND[h.kind].hex,
   x: h.side * STREET_X, z: h.z, side: h.side
@@ -9255,7 +9255,7 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
   paintDots();
   const subEl = document.querySelector('.t-sub');
-  if (subEl) subEl.textContent = '池のほとりから、七軒の灯をたずねて';
+  if (subEl) subEl.textContent = '池のほとりから、六軒の灯をたずねて';
   // ひと呼吸おいて短冊を掛ける（先にご自分で触っていたら邪魔しない）
   setTimeout(() => { if (!kuOpen && kuKey === '') setKu(true); }, 2600);
 }
