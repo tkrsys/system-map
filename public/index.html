@@ -435,6 +435,11 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<!-- 画面空間の遮蔽（足元・軒下・隙間の陰）。高画質のみ -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SAOShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/DepthLimitedBlurShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/UnpackDepthRGBAShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/SAOPass.js"></script>
 <script>
 (async function(){
 'use strict';
@@ -616,7 +621,7 @@ const Q = (function(){
   const mem = navigator.deviceMemory || 8;
   let high = !mobile && cores >= 4 && mem >= 4;
   if (qs === 'high') high = true; else if (qs === 'low') high = false;
-  return { high: high, kage: high, bloom: true, pbr: high, refl: high,
+  return { high: high, kage: high, bloom: true, pbr: high, refl: high, sao: high,
            lamps: high ? 6 : 3, dpr: high ? 2 : 1.5, forced: qs === 'high' || qs === 'low' };
 })();
 document.body.classList.add(Q.high ? 'q-high' : 'q-low');
@@ -642,15 +647,91 @@ if (Q.kage){
 }
 stage.appendChild(renderer.domElement);
 
-/* 後処理：提灯・篝火・月の光が滲む（UnrealBloom）。読み込めなければ素で描く */
-let composer = null, bloomPass = null;
+/* 後処理：遮蔽（SAO）→ 提灯・篝火・月の滲み（UnrealBloom）→ 色調整。読み込めなければ素で描く */
+let composer = null, bloomPass = null, saoPass = null, gradePass = null, saoRT = null;
 if (Q.bloom && THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass){
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
   const w0 = stage.clientWidth || window.innerWidth, h0 = stage.clientHeight || window.innerHeight;
+  /* 遮蔽：足元・軒下・隙間に陰を落とす。場面をもう一度深度へ描くので高画質のみ（見張りが最初に落とす） */
+  if (Q.sao && THREE.SAOPass){
+    saoPass = new THREE.SAOPass(scene, camera, true, false, new THREE.Vector2(w0, h0));
+    // 目盛りは __dbg.sao.params で試着して決めた（scale 1 では壁が丸ごと黒く、50 では折り目しか出ない）
+    Object.assign(saoPass.params, {
+      saoBias: 0.6, saoIntensity: 0.12, saoScale: 10, saoKernelRadius: 40, saoMinResolution: 0,
+      saoBlur: true, saoBlurRadius: 8, saoBlurStdDev: 4, saoBlurDepthCutoff: 0.005
+    });
+    // r128 の examples/js 版 SAOPass の罠：深度テクスチャを使う指定（第3引数 true）にすると、
+    // 内部で tDepth に引数の真偽値をそのまま入れてしまい、描画時に落ちる。構築後に本物を差し込む
+    const saoDepth = saoPass.beautyRenderTarget.depthTexture;
+    saoDepth.type = THREE.UnsignedIntType;           // 16bit だと far=400 で地面に縞が出る → 24bit
+    [saoPass.saoMaterial, saoPass.vBlurMaterial, saoPass.hBlurMaterial].forEach(m => {
+      if (m && m.uniforms && m.uniforms.tDepth) m.uniforms.tDepth.value = saoDepth;
+    });
+    /* 合成は自前：そのまま掛けると、格子の奥で灯る障子（自ら光る面）まで陰に沈む。
+       明るい画素ほど陰を効かせない（光る紙・提灯・月は素のまま）。
+       SAOPass には陰だけを別の板（saoRT）へ描かせ、素の絵と合わせて次の板へ出す */
+    saoPass.params.output = THREE.SAOPass.OUTPUT.SAO;
+    saoPass.needsSwap = true;
+    const dbs = renderer.getDrawingBufferSize(new THREE.Vector2());
+    saoRT = new THREE.WebGLRenderTarget(dbs.x, dbs.y, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    const saoMix = new THREE.ShaderMaterial({
+      uniforms: { tBeauty: { value: null }, tAO: { value: saoRT.texture }, tDepth: { value: saoDepth },
+                  uNear: { value: camera.near }, uFar: { value: camera.far } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: [
+        'uniform sampler2D tBeauty, tAO, tDepth; uniform float uNear, uFar; varying vec2 vUv;',
+        'void main(){',
+        '  vec4 c = texture2D(tBeauty, vUv);',
+        '  float ao = texture2D(tAO, vUv).r;',
+        '  float d = texture2D(tDepth, vUv).r;',
+        '  float z = uNear * uFar / (uFar - d * (uFar - uNear));',          // 視点からの距離
+        '  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));',
+        '  ao = mix(ao, 1.0, smoothstep(0.25, 0.7, l));',                  // 光る面には効かせない
+        '  ao = mix(ao, 1.0, smoothstep(30.0, 70.0, z));',                 // 遠景（山・対岸）には効かせない
+        '  c.rgb *= ao;',
+        '  gl_FragColor = c;',
+        '}'].join('\n'),
+      depthTest: false, depthWrite: false
+    });
+    // 画面いっぱいの板（r128 の js 版には FullScreenQuad が公開されていないので自前）
+    const saoQuadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const saoQuadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), saoMix);
+    const saoRender0 = saoPass.render;
+    saoPass.render = function(renderer2, writeBuffer, readBuffer){
+      saoRender0.call(this, renderer2, saoRT, saoRT);          // 陰だけ saoRT へ
+      saoMix.uniforms.tBeauty.value = readBuffer.texture;
+      renderer2.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+      renderer2.render(saoQuadMesh, saoQuadCam);
+    };
+    composer.addPass(saoPass);
+    window.__dbg.sao = saoPass;                      // 検証口
+  }
   // 強さ・広がり・敷居。敷居を高めにして、灯りと月だけが滲む
   bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(w0, h0), 0.5, 0.55, 0.62);
   composer.addPass(bloomPass);
+  /* 色調整：暗部を藍へ、明部を灯の橙へ寄せて対比を付け、黒を締める（映画調）。暁では藍を弱める */
+  if (THREE.ShaderPass){
+    gradePass = new THREE.ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uTeal: { value: 0.08 }, uWarm: { value: 0.06 },
+                  uContrast: { value: 1.06 }, uSat: { value: 1.08 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: [
+        'uniform sampler2D tDiffuse; uniform float uTeal, uWarm, uContrast, uSat; varying vec2 vUv;',
+        'void main(){',
+        '  vec3 c = texture2D(tDiffuse, vUv).rgb;',
+        '  float l = dot(c, vec3(0.299, 0.587, 0.114));',
+        '  c += (1.0 - l) * vec3(-0.5, -0.2, 0.6) * uTeal;',
+        '  c += l * vec3(0.6, 0.25, -0.5) * uWarm;',
+        '  c = (c - 0.5) * uContrast + 0.5;',
+        '  c = max(c - 0.012, 0.0) / (1.0 - 0.012);',
+        '  float l2 = dot(c, vec3(0.299, 0.587, 0.114));',
+        '  c = mix(vec3(l2), c, uSat);',
+        '  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);',
+        '}'].join('\n')
+    });
+    composer.addPass(gradePass);
+  }
 }
 
 function resize(){
@@ -660,6 +741,7 @@ function resize(){
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
   if (composer) composer.setSize(w, h);
+  if (saoRT){ const d = renderer.getDrawingBufferSize(new THREE.Vector2()); saoRT.setSize(d.x, d.y); }
 }
 window.addEventListener('resize', resize);
 resize();
@@ -1212,6 +1294,7 @@ const skyDome = (function(){
 /* 水面 ― 空の色を映し（フレネル）、波立つ法線で月を砕く自作シェーダー。
    曹源池だけは本物の鏡（Reflector。高画質かつ池の近くで、主カメラのときだけ描く）。
    色は暁／宵に追従（toki）。霧は scene.fog と同じ式で自前にかける */
+const FRAME = { n: 0 };     // 一駒の通し番号（frame() で進める。鏡を一駒に一度だけ描くための印）
 const WATER = (function(){
   const S = {
     uTime:    { value: 0 },
@@ -1299,10 +1382,14 @@ const WATER = (function(){
     r.material.transparent = true;
     // 描くのは主カメラ・池の近く・地上にいるときだけ（塔の内の窓や月の都では映さない）
     const obr = r.onBeforeRender;
+    // 遮蔽（SAO）が場面をもう一度描くので、鏡は一駒に一度だけ写す
     r.onBeforeRender = function(renderer, sc, cam){
-      if (refl.on && cam === camera) obr.call(this, renderer, sc, cam);
+      if (refl.on && cam === camera && refl.drawn !== FRAME.n){
+        refl.drawn = FRAME.n;
+        obr.call(this, renderer, sc, cam);
+      }
     };
-    refl = { mesh: r, on: true, off: false };
+    refl = { mesh: r, on: true, off: false, drawn: -1 };
     return r;
   }
   /* 暁／宵の色（k=0 宵・1 暁）。宵は嵐山の上の月、暁は東の低い朝日の方（MOON_DIR の先）を砕く */
@@ -9781,7 +9868,7 @@ if (Q.pbr){
 /* 駒落ちの見張り：描き始めの数秒を見て足りなければ 影 → 滲み の順に落とし、
    それでも足りなければ（重いのは PBR 材質と灯の数＝走りながらは替えられない）
    低画質で一度だけ読み直す。?q= で手で選んだときは落とさない */
-const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 4 : 0 };
+const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 5 : 0 };
 function reloadLow(){
   try {
     if (sessionStorage.getItem('machiya-q-low')) return;     // 二度目はしない
@@ -9801,27 +9888,30 @@ function dropKage(){
   });
 }
 function watchFps(raw){
-  if (WATCH.stage >= 4 || raw > 0.5) return;        // タブ切替などの長い空白は数えない
+  if (WATCH.stage >= 5 || raw > 0.5) return;        // タブ切替などの長い空白は数えない
   WATCH.t += raw;
   if (WATCH.t < 3) return;                           // 読み込み直後の重さは見ない
   WATCH.acc += raw; WATCH.n++;
   if (WATCH.acc < 3) return;
   const fps = WATCH.n / WATCH.acc;
   WATCH.acc = 0; WATCH.n = 0;
-  if (fps >= 30){ WATCH.stage = 4; return; }         // 足りている＝見張りを終える
-  if (WATCH.stage === 0 && WATER.refl && !WATER.refl.off){ WATER.refl.off = true; WATCH.stage = 1; return; }
-  if (WATCH.stage <= 1 && moonLight.castShadow){ dropKage(); WATCH.stage = 2; return; }
-  if (WATCH.stage <= 2 && composer){ composer = null; WATCH.stage = 3; return; }
-  WATCH.stage = 4;
+  if (fps >= 30){ WATCH.stage = 5; return; }         // 足りている＝見張りを終える
+  if (WATCH.stage === 0 && saoPass && saoPass.enabled){ saoPass.enabled = false; WATCH.stage = 1; return; }
+  if (WATCH.stage <= 1 && WATER.refl && !WATER.refl.off){ WATER.refl.off = true; WATCH.stage = 2; return; }
+  if (WATCH.stage <= 2 && moonLight.castShadow){ dropKage(); WATCH.stage = 3; return; }
+  if (WATCH.stage <= 3 && composer){ composer = null; WATCH.stage = 4; return; }
+  WATCH.stage = 5;
   if (Q.pbr && fps < 24) reloadLow();
 }
 
 /* 一駒ぶん：演出の更新 → 光と空と水の追従 → 描画（loop と検証口 step の両方がこれを呼ぶ） */
 function frame(dt){
+  FRAME.n++;
   update(dt);
   hemiLight.color.copy(ambLight.color);              // 暁の塗り替えに追従
   hemiLight.intensity = ambLight.intensity * HEMI_K;
   if (bloomPass) bloomPass.strength = 0.5 * (1 - 0.5 * TOKI.k);   // 明けると滲みは控えめに（障子が白飛びしない）
+  if (gradePass) gradePass.uniforms.uTeal.value = 0.08 * (1 - 0.6 * TOKI.k);   // 暁は藍を弱める
   // 空のドームはカメラに付いて回る（月の都では背景ごと外す）。水・星・遠山の時計も進める
   skyDome.mesh.position.copy(camera.position);
   skyDome.mesh.visible = scene.background === TEX.sky;
@@ -9907,6 +9997,7 @@ window.__machiya = {
   },
   /* 画質の検証口：影・滲みを手で落として速さを比べる（戻すには読み直す） */
   qset: function(o){
+    if (o && o.sao === false && saoPass) saoPass.enabled = false;
     if (o && o.refl === false && WATER.refl) WATER.refl.off = true;
     if (o && o.kage === false) dropKage();
     if (o && o.bloom === false) composer = null;
@@ -9915,7 +10006,7 @@ window.__machiya = {
   /* 画質の段と、見張りが落としたものの現況 */
   q: function(){
     return { high: Q.high, pbr: Q.pbr, kage: moonLight.castShadow, bloom: !!composer,
-             refl: !!(WATER.refl && !WATER.refl.off),
+             refl: !!(WATER.refl && !WATER.refl.off), sao: !!(saoPass && saoPass.enabled),
              lamps: roamLights.length, watch: WATCH.stage, exposure: renderer.toneMappingExposure,
              dpr: renderer.getPixelRatio() };
   },
