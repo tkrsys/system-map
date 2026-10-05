@@ -1567,6 +1567,56 @@ function haHada(mat, amp){
   mat.needsUpdate = true;
   return mat;
 }
+/* 葉の板 ― 葉群を描いた透過画像を、向きを散らした板に貼って芯のまわりに束ねる（第4段後半）。
+   板は光を受け（Standard／Lambert）、月光の影を落とし受ける。影の深度材質は map の透明を見ないので、
+   白地の同じ形を alphaMap（緑成分）にも渡す。kind: 'leaf'（広葉・花）／'needle'（松葉） */
+function leafTexture(hex, kind, seed0){
+  const c = cv(256, 256), g = c.getContext('2d');
+  const a = cv(256, 256), ga = a.getContext('2d');
+  g.clearRect(0, 0, 256, 256); ga.clearRect(0, 0, 256, 256);
+  let seed = seed0 || 777;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const r0 = (hex >> 16) & 255, g0 = (hex >> 8) & 255, b0 = hex & 255;
+  const N = kind === 'needle' ? 240 : 150;
+  for (let i = 0; i < N; i++){
+    const th = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * 108;
+    const x = 128 + Math.cos(th) * d, y = 128 + Math.sin(th) * d;
+    const k = 0.74 + rnd() * 0.5 - (y - 128) / 256 * 0.4;        // 下ほど暗く
+    const col = 'rgb(' + Math.min(255, r0 * k | 0) + ',' + Math.min(255, g0 * k | 0) + ',' + Math.min(255, b0 * k | 0) + ')';
+    if (kind === 'needle'){
+      const ang = rnd() * Math.PI * 2, len = 12 + rnd() * 12;
+      g.strokeStyle = col; g.lineWidth = 1.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); g.stroke();
+      ga.strokeStyle = '#fff'; ga.lineWidth = 2.2; ga.lineCap = 'round';
+      ga.beginPath(); ga.moveTo(x, y); ga.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); ga.stroke();
+    } else {
+      const rx = 6 + rnd() * 6, ry = 3.5 + rnd() * 4, rot = rnd() * Math.PI;
+      g.fillStyle = col;
+      g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill();
+      ga.fillStyle = '#fff';
+      ga.beginPath(); ga.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ga.fill();
+    }
+  }
+  return { map: tex(c), alpha: tex(a) };
+}
+function leafCards(group, centers, hex, kind, s, rnd, n){
+  const t = leafTexture(hex, kind, 1 + Math.floor(rnd() * 1e6));
+  const mats = [0xffffff, 0xc4c4c4, 0xe0e0e0].map(c => new LitMat({
+    map: t.map, alphaMap: t.alpha, alphaTest: 0.5, side: THREE.DoubleSide, color: c }));
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const per = n || 7;
+  centers.forEach(cn => {
+    for (let i = 0; i < per; i++){
+      const m = new THREE.Mesh(geo, mats[i % mats.length]);
+      const w = (0.9 + rnd() * 0.6) * s;
+      m.scale.set(w, w * (0.8 + rnd() * 0.3), 1);
+      m.position.set(cn[0] + (rnd() - 0.5) * 1.1 * s, cn[1] + (rnd() - 0.5) * 0.9 * s, cn[2] + (rnd() - 0.5) * 1.1 * s);
+      m.rotation.set((rnd() - 0.5) * 1.2, rnd() * Math.PI, (rnd() - 0.5) * 0.8);
+      m.raycast = function(){};
+      group.add(m);
+    }
+  });
+}
 
 // 星（霧の影響を受けない）。加算合成ではないので、暁の一括減光には手で載せる（㊿）
 // 千二百の星に明るさの分布（数個の一等星・多くの淡い星）と色（暖・冷）とまたたきを付ける
@@ -3324,6 +3374,7 @@ const tenryuji = (function(){
   });
   matsuHa.instanceMatrix.needsUpdate = true;
   g.add(matsuHa);
+  leafCards(g, HA.map(p => [p[0], p[1] + 0.1, p[2]]), 0x2a4a34, 'needle', 0.9, rnd, 5);   // 松葉の板
 
   // ── 庭の灯篭二基（池の東の際と、参道の北の竹の際） ──
   const halos = [];
@@ -3719,6 +3770,7 @@ const shoro = (function(){
   });
   matsuHa.instanceMatrix.needsUpdate = true;
   g.add(matsuHa);
+  leafCards(g, HA.map(p => [p[0], p[1] + 0.1, p[2]]), 0x2a4a34, 'needle', 0.9, rnd, 5);   // 松葉の板
 
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   g.traverse(o => { if (o.isInstancedMesh) boundInstanced(o, 13.5, 3.0, -53.8, 9.5); });
@@ -3969,13 +4021,25 @@ const SHIKI = (function(){
     kan.position.y = 0.85;
     kan.rotation.z = (rnd() - 0.5) * 0.2;
     t.add(kan);
+    // 芯の球（奥の見通しを塞ぐ）＋幹から芯へ伸びる枝＋葉の板
     const mat = haHada(new LitMat({ color: color }), 0.16);
+    const centers = [];
+    const up = new THREE.Vector3(0, 1, 0), from = new THREE.Vector3(0, 1.45, 0), to = new THREE.Vector3();
     for (let i = 0; i < 4; i++){
+      const p = [(rnd() - 0.5) * 1.2, 1.55 + rnd() * 0.75, (rnd() - 0.5) * 1.2];
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), mat);
-      b.position.set((rnd() - 0.5) * 1.2, 1.55 + rnd() * 0.75, (rnd() - 0.5) * 1.2);
-      b.scale.setScalar((0.75 + rnd() * 0.5) * s);
+      b.position.set(p[0], p[1], p[2]);
+      b.scale.setScalar((0.75 + rnd() * 0.5) * s * 0.55);
       t.add(b);
+      centers.push(p);
+      to.set(p[0], p[1], p[2]);
+      const len = from.distanceTo(to);
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.055, len, 5), MAT.wallDk);
+      br.position.copy(from).lerp(to, 0.5);
+      br.quaternion.setFromUnitVectors(up, to.clone().sub(from).normalize());
+      t.add(br);
     }
+    leafCards(t, centers, color, 'leaf', s, rnd, 9);
     t.position.set(x, 0, z);
     return t;
   }
