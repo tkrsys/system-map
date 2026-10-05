@@ -21,6 +21,24 @@
   #stage{position:fixed; inset:0}
   /* touch-action:none はそぞろ歩きの「なぞって見回す」に必須（ブラウザのジェスチャを奪われない） */
   #stage canvas{display:block; width:100%; height:100%; touch-action:none}
+  /* 画面の額：周辺減光（四隅を落として視線を中へ寄せる）と、銀塩の粒子（高画質のみ） */
+  #stage::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 74% 70% at 50% 52%,
+      rgba(0,0,0,0) 0%, rgba(0,0,0,0) 52%, rgba(2,4,10,0.58) 100%);
+  }
+  #grain{
+    position:fixed; left:-50%; top:-50%; width:200%; height:200%;
+    z-index:1; pointer-events:none; opacity:0.07; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain 0.8s steps(5) infinite;
+  }
+  body.q-low #grain{ display:none }
+  @media (prefers-reduced-motion: reduce){ #grain{ animation:none } }
+  @keyframes grain{
+    0%{transform:translate(0,0)} 20%{transform:translate(-3%,2%)} 40%{transform:translate(2%,-4%)}
+    60%{transform:translate(-4%,-1%)} 80%{transform:translate(3%,3%)} 100%{transform:translate(0,0)}
+  }
 
   /* ===== 上：御絵図への渡し ===== */
   .topbar{
@@ -319,6 +337,7 @@
 <body>
 
 <div id="stage"></div>
+<div id="grain" aria-hidden="true"></div>
 
 <div class="topbar">
   <a href="./ezu.html">一覧（御絵図）へ</a>
@@ -407,6 +426,14 @@
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 後処理（提灯・月の滲み）。r128 の examples/js 版＝上の three.min.js と同じ世代。
+     読めなくても本体は素のまま描ける（下で有無を見て分岐） -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (async function(){
 'use strict';
@@ -574,6 +601,27 @@ window.addEventListener('unhandledrejection', e => {
   window.__dbg.err = String(e.reason && (e.reason.stack || e.reason.message) || e.reason);
 });
 
+/* ---- 画質の段 ----
+   端末を見て自動で決める（?q=high / ?q=low で手でも選べる）。
+   高：月光の影・提灯の滲み（ブルーム）・PBR 材質・提灯灯 6 つ・粒子。
+   低：影なし・滲みあり・Lambert 材質・提灯灯 3 つ・粒子なし・解像度 1.5 倍まで。
+   さらに描き始めの数秒で駒落ちが見えたら、影 → 滲みの順に自動で落とす（下の watchFps） */
+const Q = (function(){
+  const qs = new URLSearchParams(location.search).get('q');
+  const ua = navigator.userAgent || '';
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+              || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
+  const cores = navigator.hardwareConcurrency || 4;
+  const mem = navigator.deviceMemory || 8;
+  let high = !mobile && cores >= 4 && mem >= 4;
+  if (qs === 'high') high = true; else if (qs === 'low') high = false;
+  return { high: high, kage: high, bloom: true, pbr: high,
+           lamps: high ? 6 : 3, dpr: high ? 2 : 1.5, forced: qs === 'high' || qs === 'low' };
+})();
+document.body.classList.add(Q.high ? 'q-high' : 'q-low');
+/* 光を受ける材質。高画質では PBR（Standard＝月や提灯の照り返しが出る）、低画質では従来の Lambert */
+const LitMat = Q.pbr ? THREE.MeshStandardMaterial : THREE.MeshLambertMaterial;
+
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
@@ -581,9 +629,28 @@ try {
   document.getElementById('fallback').style.display = 'flex';
   return;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
 renderer.setClearColor(0x05080f, 1);
+/* 階調：ACES フィルミック。暗部を締め、提灯や月の飽和をなめらかに畳む。
+   色空間は従来どおり（素の値をそのまま通す）＝各所の色指定は書き換えなくてよい */
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;   // r128 の ACES は内部で 1/0.6 倍するので 1.0 より下が「素」
+if (Q.kage){
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+}
 stage.appendChild(renderer.domElement);
+
+/* 後処理：提灯・篝火・月の光が滲む（UnrealBloom）。読み込めなければ素で描く */
+let composer = null, bloomPass = null;
+if (Q.bloom && THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass){
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  const w0 = stage.clientWidth || window.innerWidth, h0 = stage.clientHeight || window.innerHeight;
+  // 強さ・広がり・敷居。敷居を高めにして、灯りと月だけが滲む
+  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(w0, h0), 0.5, 0.55, 0.62);
+  composer.addPass(bloomPass);
+}
 
 function resize(){
   const w = stage.clientWidth  || window.innerWidth;
@@ -591,6 +658,7 @@ function resize(){
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
+  if (composer) composer.setSize(w, h);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -598,17 +666,42 @@ resize();
 /* ---- 明かり ----
    暁（㊿）では、この二灯の色と強さ、月光の向きがそのまま朝の光に変わる。
    素の値は AKARI_YORU に控えて、TOKI がそこから朝の値へ寄せる */
-const ambLight = new THREE.AmbientLight(0x33405e, 0.62);
+const ambLight = new THREE.AmbientLight(0x33405e, 0.42);
 scene.add(ambLight);
-const moonLight = new THREE.DirectionalLight(0xb8cdf0, 0.40);
-moonLight.position.set(-8, 16, 6);      // 東（x 負）の高みから射す月あかり
+/* 半球光：空の藍を上から、地の墨を下から。面の向きで明るさが変わり、箱が箱に見える。
+   色と強さは毎フレーム環境光に追従させる（暁の塗り替えが一緒に乗る） */
+const HEMI_K = 0.75;                                   // 環境光に対する半球光の割合
+const hemiLight = new THREE.HemisphereLight(0x33405e, 0x070608, 0.42 * HEMI_K);
+scene.add(hemiLight);
+const moonLight = new THREE.DirectionalLight(0xb8cdf0, 0.50);
+const MOON_DIR = new THREE.Vector3(-8, 16, 6);   // 東（x 負）の高みから射す月あかりの向き（暁で低みへ動く）
+moonLight.position.copy(MOON_DIR);
 scene.add(moonLight);
-const AKARI_YORU = { amb: 0x33405e, ambI: 0.62, tsuki: 0xb8cdf0, tsukiI: 0.40,
+scene.add(moonLight.target);
+const AKARI_YORU = { amb: 0x33405e, ambI: 0.42, tsuki: 0xb8cdf0, tsukiI: 0.50,
                      fog: 0x0a1424, fogD: 0.020, clear: 0x05080f };
 
-// 提灯の灯りは 3 灯だけを使い回す（近い町屋へ移動させる）
+/* 月光の影。影の箱（直交カメラ）はカメラの足もとを追いかける（下の followKage） */
+if (Q.kage){
+  moonLight.castShadow = true;
+  const sh = moonLight.shadow;
+  sh.mapSize.set(2048, 2048);
+  sh.camera.near = 1;  sh.camera.far = 120;
+  sh.camera.left = -36; sh.camera.right = 36; sh.camera.top = 36; sh.camera.bottom = -36;
+  sh.bias = -0.0006; sh.normalBias = 0.03;
+}
+const KAGE_F = new THREE.Vector3();
+function followKage(){
+  camera.getWorldDirection(KAGE_F); KAGE_F.y = 0;
+  if (KAGE_F.lengthSq() < 1e-4) KAGE_F.set(0, 0, -1); else KAGE_F.normalize();
+  const cx = camera.position.x + KAGE_F.x * 12, cz = camera.position.z + KAGE_F.z * 12;
+  moonLight.target.position.set(cx, 0, cz);
+  moonLight.position.set(cx, 0, cz).addScaledVector(MOON_DIR, 60 / MOON_DIR.length());
+}
+
+// 提灯の灯りは数灯だけを使い回す（近い町屋へ移動させる）
 const roamLights = [];
-for (let i = 0; i < 3; i++){
+for (let i = 0; i < Q.lamps; i++){
   const p = new THREE.PointLight(0xffc978, 0.0, 13, 2);
   scene.add(p);
   roamLights.push(p);
@@ -1153,7 +1246,7 @@ const akatsukiFx = (function(){
 (function ground(){
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(60, 116),
-    new THREE.MeshLambertMaterial({ map:TEX.stone })
+    new LitMat({ map:TEX.stone })
   );
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, 0, -20);
@@ -1185,13 +1278,13 @@ const waterStripsYabu = [];
    5. 町屋をこしらえる
    ============================================================ */
 const MAT = {
-  wall   : new THREE.MeshLambertMaterial({ map:TEX.wood }),
-  wallDk : new THREE.MeshLambertMaterial({ map:TEX.woodDk }),
-  plaster: new THREE.MeshLambertMaterial({ map:TEX.plaster }),
-  roof   : new THREE.MeshLambertMaterial({ color:0x2b2f3a }),
-  roofEdge:new THREE.MeshLambertMaterial({ color:0x3d424f }),
-  bar    : new THREE.MeshLambertMaterial({ color:0x2a1d12 }),
-  bamboo : new THREE.MeshLambertMaterial({ color:0x574a2e }),
+  wall   : new LitMat({ map:TEX.wood }),
+  wallDk : new LitMat({ map:TEX.woodDk }),
+  plaster: new LitMat({ map:TEX.plaster }),
+  roof   : new LitMat({ color:0x2b2f3a }),
+  roofEdge:new LitMat({ color:0x3d424f }),
+  bar    : new LitMat({ color:0x2a1d12 }),
+  bamboo : new LitMat({ color:0x574a2e }),
   dark   : new THREE.MeshBasicMaterial({ color:0x080a10 }),
   inner  : new THREE.MeshBasicMaterial({ color:0xffb968 })   // 中から漏れる灯り
 };
@@ -1327,7 +1420,7 @@ function buildMachiya(opt){
 
   const norenGroup = new THREE.Group();       // 上端で吊る
   norenGroup.position.set(doorX, 2.02, F + 0.13);
-  const norenMat = new THREE.MeshLambertMaterial({
+  const norenMat = new LitMat({
     map: norenTexture(opt.kanji || '', accent),
     side: THREE.DoubleSide, transparent:true
   });
@@ -1442,7 +1535,7 @@ function sandoFloor(z){
 }
 
 /* 河原・対岸・山裾（石畳はここで土の色に変わる） */
-const MAT_KAWARA = new THREE.MeshLambertMaterial({ color:0x171c26 });
+const MAT_KAWARA = new LitMat({ color:0x171c26 });
 [
   { d:12, z:-84    },      // 町側の河原
   { d:11, z:-125.5 },      // 対岸の河原
@@ -1456,7 +1549,7 @@ const MAT_KAWARA = new THREE.MeshLambertMaterial({ color:0x171c26 });
 /* 橋へ導く石の細道（両袂） */
 [[-84, 12], [-125.5, 11]].forEach(k => {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(3.4, k[1]),
-    new THREE.MeshLambertMaterial({ map:TEX.stone }));
+    new LitMat({ map:TEX.stone }));
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, 0.005, k[0]);
   scene.add(m);
@@ -1559,7 +1652,7 @@ const bridgeGroup = (function(){
 /* 袂の石灯篭（両岸に二基ずつ） */
 const touros = [];
 (function(){
-  const stone = new THREE.MeshLambertMaterial({ color:0x353b47 });
+  const stone = new LitMat({ color:0x353b47 });
   [[-2.7, -86.4], [2.7, -86.4], [-2.9, -123.6], [2.9, -123.6]].forEach(k => {
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.22, 0.52), stone);
@@ -1654,7 +1747,7 @@ const MTS = [
 ];
 const mtGroup = (function(){
   const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color:0x131c29 });
+  const mat = new LitMat({ color:0x131c29 });
   MTS.forEach(m => {
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(m.r, 26, 14, 0, Math.PI * 2, 0, Math.PI / 2), mat);
@@ -1712,8 +1805,8 @@ const kasumis = [];
 (function(){
   let seed = 555;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const kan = new THREE.MeshLambertMaterial({ color:0x3d5a40 });
-  const ha  = new THREE.MeshLambertMaterial({ color:0x2a4231 });
+  const kan = new LitMat({ color:0x3d5a40 });
+  const ha  = new LitMat({ color:0x2a4231 });
   for (let i = 0; i < 12; i++){
     const x = 5.5 + rnd() * 12, z = -126.5 - rnd() * 10;
     const h = 3.4 + rnd() * 1.5;
@@ -1798,7 +1891,7 @@ const nagashiGlow = (function(){
   const bodyGeo = new THREE.BoxGeometry(0.22, 0.16, 0.22);
   const roofGeo = new THREE.ConeGeometry(0.19, 0.10, 4);
   const bodyMat = new THREE.MeshBasicMaterial({ color:0xffd9a0 });
-  const roofMat = new THREE.MeshLambertMaterial({ color:0x2a2018 });
+  const roofMat = new LitMat({ color:0x2a2018 });
   const N = 10;
   for (let i = 0; i < N; i++){
     const g = new THREE.Group();
@@ -1866,7 +1959,7 @@ const hinoko = (function(){
 /* ⑦ 渡月橋を渡る宵の人影 ― 二人連れと、提灯を提げたひとり */
 const walkers = [];
 if (FX.hitokage){
-  const silk = new THREE.MeshLambertMaterial({ color:0x14161f });
+  const silk = new LitMat({ color:0x14161f });
   const person = px => {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.16, 1.02, 7), silk);
@@ -1962,7 +2055,7 @@ const chikurin = (function(){
   const N = 256;                 // 見上げても切れ目のない壁にする（描画は一回のまま）
   const geo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
   geo.translate(0, 0.5, 0);   // 根元を原点に置き、高さは行列の scale で決める
-  const stalks = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map: TEX.take }), N);
+  const stalks = new THREE.InstancedMesh(geo, new LitMat({ map: TEX.take }), N);
   stalks.frustumCulled = false;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler(),
         v3 = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
@@ -2072,7 +2165,7 @@ const yabu = (function(){
   const michi = new THREE.Group();
   // 藪の底は石畳を隠して土に。西は天龍寺の土塀（x-7.6）の手前まで敷く
   const tsuchi = new THREE.Mesh(new THREE.PlaneGeometry(15.0, LEN),
-    new THREE.MeshLambertMaterial({ color: 0x1a1c16 }));
+    new LitMat({ color: 0x1a1c16 }));
   tsuchi.rotation.x = -Math.PI / 2;
   tsuchi.position.set(0, 0.006, zc);
   michi.add(tsuchi);
@@ -2082,7 +2175,7 @@ const yabu = (function(){
   jariMap.needsUpdate = true;
   const jari = new THREE.Mesh(new THREE.PlaneGeometry(2.35, LEN),
     // 藪のなかに灯りは無いので、月あかりぶんは emissive で下駄を履かせる（道だけ白く浮く）
-    new THREE.MeshLambertMaterial({ map: jariMap, color: 0xb0a992, emissive: 0x16170f }));
+    new LitMat({ map: jariMap, color: 0xb0a992, emissive: 0x16170f }));
   jari.rotation.x = -Math.PI / 2;
   jari.position.set(0, 0.011, zc);
   michi.add(jari);
@@ -2107,7 +2200,7 @@ const yabu = (function(){
   kakiMap.needsUpdate = true;
   const body = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.07, HH, SEG),
-    new THREE.MeshLambertMaterial({ map: kakiMap }), segs.length);
+    new LitMat({ map: kakiMap }), segs.length);
   const rail = new THREE.InstancedMesh(
     new THREE.CylinderGeometry(0.032, 0.032, SEG, 5), MAT.bamboo, segs.length * 2);
   const post = new THREE.InstancedMesh(
@@ -2132,7 +2225,7 @@ const yabu = (function(){
   /* ── ㉘ 藪のなかの一本の高木。葉を落とし、月あかりに黒く立つ ── */
   const ko = new THREE.Group();
   const TX = 2.75, TZ = -74.2, TH = 11.4;   // 垣のすぐ後ろ。小径の先に幹が立ち上がる
-  const kiMat = new THREE.MeshLambertMaterial({ color: 0x1f1c15 });   // 影として立たせる
+  const kiMat = new LitMat({ color: 0x1f1c15 });   // 影として立たせる
   const miki = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.26, TH, 7), kiMat);
   miki.position.set(TX, TH / 2, TZ);
   miki.rotation.z = 0.035;
@@ -2170,7 +2263,7 @@ const yabu = (function(){
 /* ⑯ 対岸の納涼床：西のたもと、提灯の灯が水面に伸びる */
 const kawadoko = (function(){
   const g = new THREE.Group();
-  const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
+  const wood = new LitMat({ map: TEX.woodDk });
   const CX = -21, CZ = -121.8;   // 対岸の河原（z-120〜-131）の水際
   // 床板
   const deck = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.1, 3.2), wood);
@@ -2182,7 +2275,7 @@ const kawadoko = (function(){
     leg.position.set(p[0], tall ? 0.15 : 0.26, p[1]); g.add(leg);
   });
   // 低い欄干（両端と山側。川側は眺めのため開ける）
-  const railMat = new THREE.MeshLambertMaterial({ color: 0x2a1d12 });
+  const railMat = new LitMat({ color: 0x2a1d12 });
   [[-2.45, 0, 0.02, 3.1], [2.45, 0, 0.02, 3.1]].forEach(r => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, r[3]), railMat);
     m.position.set(r[0], 0.92, r[2]); g.add(m);
@@ -2237,7 +2330,7 @@ const kawadoko = (function(){
 /* ⑰ お地蔵さんの祠：肆のかたわら、東側の道ばた */
 const hokora = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x3b4048 });
+  const stone = new LitMat({ color: 0x3b4048 });
   const dai = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.4), stone);
   dai.position.y = 0.09; g.add(dai);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.5, 0.36), MAT.wallDk);
@@ -2245,7 +2338,7 @@ const hokora = (function(){
   const kuchi = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.38), MAT.dark);
   kuchi.position.set(0, 0.44, 0.181); g.add(kuchi);
   // お地蔵さん（赤い前掛け）
-  const jizoMat = new THREE.MeshLambertMaterial({ color: 0x9aa0ac });
+  const jizoMat = new LitMat({ color: 0x9aa0ac });
   const mi = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.22, 8), jizoMat);
   mi.position.set(0, 0.37, 0.10); g.add(mi);
   const atama = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), jizoMat);
@@ -2356,8 +2449,8 @@ const okuribi = (function(){
    ============================================================ */
 const butai = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x2e333d });
-  const hillMat = new THREE.MeshLambertMaterial({ color: 0x131c29 });
+  const stone = new LitMat({ color: 0x2e333d });
+  const hillMat = new LitMat({ color: 0x131c29 });
 
   // ── 物見の丘（頂 4.95。舞台と塔の土台になる） ──
   const knoll = new THREE.Mesh(
@@ -2393,7 +2486,7 @@ const butai = (function(){
   const deck = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.22, 3.4), MAT.wallDk);
   deck.position.set(-15, FLOOR - 0.11, -134.9);
   g.add(deck);
-  const railMat = new THREE.MeshLambertMaterial({ color: 0x2a1d12 });
+  const railMat = new LitMat({ color: 0x2a1d12 });
   // 欄干（北・東・西。南は丘と塔につながる）
   [[[-15, -133.35], 12.2, 0],
    [[-9.05, -134.9], 3.4, 1],
@@ -2450,7 +2543,7 @@ const butai = (function(){
     baseY += t[1] + t[3] * 0.55;
   });
   // 相輪（先で小さく光る）
-  const sorinMat = new THREE.MeshLambertMaterial({ color: 0x6a5a30 });
+  const sorinMat = new LitMat({ color: 0x6a5a30 });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.3, 6), sorinMat);
   pole.position.y = baseY + 1.0; tou.add(pole);
   for (let i = 0; i < 5; i++){
@@ -2516,14 +2609,14 @@ const butai = (function(){
    ============================================================ */
 const tenryuji = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
-  const shirakabe = new THREE.MeshLambertMaterial({ map: TEX.plaster });
+  const stone = new LitMat({ color: 0x343a46 });
+  const shirakabe = new LitMat({ map: TEX.plaster });
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
         vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
 
   // ── 庭の地面（白砂の見立て。夜なのでほの明るい灰） ──
   const niwa = new THREE.Mesh(new THREE.PlaneGeometry(16.6, 17.8),
-    new THREE.MeshLambertMaterial({ color: 0x232833 }));
+    new LitMat({ color: 0x232833 }));
   niwa.rotation.x = -Math.PI / 2;
   niwa.position.set(-15.9, 0.01, -67.5);
   g.add(niwa);
@@ -2757,7 +2850,7 @@ const tenryuji = (function(){
   matsuKan.instanceMatrix.needsUpdate = true;
   g.add(matsuKan);
   const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 8, 6),
-    new THREE.MeshLambertMaterial({ color: 0x1d3226 }), 6);
+    new LitMat({ color: 0x1d3226 }), 6);
   const HA = [[-21.2, 2.0, -61.0, 1.3], [-20.6, 1.6, -61.7, 1.0], [-21.5, 1.45, -61.6, 0.8],
               [-18.8, 1.85, -62.8, 1.15], [-19.4, 1.5, -62.3, 0.9], [-18.5, 1.35, -62.1, 0.75]];
   HA.forEach((p, i) => {
@@ -2935,7 +3028,7 @@ const unryu = (function(){
   });
   // 入口の踏み石と框（北面＝参道から一歩で上がる側に）
   const fumi = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.07, 0.5),
-    new THREE.MeshLambertMaterial({ color: 0x343a46 }));
+    new LitMat({ color: 0x343a46 }));
   fumi.position.set(CX, 0.035, CZ + 1.75);
   g.add(fumi);
   const kamachi = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.3, 0.12), MAT.wallDk);
@@ -2989,9 +3082,9 @@ const unryu = (function(){
    ============================================================ */
 const shoro = (function(){
   const g = new THREE.Group();
-  const stone  = new THREE.MeshLambertMaterial({ color: 0x343a46 });
-  const stoneI = new THREE.MeshLambertMaterial({ color: 0x343a46 });   // 色なしインスタンス用の双子
-  const kaneMat = new THREE.MeshLambertMaterial({ color: 0x2b3440 });
+  const stone  = new LitMat({ color: 0x343a46 });
+  const stoneI = new LitMat({ color: 0x343a46 });   // 色なしインスタンス用の双子
+  const kaneMat = new LitMat({ color: 0x2b3440 });
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
         vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
   let seed = 8181;
@@ -3001,7 +3094,7 @@ const shoro = (function(){
 
   // ── 庭の地面（白砂の見立て。境内の庭と同じ沈んだ灰） ──
   const niwa = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 10.2),
-    new THREE.MeshLambertMaterial({ color: 0x232833 }));
+    new LitMat({ color: 0x232833 }));
   niwa.rotation.x = -Math.PI / 2;
   niwa.position.set(14.5, 0.013, -53.8);
   g.add(niwa);
@@ -3046,7 +3139,7 @@ const shoro = (function(){
   roban.position.set(SX, 4.5, SZ);
   g.add(roban);
   const hoju = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8),
-    new THREE.MeshLambertMaterial({ color: 0x6a5a30 }));
+    new LitMat({ color: 0x6a5a30 }));
   hoju.position.set(SX, 4.72, SZ);
   g.add(hoju);
 
@@ -3060,7 +3153,7 @@ const shoro = (function(){
   ryu.rotation.x = Math.PI / 2;
   ryu.position.y = 0.36; kane.add(ryu);
   const tsukiza = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 12),
-    new THREE.MeshLambertMaterial({ color: 0x3a4550 }));
+    new LitMat({ color: 0x3a4550 }));
   tsukiza.rotation.x = Math.PI / 2;
   tsukiza.position.set(0, -0.5, -0.55);         // 南面＝参る側（z マイナスが南。撞木の側）
   kane.add(tsukiza);
@@ -3088,7 +3181,7 @@ const shoro = (function(){
   log.position.y = -0.82;
   shumoku.add(log);
   const logCap = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.1, 10),
-    new THREE.MeshLambertMaterial({ color: 0x4a3a22 }));
+    new LitMat({ color: 0x4a3a22 }));
   logCap.rotation.x = Math.PI / 2;
   logCap.position.set(0, -0.82, 0.8);           // 鐘に当たる木口（北の端＝鐘の側）
   shumoku.add(logCap);
@@ -3109,7 +3202,7 @@ const shoro = (function(){
   // ── 常夜灯二基（敷石の両脇。撞座を照らす） ──
   const jSao  = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.6, 0.2), stoneI, 2);
   const jHi   = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.26, 0.28),
-    new THREE.MeshLambertMaterial({ color: 0xf0d3a4, emissive: 0x3a2a12 }), 2);
+    new LitMat({ color: 0xf0d3a4, emissive: 0x3a2a12 }), 2);
   const jKasa = new THREE.InstancedMesh(new THREE.ConeGeometry(0.33, 0.22, 4), stoneI, 2);
   [[11.0, -56.6], [14.2, -56.6]].forEach((p, i) => {
     m4.makeTranslation(p[0], 0.3, p[1]);  jSao.setMatrixAt(i, m4);
@@ -3128,7 +3221,7 @@ const shoro = (function(){
   // ── 庭の際（北と東を竹穂垣で閉じる。行けない縁をそのまま景色にする） ──
   const KAKI = [[14.4, -48.85, 14.6, 0], [7.25, -53.8, 9.8, 1]];
   const kakiBody = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1.75, 0.22),
-    new THREE.MeshLambertMaterial({ map: TEX.hogaki }), KAKI.length);
+    new LitMat({ map: TEX.hogaki }), KAKI.length);
   const kakiTop  = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.07, 0.28), MAT.bamboo, KAKI.length);
   KAKI.forEach((k, i) => {
     eu.set(0, k[3] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
@@ -3152,7 +3245,7 @@ const shoro = (function(){
   matsuKan.instanceMatrix.needsUpdate = true;
   g.add(matsuKan);
   const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.6, 8, 6),
-    new THREE.MeshLambertMaterial({ color: 0x1d3226 }), 6);
+    new LitMat({ color: 0x1d3226 }), 6);
   const HA = [[18.2, 2.2, -50.6, 1.4], [17.6, 1.8, -51.2, 1.0], [18.9, 1.7, -50.1, 0.85],
               [20.4, 2.3, -52.4, 1.3], [19.8, 1.9, -52.9, 0.95], [21.0, 1.75, -52.0, 0.8]];
   HA.forEach((p, i) => {
@@ -3217,7 +3310,7 @@ const sakai = (function(){
     kan.rotation.z = (rnd() - 0.5) * 0.16;
     tree.add(kan);
     const fronds = new THREE.InstancedMesh(frondGeo,
-      new THREE.MeshLambertMaterial({ map: TEX.yanagi, transparent: true,
+      new LitMat({ map: TEX.yanagi, transparent: true,
         side: THREE.DoubleSide, depthWrite: false }), 4);
     for (let i = 0; i < 4; i++){
       eu.set((rnd() - 0.5) * 0.2, (i / 4) * Math.PI * 2 + rnd(), (rnd() - 0.5) * 0.14);
@@ -3244,7 +3337,7 @@ const sakai = (function(){
     ASHI.push([p[0] + 0.1, p[1] - 0.05, rnd() * Math.PI]);
   });
   const ashi = new THREE.InstancedMesh(ashiGeo,
-    new THREE.MeshLambertMaterial({ map: TEX.ashi, transparent: true,
+    new LitMat({ map: TEX.ashi, transparent: true,
       side: THREE.DoubleSide, depthWrite: false }), ASHI.length);
   ASHI.forEach((p, i) => {
     eu.set(0, p[2], 0); q0.setFromEuler(eu);
@@ -3293,13 +3386,13 @@ const chamise = (function(){
   ashiG.instanceMatrix.needsUpdate = true;
   g.add(ashiG);
   const mousen = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.03, 0.5),
-    new THREE.MeshLambertMaterial({ color: 0xa8352c }));
+    new LitMat({ color: 0xa8352c }));
   mousen.position.y = 0.47; g.add(mousen);
   // 野点傘（床几のかたわらに立てて開く）
   const kasaPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 2.6, 6), MAT.bamboo);
   kasaPole.position.set(-1.05, 1.3, -0.1); g.add(kasaPole);
   const kasa = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.55, 10),
-    new THREE.MeshLambertMaterial({ color: 0x93302a, side: THREE.DoubleSide }));
+    new LitMat({ color: 0x93302a, side: THREE.DoubleSide }));
   kasa.position.set(-1.05, 2.45, -0.1); g.add(kasa);
   // 行灯（小さな灯と地の照り）
   const anBody = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.22), MAT.inner);
@@ -3411,7 +3504,7 @@ const SHIKI = (function(){
     kan.position.y = 0.85;
     kan.rotation.z = (rnd() - 0.5) * 0.2;
     t.add(kan);
-    const mat = new THREE.MeshLambertMaterial({ color: color });
+    const mat = new LitMat({ color: color });
     for (let i = 0; i < 4; i++){
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), mat);
       b.position.set((rnd() - 0.5) * 1.2, 1.55 + rnd() * 0.75, (rnd() - 0.5) * 1.2);
@@ -3514,7 +3607,7 @@ const SHIKI = (function(){
    西は保津峡の山が川面まで迫り、東は盆地へ開けて低い山と町の灯 */
 const enzan = (function(){
   const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0x111a26 });   // 三峰よりひとつ遠い色
+  const mat = new LitMat({ color: 0x111a26 });   // 三峰よりひとつ遠い色
   // [cx, cz, r, sy, sz]
   const MINE = [
     [  14,   52, 34, 0.42, 0.62],   // 小倉山（通りの延長の北、竹林の背）
@@ -3596,15 +3689,15 @@ const nakanoshima = (function(){
   const g = new THREE.Group();
   // 州浜（水面よりわずかに高い砂の州）
   const suhama = new THREE.Mesh(new THREE.CircleGeometry(1, 24),
-    new THREE.MeshLambertMaterial({ color: 0x1a212c }));
+    new LitMat({ color: 0x1a212c }));
   suhama.rotation.x = -Math.PI / 2;
   suhama.scale.set(15, 7.2, 1);
   suhama.position.set(-40, -0.16, -107);
   g.add(suhama);
   // 松（幹はまとめて一描画、傘は二段のシルエット）
   const KAN = [[-33.5, -104.5, 4.4, -0.06], [-41.5, -110, 5.2, 0.05], [-47, -103.5, 3.8, -0.09]];
-  const kanMat = new THREE.MeshLambertMaterial({ color: 0x161009 });
-  const kasaMat = new THREE.MeshLambertMaterial({ color: 0x0e1a15 });
+  const kanMat = new LitMat({ color: 0x161009 });
+  const kasaMat = new LitMat({ color: 0x0e1a15 });
   const kan = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.15, 1, 5), kanMat, KAN.length);
   const kasa = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), kasaMat, KAN.length * 2);
   kan.frustumCulled = kasa.frustumCulled = false;   // 位置が散るので境界球カリングは切る
@@ -3625,7 +3718,7 @@ const nakanoshima = (function(){
   g.add(kan, kasa);
   // 川茶屋（小屋の影。提灯二つの灯だけ暖かい）
   const koya = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.5, 2.0),
-    new THREE.MeshLambertMaterial({ color: 0x10151e }));
+    new LitMat({ color: 0x10151e }));
   koya.position.set(-40, 0.59, -108.2);
   g.add(koya);
   const kyane = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.12, 2.5), MAT.roof);
@@ -3654,7 +3747,7 @@ const nakanoshima = (function(){
 /* ㉛ 鵜舟の舟だまり ― 上流（西＝x正）の水際に三艘舫って、舳先の篝に残り火 */
 const ubune = (function(){
   const g = new THREE.Group();
-  const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
+  const wood = new LitMat({ map: TEX.woodDk });
   // [cx, cz, 向き]
   const FUNE = [[17.4, -88.6, 0.42], [19.6, -89.4, -0.18], [21.8, -88.2, 0.66]];
   const hull = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.24, 3.1), wood, FUNE.length);
@@ -3694,7 +3787,7 @@ const ubune = (function(){
 /* ㉜ 上流の岩場と早瀬 ― 保津峡の入口の見立て（西＝x正）。岩の下流側で白波がちらつく */
 const iwaba = (function(){
   const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0x272e3b });
+  const mat = new LitMat({ color: 0x272e3b });
   // [x, z, 大きさ, 低さ, 川の中か]
   const IWA = [
     [17.5, -83.0, 1.1, 0.75, 0], [20.5, -86.5, 1.5, 0.90, 0], [24.5, -81.5, 0.9, 0.60, 0],
@@ -3735,8 +3828,8 @@ const iwaba = (function(){
      天龍寺と同じく scale.x=-1 の鏡像で西＝x正側へ建てる） */
 const garan = (function(){
   const g = new THREE.Group();
-  const wallMat = new THREE.MeshLambertMaterial({ color: 0x11161f });
-  const roofMat = new THREE.MeshLambertMaterial({ color: 0x1a2130 });
+  const wallMat = new LitMat({ color: 0x11161f });
+  const roofMat = new LitMat({ color: 0x1a2130 });
   // 庫裏（大きな切妻。鐘楼の庭の西の突き当たり＝実座標 x17.3〜23.7）
   const KX = -20.5;
   const body = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.0, 4.6), wallMat);
@@ -3774,8 +3867,8 @@ const garan = (function(){
 /* ㉞ 木戸の先の家並み ― 続きの町の影。提灯の点列が霧の奥へ溶けていく */
 const ienami = (function(){
   const g = new THREE.Group();
-  const wallMat = new THREE.MeshLambertMaterial({ color: 0x121722 });
-  const roofMat = new THREE.MeshLambertMaterial({ color: 0x0d1118 });
+  const wallMat = new LitMat({ color: 0x121722 });
+  const roofMat = new LitMat({ color: 0x0d1118 });
   // [side, z, 間口]（奥へゆくほど霧が呑む）
   // 北の田の道・畦道・大覚寺の境内に場所を譲り、木戸ぎわの四棟だけ残した（5p）
   // ―― さらに西側の二棟は落柿舎（㊷）の田に譲って畳んだ。実際の嵯峨野も
@@ -3886,19 +3979,19 @@ const sora = (function(){
    ============================================================ */
 const adashino = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x3b4048 });
+  const stone = new LitMat({ color: 0x3b4048 });
   // ⚠ r128 の罠：setColorAt を使う InstancedMesh（羅漢の胴と頭）と、色を持たない
   //   InstancedMesh が同じ材質を共用すると、先に確定したプログラムが instanceColor を
   //   要求して描画時に「isInterleavedBufferAttribute of null」で落ちる。色なしの
   //   インスタンス（階・常夜灯の竿と笠）には双子の材質を渡す
-  const stoneI = new THREE.MeshLambertMaterial({ color: 0x3b4048 });
+  const stoneI = new LitMat({ color: 0x3b4048 });
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
         vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
   let seed = 6464;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
   // ── 土の面（石畳の広場を土に返す。藪の道と同じ作法。囲いの竹の根方まで敷く） ──
-  const tsuchiMat = new THREE.MeshLambertMaterial({ color: 0x191b15 });
+  const tsuchiMat = new LitMat({ color: 0x191b15 });
   const no = new THREE.Mesh(new THREE.PlaneGeometry(21.2, 22.0), tsuchiMat);
   no.rotation.x = -Math.PI / 2;
   no.position.set(-18.2, 0.012, -67.1);
@@ -3932,7 +4025,7 @@ const adashino = (function(){
   monMune.position.set(-8.9, 2.02 + monRise + 0.02, -61.9);
   g.add(monMune);
   // 仁王二体（門の内側。夜は影だけ。胴・頭・腕は各一描画）
-  const nioMat = new THREE.MeshLambertMaterial({ color: 0x1b1a17 });
+  const nioMat = new LitMat({ color: 0x1b1a17 });
   const NIO = [[-9.05, -60.95], [-9.05, -62.85]];
   const nioDou  = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.21, 1.25, 7), nioMat, 2);
   const nioAtama = new THREE.InstancedMesh(new THREE.SphereGeometry(0.14, 8, 7), nioMat, 2);
@@ -3962,7 +4055,7 @@ const adashino = (function(){
   hyou.position.set(-8.05, 0.8, -63.5);
   g.add(hyou);
   const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 1.54),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('愛宕念仏寺出張所', '千二百羅漢'),
+    new LitMat({ map: hyouTexture('愛宕念仏寺出張所', '千二百羅漢'),
       emissive: 0x141620 }));
   hyouMen.rotation.y = Math.PI / 2;
   hyouMen.position.set(-7.89, 0.8, -63.5);
@@ -4044,7 +4137,7 @@ const adashino = (function(){
   // ── 低い石積みの囲い（野の奥と北の際。歩ける限界がそのまま景色になる） ──
   [[-27.0, -67.2, 0.4, 20.2, 1], [-17.6, -57.2, 0.4, 18.6, 0]].forEach(k => {
     const tsumi = new THREE.Mesh(new THREE.BoxGeometry(k[4] ? 0.5 : k[3], k[2], k[4] ? k[3] : 0.5),
-      new THREE.MeshLambertMaterial({ color: 0x2c313c }));
+      new LitMat({ color: 0x2c313c }));
     tsumi.position.set(k[0], k[2] / 2, k[1]);
     g.add(tsumi);
   });
@@ -4055,7 +4148,7 @@ const adashino = (function(){
     const sao = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), stone);
     sao.position.set(p[0], 0.25, p[1]); g.add(sao);
     const hib = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.24, 0.28),
-      new THREE.MeshLambertMaterial({ color: 0x9fb0c8, emissive: 0x1c2836 }));
+      new LitMat({ color: 0x9fb0c8, emissive: 0x1c2836 }));
     hib.position.set(p[0], 0.62, p[1]); g.add(hib);
     const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.2, 4), stone);
     kasa.rotation.y = Math.PI / 4;
@@ -4142,7 +4235,7 @@ const adashino = (function(){
   g.add(honHi);
   const bSao  = new THREE.InstancedMesh(new THREE.BoxGeometry(0.18, 0.6, 0.18), stoneI, 2);
   const bHibu = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 0.24, 0.26),
-    new THREE.MeshLambertMaterial({ color: 0xefd2a2, emissive: 0x3a2a12 }), 2);
+    new LitMat({ color: 0xefd2a2, emissive: 0x3a2a12 }), 2);
   const bKasa = new THREE.InstancedMesh(new THREE.ConeGeometry(0.3, 0.2, 4), stoneI, 2);
   [[-24.5, -64.9], [-24.5, -69.1]].forEach((p, i) => {
     m4.makeTranslation(p[0], 0.3, p[1]);  bSao.setMatrixAt(i, m4);
@@ -4155,7 +4248,7 @@ const adashino = (function(){
   // 本堂まわりだけ苔を敷く（境内の暖かさの範囲を足もとでも見せる）
   // 苔は本堂の足もとから滲むように四つの斑で（四角に敷くと緑の敷物のように浮く）
   const bKoke = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 14),
-    new THREE.MeshLambertMaterial({ map: TEX.koke, emissive: 0x080e08 }), 4);
+    new LitMat({ map: TEX.koke, emissive: 0x080e08 }), 4);
   [[-23.6, -67.0, 2.1], [-22.6, -64.6, 1.5], [-22.9, -69.3, 1.7], [-21.0, -66.4, 1.2]]
     .forEach((p, i) => {
       eu.set(-Math.PI / 2, 0, rnd() * Math.PI); q0.setFromEuler(eu);
@@ -4177,7 +4270,7 @@ const adashino = (function(){
   sKeta.position.set(-25.2, 1.46, -63.2);
   g.add(sKeta);
   const sKane = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.19, 0.34, 8),
-    new THREE.MeshLambertMaterial({ color: 0x232b36 }), 3);
+    new LitMat({ color: 0x232b36 }), 3);
   for (let i = 0; i < 3; i++){
     m4.makeTranslation(-25.2, 1.19, -63.9 + i * 0.7);
     sKane.setMatrixAt(i, m4);
@@ -4200,7 +4293,7 @@ const adashino = (function(){
   g.add(hokoraHi);
 
   // ── 苔むした古木（野の北の隅に一本、葉のない影） ──
-  const kokuMat = new THREE.MeshLambertMaterial({ color: 0x1d1a14 });
+  const kokuMat = new LitMat({ color: 0x1d1a14 });
   const kan = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, 8.4, 6), kokuMat);
   kan.position.set(-22.6, 4.2, -58.9);
   kan.rotation.z = 0.05;
@@ -4242,7 +4335,7 @@ const adashino = (function(){
   const kakoiGeo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
   kakoiGeo.translate(0, 0.5, 0);                       // 根元を原点に。丈は行列の scale で
   const kakoiTake = new THREE.InstancedMesh(kakoiGeo,
-    new THREE.MeshLambertMaterial({ map: TEX.take }), TAKE_POS.length);
+    new LitMat({ map: TEX.take }), TAKE_POS.length);
   kakoiTake.frustumCulled = false;                     // 位置が散るので境界球カリングは切る
   TAKE_POS.forEach((p, i) => {
     eu.set((rnd() - 0.5) * 0.08, rnd() * Math.PI, (rnd() - 0.5) * 0.08);
@@ -4312,9 +4405,9 @@ const adashino = (function(){
 const NONOMIYA_SHIFT_Z = 8.2;      // 鐘楼の庭に場所を譲って北へ退いたぶん（歩ける矩形も同じだけ北へ）
 const nonomiya = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
-  const shu   = new THREE.MeshLambertMaterial({ color: 0x8e3628 });   // 朱（夜なので沈んだ朱）
-  const sugiM = new THREE.MeshLambertMaterial({ color: 0x141d18 });
+  const stone = new LitMat({ color: 0x343a46 });
+  const shu   = new LitMat({ color: 0x8e3628 });   // 朱（夜なので沈んだ朱）
+  const sugiM = new LitMat({ color: 0x141d18 });
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
         vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
   let seed = 5252;
@@ -4322,7 +4415,7 @@ const nonomiya = (function(){
   const halos = [];
 
   // ── 路地の土（石畳を土に返す。藪の道と同じ作法） ──
-  const tsuchi = new THREE.MeshLambertMaterial({ color: 0x1b1c16, emissive: 0x131409 });
+  const tsuchi = new LitMat({ color: 0x1b1c16, emissive: 0x131409 });
   const roji = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 2.0), tsuchi);
   roji.rotation.x = -Math.PI / 2;
   roji.position.set(4.95, 0.013, -50.2);
@@ -4331,7 +4424,7 @@ const nonomiya = (function(){
   // ── 絨毯苔の庭（夜でも緑が読めるよう emissive で下駄。砂利と同じ手） ──
   // 社叢の根方まで敷いて、石畳の大きな石が「町の舗装の続き」に見えるのを防ぐ（藪の道の学び）
   const koke = new THREE.Mesh(new THREE.PlaneGeometry(14.4, 14.4),
-    new THREE.MeshLambertMaterial({ map: TEX.koke, emissive: 0x0d1a0e }));
+    new LitMat({ map: TEX.koke, emissive: 0x0d1a0e }));
   koke.rotation.x = -Math.PI / 2;
   koke.position.set(14.9, 0.014, -48.6);
   g.add(koke);
@@ -4345,7 +4438,7 @@ const nonomiya = (function(){
     [18.3, -55.6, 7.6, 0]             // 南（庫裏の東の抜け）
   ];
   const hogakiBody = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1.9, 0.22),
-    new THREE.MeshLambertMaterial({ map: TEX.hogaki }), HOGAKI.length);
+    new LitMat({ map: TEX.hogaki }), HOGAKI.length);
   const hogakiTop  = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.07, 0.28), MAT.bamboo, HOGAKI.length);
   HOGAKI.forEach((k, i) => {
     eu.set(0, k[3] ? Math.PI / 2 : 0, 0); q0.setFromEuler(eu);
@@ -4368,7 +4461,7 @@ const nonomiya = (function(){
   g.add(shiki);
 
   // ── 黒木鳥居（皮付きのまま。柱は路地の幅の外に立てて、あいだを抜ける） ──
-  const kurokiM = new THREE.MeshLambertMaterial({ map: TEX.kuroki });
+  const kurokiM = new LitMat({ map: TEX.kuroki });
   const hashira = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.155, 2.9, 8), kurokiM, 2);
   [-1, 1].forEach((s, i) => {
     m4.makeTranslation(8.9, 1.45, -50.2 + s * 1.16);
@@ -4386,7 +4479,7 @@ const nonomiya = (function(){
   g.add(nuki);
 
   // ── 小柴垣（歩ける境内の縁がそのまま景色になる。稲荷へ抜ける切れ目だけ空ける） ──
-  const shibaM = new THREE.MeshLambertMaterial({ map: TEX.shiba });
+  const shibaM = new LitMat({ map: TEX.shiba });
   const KAKI = [                            // [中心x, 中心z, 長さ(x沿い)]
     [10.4, -45.2, 4.1],                     // 北（稲荷の小径 x13.0〜14.2 を空ける）
     [15.5, -45.2, 2.7],
@@ -4501,7 +4594,7 @@ const nonomiya = (function(){
   kameDai.position.set(11.3, 0.08, -51.5);
   g.add(kameDai);
   const kame = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 9),
-    new THREE.MeshLambertMaterial({ color: 0x2c3a2a, emissive: 0x131f14 }));
+    new LitMat({ color: 0x2c3a2a, emissive: 0x131f14 }));
   kame.scale.set(1, 0.66, 0.82);
   kame.position.set(11.3, 0.31, -51.5);
   g.add(kame);
@@ -4523,7 +4616,7 @@ const nonomiya = (function(){
   emaKeta.position.set(10.6, 1.45, -44.9);
   g.add(emaKeta);
   const ema = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, 0.14, 0.02),
-    new THREE.MeshLambertMaterial({ color: 0xd8cdb2 }), 34);
+    new LitMat({ color: 0xd8cdb2 }), 34);
   ema.frustumCulled = false;
   for (let i = 0; i < 34; i++){
     const row = i % 2;
@@ -4540,7 +4633,7 @@ const nonomiya = (function(){
   // ── 常夜灯二基（鳥居の内側。参道に灯をこぼす） ──
   const jSao  = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.62, 0.2), stone, 2);
   const jHi   = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.26, 0.28),
-    new THREE.MeshLambertMaterial({ color: 0xf0d3a4, emissive: 0x3a2a12 }), 2);
+    new LitMat({ color: 0xf0d3a4, emissive: 0x3a2a12 }), 2);
   const jKasa = new THREE.InstancedMesh(new THREE.ConeGeometry(0.33, 0.22, 4), stone, 2);
   [[9.9, -48.95], [9.9, -51.45]].forEach((p, i) => {
     m4.makeTranslation(p[0], 0.31, p[1]); jSao.setMatrixAt(i, m4);
@@ -4560,7 +4653,7 @@ const nonomiya = (function(){
   const IWA = [[10.2, -47.0, 0.6], [12.0, -46.4, 0.85], [15.0, -47.2, 0.7],
                [10.8, -51.6, 0.55], [13.4, -51.9, 0.9], [16.4, -52.4, 0.65], [18.6, -46.6, 0.8]];
   const iwa = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.3, 0),
-    new THREE.MeshLambertMaterial({ color: 0x2a3330, emissive: 0x0d1410 }), IWA.length);
+    new LitMat({ color: 0x2a3330, emissive: 0x0d1410 }), IWA.length);
   iwa.frustumCulled = false;
   IWA.forEach((p, i) => {
     eu.set(rnd() * Math.PI, rnd() * Math.PI, rnd() * 0.4); q0.setFromEuler(eu);
@@ -4588,7 +4681,7 @@ const nonomiya = (function(){
   }
   const takeGeo = new THREE.CylinderGeometry(0.055, 0.068, 1, 6);
   takeGeo.translate(0, 0.5, 0);
-  const take = new THREE.InstancedMesh(takeGeo, new THREE.MeshLambertMaterial({ map: TEX.take }),
+  const take = new THREE.InstancedMesh(takeGeo, new LitMat({ map: TEX.take }),
     TAKE.length);
   take.frustumCulled = false;
   TAKE.forEach((p, i) => {
@@ -4636,7 +4729,7 @@ const nonomiya = (function(){
   hyou.position.set(2.42, 0.75, -51.62);
   hyouG.add(hyou);
   const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 1.44),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('野宮神社', '源氏物語の宮'), emissive: 0x141620 }));
+    new LitMat({ map: hyouTexture('野宮神社', '源氏物語の宮'), emissive: 0x141620 }));
   hyouMen.rotation.y = -Math.PI / 2;
   hyouMen.position.set(2.245, 0.75, -51.62);
   hyouG.add(hyouMen);
@@ -4708,14 +4801,14 @@ const sagano = (function(){
 
   // 野の土（藪の道・野宮の路地と同じ作法で、石畳を土に返す）
   const no = new THREE.Mesh(new THREE.PlaneGeometry(51, 31),
-    new THREE.MeshLambertMaterial({ color: 0x111209, emissive: 0x030402 }));
+    new LitMat({ color: 0x111209, emissive: 0x030402 }));
   no.rotation.x = -Math.PI / 2;
   no.position.set(-3.5, 0.012, 20.5);
   g.add(no);
 
   // 踏み固められた道すじ（街道・辻から東へ折れる畦道・池の西と北の汀）
   const michi = kitaInst(KITA_PLANE,
-    new THREE.MeshLambertMaterial({ color: 0x1a1811, emissive: 0x040302 }), [
+    new LitMat({ color: 0x1a1811, emissive: 0x040302 }), [
     [   0, 0.016, 11.4, -Math.PI/2, 0, 0,  4.6, 14.0, 1],   // 街道（木戸 z+4.8 → 表門 z+18.4）
     [-4.05, 0.016, 15.5, -Math.PI/2, 0, 0, 4.9,  3.2, 1],   // 辻から東へ折れる畦道
     [-5.0, 0.016, 19.6, -Math.PI/2, 0, 0,  3.0, 11.4, 1],   // 池の西の汀
@@ -4744,15 +4837,15 @@ const sagano = (function(){
    [18.0, 18.5, 7.0, 0], [18.0, 28.5, 7.0, 0], [14.5, 23.5, 10.0, 1]].forEach(a => {
     AZE.push([a[0], 0.06, a[1], 0, a[3] ? Math.PI / 2 : 0, 0, a[2], 0.12, 0.34]);
   });
-  g.add(kitaInst(KITA_BOX, new THREE.MeshLambertMaterial({ color: 0x1e1c15 }), AZE));
+  g.add(kitaInst(KITA_BOX, new LitMat({ color: 0x1e1c15 }), AZE));
 
   // 辻の道標（東へ折れれば広沢の池。南を向いて立つ＝木戸から歩いてきた目に入る）
-  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const stone = new LitMat({ color: 0x343a46 });
   const michishirube = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.25, 0.28), stone);
   michishirube.position.set(-2.25, 0.63, 13.6);
   g.add(michishirube);
   const msMen = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.2),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('広沢池', 'ひがしへ'), emissive: 0x141620 }));
+    new LitMat({ map: hyouTexture('広沢池', 'ひがしへ'), emissive: 0x141620 }));
   msMen.rotation.y = Math.PI;                  // 面を南（-z）へ向ける
   msMen.position.set(-2.25, 0.63, 13.455);
   g.add(msMen);
@@ -4765,9 +4858,9 @@ const sagano = (function(){
    村雨の廊下が直角に折れて五大堂へ。西の奥に朱の心経宝塔 */
 const daikakuji = (function(){
   const g = new THREE.Group();
-  const stone   = new THREE.MeshLambertMaterial({ color: 0x343a46 });
-  const shu     = new THREE.MeshLambertMaterial({ color: 0x8e3628 });   // 朱（夜なので沈んだ朱）
-  const shirakabe = new THREE.MeshLambertMaterial({ map: TEX.plaster });
+  const stone   = new LitMat({ color: 0x343a46 });
+  const shu     = new LitMat({ color: 0x8e3628 });   // 朱（夜なので沈んだ朱）
+  const shirakabe = new LitMat({ map: TEX.plaster });
   const PLASTER = [], ROOF = [], ROOFEDGE = [], DARK = [], WALLM = [], STONE = [],
         SHUBOX = [], SHOJI = [], HIBUKURO = [];
 
@@ -4931,7 +5024,7 @@ const daikakuji = (function(){
   const matsuKan = kitaInst(new THREE.CylinderGeometry(0.08, 0.13, 2.0, 6), MAT.wallDk,
     MATSU.map(pp => [pp[0], 1.0 * pp[2], pp[1], 0, 0, 0, 1, pp[2], 1]));
   const matsuHa = kitaInst(new THREE.SphereGeometry(0.6, 8, 6),
-    new THREE.MeshLambertMaterial({ color: 0x1d3226 }),
+    new LitMat({ color: 0x1d3226 }),
     MATSU.flatMap(pp => [
       [pp[0], 2.05 * pp[2], pp[1], 0, 0, 0, 1.3 * pp[2], 0.5 * pp[2], 1.3 * pp[2]],
       [pp[0] + 0.5 * pp[2], 1.7 * pp[2], pp[1] - 0.4 * pp[2], 0, 0, 0,
@@ -4944,7 +5037,7 @@ const daikakuji = (function(){
   hyou.position.set(2.9, 0.8, 16.6);
   g.add(hyou);
   const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 1.54),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('大覚寺', '旧嵯峨御所'), emissive: 0x141620 }));
+    new LitMat({ map: hyouTexture('大覚寺', '旧嵯峨御所'), emissive: 0x141620 }));
   hyouMen.rotation.y = Math.PI;
   hyouMen.position.set(2.9, 0.8, 16.445);
   g.add(hyouMen);
@@ -4971,7 +5064,7 @@ const daikakuji = (function(){
    水面の月の道が渡月橋の月まで一本につながる（平安からの観月の池） */
 const hirosawa = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const stone = new LitMat({ color: 0x343a46 });
   let seed = 6161;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const PC = { x: -15.0, z: 16.0, rx: 8.0, rz: 7.0 };
@@ -4992,7 +5085,7 @@ const hirosawa = (function(){
   const YX = -21.5, YZ = 31.5;      // 大沢池（㊶）に場所を譲って北西へ退けた
   const yama = new THREE.Mesh(
     new THREE.SphereGeometry(8.5, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshLambertMaterial({ color: 0x131c29 }));
+    new LitMat({ color: 0x131c29 }));
   yama.scale.set(1, 0.5, 0.55);
   yama.position.set(YX, 0, YZ);
   g.add(yama);
@@ -5009,7 +5102,7 @@ const hirosawa = (function(){
     KODACHI.push([hx, hy + sz2 * 0.25, hz, 0, rnd() * Math.PI, 0, sz2, sz2 * 0.8, sz2]);
   }
   g.add(kitaInst(new THREE.SphereGeometry(0.8, 7, 5),
-    new THREE.MeshLambertMaterial({ color: 0x0e1720 }), KODACHI));
+    new LitMat({ color: 0x0e1720 }), KODACHI));
   // その山影が水面の北へ落ちる（暗いだけの一枚。月の道の手前で切れる）
   const kage = new THREE.Mesh(new THREE.PlaneGeometry(11, 5.4),
     new THREE.MeshBasicMaterial({ color: 0x060a12, transparent: true, opacity: 0.5,
@@ -5048,7 +5141,7 @@ const hirosawa = (function(){
   //   （instanceColor が InstancedBufferAttribute にならない既知の穴）。
   //   色のばらつきは材質を二つに分けて出す ―― 増えるのは一描画だけ
   const ISHI = [[], []];
-  const ishiMat = [stone, new THREE.MeshLambertMaterial({ color: 0x272c37 })];
+  const ishiMat = [stone, new LitMat({ color: 0x272c37 })];
   for (let i = 0; i < 20; i++){
     const th = (i / 20) * Math.PI * 2 + rnd() * 0.22;
     const sz = 0.42 + rnd() * 0.5;
@@ -5062,7 +5155,7 @@ const hirosawa = (function(){
   ISHI.forEach((list, i) => { if (list.length) g.add(kitaInst(ishiGeo, ishiMat[i], list)); });
   const IX = -17.5, IZ = 16.5;
   const suhama = new THREE.Mesh(new THREE.CircleGeometry(1.35, 20),
-    new THREE.MeshLambertMaterial({ color: 0x141822 }));
+    new LitMat({ color: 0x141822 }));
   suhama.rotation.x = -Math.PI / 2;
   suhama.position.set(IX, 0.045, IZ);
   g.add(suhama);
@@ -5076,7 +5169,7 @@ const hirosawa = (function(){
   shimaMatsu.rotation.z = 0.1;
   g.add(shimaMatsu);
   const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 8, 6),
-    new THREE.MeshLambertMaterial({ color: 0x1a2c22 }), [
+    new LitMat({ color: 0x1a2c22 }), [
     [IX + 0.34, 1.28, IZ + 0.1, 0, 0, 0, 1.15, 0.42, 1.15],
     [IX + 0.62, 1.02, IZ + 0.3, 0, 0, 0, 0.8, 0.34, 0.8]
   ]);
@@ -5109,7 +5202,7 @@ const hirosawa = (function(){
   hyou.position.set(-3.4, 0.65, 24.9);
   g.add(hyou);
   const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 1.24),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('広沢池', '観月の池'), emissive: 0x141620 }));
+    new LitMat({ map: hyouTexture('広沢池', '観月の池'), emissive: 0x141620 }));
   hyouMen.rotation.y = Math.PI;
   hyouMen.position.set(-3.4, 0.65, 24.755);
   g.add(hyouMen);
@@ -5131,8 +5224,8 @@ const hirosawa = (function(){
    ============================================================ */
 const osawa = (function(){
   const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x343a46 });
-  const stone2 = new THREE.MeshLambertMaterial({ color: 0x272c37 });
+  const stone = new LitMat({ color: 0x343a46 });
+  const stone2 = new LitMat({ color: 0x272c37 });
   let seed = 9091;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const PC = { x: -8.0, z: 29.2, rx: 4.4, rz: 3.8 };
@@ -5163,20 +5256,20 @@ const osawa = (function(){
   // ── 菊ヶ島と天神島（州浜のうえに、島の松と天神さんの小鳥居） ──
   const SHIMA = [[-9.6, 30.0, 1.15], [-10.6, 28.0, 0.95]];
   const suhama = kitaInst(new THREE.CircleGeometry(1, 18),
-    new THREE.MeshLambertMaterial({ color: 0x141822 }),
+    new LitMat({ color: 0x141822 }),
     SHIMA.map(p => [p[0], 0.045, p[1], -Math.PI / 2, 0, 0, p[2], p[2], 1]));
   g.add(suhama);
   // 菊ヶ島の松
   const shimaKan = kitaInst(new THREE.CylinderGeometry(0.06, 0.1, 1.3, 6), MAT.wallDk,
     [[-9.6, 0.65, 30.0, 0, 0, 0, 1, 1, 1]]);
   const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 8, 5),
-    new THREE.MeshLambertMaterial({ color: 0x1a2c22 }), [
+    new LitMat({ color: 0x1a2c22 }), [
     [-9.55, 1.4, 29.95, 0, 0, 0, 1.15, 0.44, 1.15],
     [-9.25, 1.14, 30.25, 0, 0, 0, 0.78, 0.34, 0.78]
   ]);
   g.add(shimaKan, shimaHa);
   // 天神島の小鳥居（朱は沈ませる。夜は形だけ読めればよい）
-  const shu = new THREE.MeshLambertMaterial({ color: 0x7d3128 });
+  const shu = new LitMat({ color: 0x7d3128 });
   const TORII = [
     [-10.6, 0.36, 27.72, 0, 0, 0, 0.07, 0.62, 0.07],
     [-10.6, 0.36, 28.28, 0, 0, 0, 0.07, 0.62, 0.07],
@@ -5331,17 +5424,17 @@ const rakushisha = (function(){
   const g = new THREE.Group();
   let seed = 4949;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const tsuchikabe = new THREE.MeshLambertMaterial({ color: 0x352a1b });   // 草庵の土壁
-  const kayaM = new THREE.MeshLambertMaterial({ map: TEX.kaya });
+  const tsuchikabe = new LitMat({ color: 0x352a1b });   // 草庵の土壁
+  const kayaM = new LitMat({ map: TEX.kaya });
 
   // 庭の土と、田のへりの小道（畦の南側を西へ。街道から庵の縁先まで）
   const niwa = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 7.8),
-    new THREE.MeshLambertMaterial({ color: 0x15130c, emissive: 0x030302 }));
+    new LitMat({ color: 0x15130c, emissive: 0x030302 }));
   niwa.rotation.x = -Math.PI / 2;
   niwa.position.set(16.3, 0.014, 10.7);
   g.add(niwa);
   const komichi = new THREE.Mesh(new THREE.PlaneGeometry(13.2, 1.0),
-    new THREE.MeshLambertMaterial({ color: 0x1a1811, emissive: 0x040302 }));
+    new LitMat({ color: 0x1a1811, emissive: 0x040302 }));
   komichi.rotation.x = -Math.PI / 2;
   komichi.position.set(8.2, 0.016, 7.85);
   g.add(komichi);
@@ -5357,7 +5450,7 @@ const rakushisha = (function(){
   yane.position.set(HX, 2.41, HZ);
   g.add(yane);
   const mune = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 0.3),
-    new THREE.MeshLambertMaterial({ color: 0x1c1710 }));
+    new LitMat({ color: 0x1c1710 }));
   mune.position.set(HX, 3.06, HZ);
   g.add(mune);
   // 濡れ縁（東の縁先。田と月を眺める腰かけ）
@@ -5377,12 +5470,12 @@ const rakushisha = (function(){
   g.add(halo);
   // 蓑と笠（東の壁。編笠を上に、蓑を下に掛ける）
   const mino = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 8),
-    new THREE.MeshLambertMaterial({ color: 0x33291a, emissive: 0x060503 }));
+    new LitMat({ color: 0x33291a, emissive: 0x060503 }));
   mino.scale.x = 0.42;
   mino.position.set(14.6, 1.02, HZ - 0.55);
   g.add(mino);
   const kasa = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.16, 9),
-    new THREE.MeshLambertMaterial({ color: 0x4a3d24, emissive: 0x070503 }));
+    new LitMat({ color: 0x4a3d24, emissive: 0x070503 }));
   kasa.scale.x = 0.5;
   kasa.position.set(14.6, 1.48, HZ - 0.55);
   g.add(kasa);
@@ -5400,7 +5493,7 @@ const rakushisha = (function(){
       eda.rotation.z = e[3];
       t.add(eda);
     });
-    const haM = new THREE.MeshLambertMaterial({ color: 0x17251b });
+    const haM = new LitMat({ color: 0x17251b });
     for (let i = 0; i < 4; i++){
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), haM);
       b.position.set((rnd() - 0.5) * 1.5, 2.0 + rnd() * 0.7, (rnd() - 0.5) * 1.3);
@@ -5413,7 +5506,7 @@ const rakushisha = (function(){
   }
   kakiTree(18.5, 13.3, 1.1);
   kakiTree(12.5, 6.6, 0.9);
-  const kakiM = new THREE.MeshLambertMaterial({ color: 0xb35a1e, emissive: 0x2a1004 });
+  const kakiM = new LitMat({ color: 0xb35a1e, emissive: 0x2a1004 });
   const MI = [];
   [[18.5, 13.3, 1.1], [12.5, 6.6, 0.9]].forEach(k => {
     for (let i = 0; i < 9; i++){
@@ -5427,7 +5520,7 @@ const rakushisha = (function(){
   g.add(kaki);
 
   // 小柴垣（野宮と同じ作法。東の南寄りだけ空けて、小道からの入りにする）
-  const shibaM = new THREE.MeshLambertMaterial({ map: TEX.shiba });
+  const shibaM = new LitMat({ map: TEX.shiba });
   const HEI = [                            // [中心x, 中心z, 長さ, z沿いか]
     [16.25, 14.4, 6.1, 0],                 // 北
     [16.25,  7.0, 6.1, 0],                 // 南
@@ -5451,11 +5544,11 @@ const rakushisha = (function(){
 
   // 標（入りのわき。南＝小道の側へ面を向ける）
   const hyou = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.05, 0.24),
-    new THREE.MeshLambertMaterial({ color: 0x343a46 }));
+    new LitMat({ color: 0x343a46 }));
   hyou.position.set(13.0, 0.53, 8.75);
   g.add(hyou);
   const hyouMen = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 1.0),
-    new THREE.MeshLambertMaterial({ map: hyouTexture('落柿舎', '去来の草庵'), emissive: 0x141620 }));
+    new LitMat({ map: hyouTexture('落柿舎', '去来の草庵'), emissive: 0x141620 }));
   hyouMen.rotation.y = Math.PI;
   hyouMen.position.set(13.0, 0.53, 8.625);
   g.add(hyouMen);
@@ -5473,8 +5566,8 @@ const tahoto = (function(){
   const TX = 8.0, TZ = 36.5;
   const q = 1 - Math.pow((TX - 14) / 34, 2) - Math.pow((TZ - 52) / 21.08, 2);
   const TY = 14.28 * Math.sqrt(Math.max(0, q)) - 0.25;   // 山肌にわずかに沈める
-  const yaneM = new THREE.MeshLambertMaterial({ color: 0x212a3a, emissive: 0x060810 });
-  const kabeM = new THREE.MeshLambertMaterial({ color: 0x2c3140, emissive: 0x070810 });
+  const yaneM = new LitMat({ color: 0x212a3a, emissive: 0x060810 });
+  const kabeM = new LitMat({ color: 0x2c3140, emissive: 0x070810 });
   const shita = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.5, 0.92), kabeM);
   shita.position.set(TX, TY + 0.25, TZ);
   const yane1 = new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.42, 4), yaneM);
@@ -5487,7 +5580,7 @@ const tahoto = (function(){
   yane2.rotation.y = Math.PI / 4;
   yane2.position.set(TX, TY + 1.2, TZ);
   const sorin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5),
-    new THREE.MeshLambertMaterial({ color: 0x6a5a30, emissive: 0x141006 }));
+    new LitMat({ color: 0x6a5a30, emissive: 0x141006 }));
   sorin.position.set(TX, TY + 1.6, TZ);
   g.add(shita, yane1, kame, yane2, sorin);
   // 塔の灯（南面の連子窓ひとつぶん）
@@ -5522,7 +5615,7 @@ const goju = (function(){
   const TX = -67.0, TZ2 = -171.0;
   const tou = new THREE.Group();
   const kidan = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.9, 8.4),
-    new THREE.MeshLambertMaterial({ color: 0x232630 }));
+    new LitMat({ color: 0x232630 }));
   kidan.position.y = 0.45; tou.add(kidan);
   let baseY = 0.9;
   const tiers = [
@@ -5538,7 +5631,7 @@ const goju = (function(){
     baseY += t[1] + t[3] * 0.52;
   });
   // 相輪
-  const sorinM = new THREE.MeshLambertMaterial({ color: 0x6a5a30, emissive: 0x0e0a04 });
+  const sorinM = new LitMat({ color: 0x6a5a30, emissive: 0x0e0a04 });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.6, 6), sorinM);
   pole.position.y = baseY + 1.6; tou.add(pole);
   for (let i = 0; i < 7; i++){
@@ -5562,7 +5655,7 @@ const goju = (function(){
   tou.position.set(TX, touY, TZ2);
   g.add(tou);
   // 立ち位置わきの灯篭ひとつ（舞台の隅の灯篭と同じ書法）
-  const stone2 = new THREE.MeshLambertMaterial({ color: 0x3a3f4c });
+  const stone2 = new LitMat({ color: 0x3a3f4c });
   const tY = pkY(-57.0, -162.2);
   const sao = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.52, 0.22), stone2);
   const hib = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.26, 0.3), MAT.inner);
@@ -6129,8 +6222,8 @@ const toriigata = (function(){
    小さな提灯をひとつ提げて客待ちの風情（嵐山の橋の袂の定番） */
 const jinrikisha = (function(){
   const g = new THREE.Group();
-  const kuro = new THREE.MeshLambertMaterial({ color: 0x14161c });   // 黒塗りの車体
-  const shu  = new THREE.MeshLambertMaterial({ color: 0x8e3628 });   // 緋毛氈
+  const kuro = new LitMat({ color: 0x14161c });   // 黒塗りの車体
+  const shu  = new LitMat({ color: 0x8e3628 });   // 緋毛氈
   // 車輪（大きな二輪。輻は細い棒をまとめて一描画）
   const wheelGeo = new THREE.TorusGeometry(0.5, 0.036, 8, 20);
   [-1, 1].forEach(s => {
@@ -6192,7 +6285,7 @@ const jinrikisha = (function(){
    中之島の州は北の水路をまわって霧の向こうへ */
 const kudari = (function(){
   const g = new THREE.Group();
-  const wood = new THREE.MeshLambertMaterial({ map: TEX.woodDk });
+  const wood = new LitMat({ map: TEX.woodDk });
   const boat = new THREE.Group();
   boat.add(kitaInst(KITA_BOX, wood, [
     [0, 0.10, 0, 0, 0, 0, 0.92, 0.14, 3.6],            // 底
@@ -6201,7 +6294,7 @@ const kudari = (function(){
     [0, 0.28, -1.72, 0, 0, 0, 0.8, 0.22, 0.14],        // 艫
     [0, 0.32, 1.74, 0.35, 0, 0, 0.8, 0.2, 0.14]        // 舳（わずかに反らす）
   ]));
-  const silk = new THREE.MeshLambertMaterial({ color: 0x14161f });
+  const silk = new LitMat({ color: 0x14161f });
   // 船頭（艫に立って棹をさす）
   const sendo = new THREE.Group();
   const sBody = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.15, 1.0, 7), silk);
@@ -6263,7 +6356,7 @@ const kudari = (function(){
 const shishiodoshi = (function(){
   const g = new THREE.Group();
   const CX = 17.9, CZ = -50.9;
-  const stoneM = new THREE.MeshLambertMaterial({ color: 0x343a46 });
+  const stoneM = new LitMat({ color: 0x343a46 });
   const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 0.34, 10), stoneM);
   hachi.position.set(CX - 0.72, 0.17, CZ);
   const mizu = new THREE.Mesh(new THREE.CircleGeometry(0.34, 12),
@@ -6373,14 +6466,14 @@ const tsukimen = (function(){
   TG.add(tsukiHi);
 
   /* 遠い縁の丘とクレーターの土手・岩 */
-  const okaM = new THREE.MeshLambertMaterial({ color: 0x4a505c, emissive: 0x111420 });
+  const okaM = new LitMat({ color: 0x4a505c, emissive: 0x111420 });
   const OKA = [];
   [[-16, -12, 6.5, 0.34], [14, -10, 5.0, 0.3], [20, -40, 7.5, 0.36],
    [-19, -46, 5.5, 0.3], [4, -52, 8.0, 0.4]].forEach(o => {
     OKA.push([S.x + o[0], S.y, S.z + o[1], 0, rnd() * Math.PI, 0, o[2], o[2] * o[3], o[2]]);
   });
   TG.add(kitaInst(new THREE.SphereGeometry(1, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2), okaM, OKA));
-  const iwaM = new THREE.MeshLambertMaterial({ color: 0x3f4550, emissive: 0x0d1016 });
+  const iwaM = new LitMat({ color: 0x3f4550, emissive: 0x0d1016 });
   const IWA2 = [];
   for (let i = 0; i < 9; i++){
     const th = rnd() * Math.PI * 2, rr = 5 + rnd() * 16;
@@ -6399,19 +6492,19 @@ const tsukimen = (function(){
 
   /* 臼と餅 */
   const usu = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.66, 12),
-    new THREE.MeshLambertMaterial({ color: 0x3a2a1c, emissive: 0x0a0705 }));
+    new LitMat({ color: 0x3a2a1c, emissive: 0x0a0705 }));
   usu.position.set(S.x, S.y + 0.33, S.z - 1.6);
   TG.add(usu);
   const mochi = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 9),
-    new THREE.MeshLambertMaterial({ color: 0xf2efe6, emissive: 0x2e2c26 }));
+    new LitMat({ color: 0xf2efe6, emissive: 0x2e2c26 }));
   mochi.scale.set(1, 0.62, 1);
   mochi.position.set(S.x, S.y + 0.72, S.z - 1.6);
   TG.add(mochi);
 
   /* 兎（白い毛・紅い目。s で丈を変える） */
-  const fur   = new THREE.MeshLambertMaterial({ color: 0xe9e7df, emissive: 0x23242a });
-  const pinkM = new THREE.MeshLambertMaterial({ color: 0xc9939d, emissive: 0x2a1c20 });
-  const eyeM  = new THREE.MeshLambertMaterial({ color: 0x7a2020, emissive: 0x3a0e0e });
+  const fur   = new LitMat({ color: 0xe9e7df, emissive: 0x23242a });
+  const pinkM = new LitMat({ color: 0xc9939d, emissive: 0x2a1c20 });
+  const eyeM  = new LitMat({ color: 0x7a2020, emissive: 0x3a0e0e });
   function usagi(s){
     const u = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), fur);
@@ -6459,11 +6552,11 @@ const tsukimen = (function(){
   eA.position.set(0, 0, 0);
   kine.add(eA);
   const totte = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.048, 0.98, 7),
-    new THREE.MeshLambertMaterial({ color: 0x4a3a26, emissive: 0x0c0906 }));
+    new LitMat({ color: 0x4a3a26, emissive: 0x0c0906 }));
   totte.position.set(0, 0.44, 0);
   kine.add(totte);
   const kineHead = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 0.42, 9),
-    new THREE.MeshLambertMaterial({ color: 0x5a4830 , emissive: 0x0e0b07 }));
+    new LitMat({ color: 0x5a4830 , emissive: 0x0e0b07 }));
   kineHead.position.set(0, 1.02, 0);
   kine.add(kineHead);
   kine.position.set(S.x + 0.12, S.y + 0.98, S.z - 0.95);   // わずかに脇へ＝休みの拍でも顔が隠れない
@@ -7001,7 +7094,7 @@ function aimTsukiMichi(tm, PD, tmin, tmax){
    ============================================================ */
 const cat = (function(){
   const g = new THREE.Group();
-  const fur = new THREE.MeshLambertMaterial({ color:0x1b1b22 });
+  const fur = new LitMat({ color:0x1b1b22 });
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), fur);
   body.scale.set(1.35, 0.95, 1);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), fur);
@@ -8518,7 +8611,8 @@ const TOKI = {
   UTSURI: 8.0,          // 空が変わりきるまで（秒）
   /* 赤入れ用の目盛り。__machiya.toki.tune を書き替えて set() で試着できる。
      霧の色を明るくしすぎると嵐山が白い壁になって形を失う（見比べて決めた値） */
-  tune: { amb: 0.84, ambCol: 0x77809a, sun: 0.46, sunCol: 0xffb98c,
+  /* 環境光を下げ、朝日を強める＝東向きの面だけが茜に照り、裏は藍の影に沈む（影の有無が見える） */
+  tune: { amb: 0.56, ambCol: 0x77809a, sun: 0.85, sunCol: 0xffb98c,
           fog: 0.0208, fogCol: 0x4d5b74, clear: 0x4c5972, tint: 0.42,
           akane: 0.52, shiro: 0.34 }
 };
@@ -8614,7 +8708,7 @@ const tokiMats = (function(){
         lamps.push({ m: m, base: m.opacity, wrote: NaN });
         return;
       }
-      if (m.isMeshLambertMaterial){
+      if (m.isMeshLambertMaterial || m.isMeshStandardMaterial){
         lands.push({ m: m, base: m.color.getHex(), wrote: -1,
                      baseE: m.emissive ? m.emissive.getHex() : 0, wroteE: -1 });
         return;
@@ -8683,7 +8777,7 @@ function tokiSky(){
   ambLight.intensity = (Y.ambI + (T.amb - Y.ambI) * k) * d;
   moonLight.color.setHex(mixHex(Y.tsuki, T.sunCol, k));
   moonLight.intensity = (Y.tsukiI + (T.sun - Y.tsukiI) * k) * d;
-  moonLight.position.set(-8 - 22 * k, 16 - 10 * k, 6 - 12 * k);   // 東の低みへ降りる
+  MOON_DIR.set(-8 - 22 * k, 16 - 3 * k, 6 - 12 * k);    // 東の低みへ降りる（仰角 約23°。置き場は followKage が毎フレーム決める）
   // 有明の月：色を褪せさせるだけで消さない。欠けぎわは明けていく空の色に寄せる
   moonFx.disc.material.color.setHex(mixHex(0xFFE9BE, 0xE7ECF4, k));
   moonFx.bite.material.color.setHex(mixHex(0x0a1226, SKY.AKE[1], k));
@@ -9260,11 +9354,87 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   setTimeout(() => { if (!kuOpen && kuKey === '') setKu(true); }, 2600);
 }
 
+/* ============================================================
+   10c. 影の役と材質の仕上げ（組み立てが終わってから一度だけ）
+   ============================================================ */
+if (Q.kage){
+  /* 光を受ける不透明な面は影を受け、そのうち手ごろな大きさの物は影を落とす。
+     受ける/受けないは材質ごとに揃える（同じ材質で混ぜると毎フレーム作り直しになる） */
+  scene.traverse(o => {
+    if (!o.isMesh || o.isSprite) return;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (!m || !(m.isMeshLambertMaterial || m.isMeshStandardMaterial)) return;
+    if (m.transparent || m.blending !== THREE.NormalBlending) return;
+    o.receiveShadow = true;
+    const g = o.geometry;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const r = g.boundingSphere ? g.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) : 1e9;
+    o.castShadow = r < 24;          // 地面や遠景の大きな板は受けるだけ
+  });
+}
+if (Q.pbr){
+  /* PBR の肌：素は少しざらつかせ（月あかりが広く柔らかく返る）、瓦だけ釉薬の照りを残す */
+  const seen = new Set();
+  scene.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null;
+    if (!ms) return;
+    ms.forEach(m => {
+      if (!m || !m.isMeshStandardMaterial || seen.has(m)) return;
+      seen.add(m);
+      m.roughness = 0.85; m.metalness = 0;
+    });
+  });
+  [MAT.roof, MAT.roofEdge, MAT_KAWARA].forEach(m => { m.roughness = 0.5; });
+}
+
+/* 駒落ちの見張り：描き始めの数秒を見て足りなければ 影 → 滲み の順に落とし、
+   それでも足りなければ（重いのは PBR 材質と灯の数＝走りながらは替えられない）
+   低画質で一度だけ読み直す。?q= で手で選んだときは落とさない */
+const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 3 : 0 };
+function reloadLow(){
+  try {
+    if (sessionStorage.getItem('machiya-q-low')) return;     // 二度目はしない
+    sessionStorage.setItem('machiya-q-low', '1');
+  } catch (e) { return; }
+  const u = new URL(location.href);
+  u.searchParams.set('q', 'low');
+  location.replace(u.toString());
+}
+function dropKage(){
+  moonLight.castShadow = false;
+  renderer.shadowMap.enabled = false;
+  scene.traverse(o => {
+    if (o.isMesh){ o.castShadow = false; o.receiveShadow = false; }
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null;
+    if (ms) ms.forEach(m => { if (m) m.needsUpdate = true; });
+  });
+}
+function watchFps(raw){
+  if (WATCH.stage >= 3 || raw > 0.5) return;        // タブ切替などの長い空白は数えない
+  WATCH.t += raw;
+  if (WATCH.t < 3) return;                           // 読み込み直後の重さは見ない
+  WATCH.acc += raw; WATCH.n++;
+  if (WATCH.acc < 3) return;
+  const fps = WATCH.n / WATCH.acc;
+  WATCH.acc = 0; WATCH.n = 0;
+  if (fps >= 30){ WATCH.stage = 3; return; }         // 足りている＝見張りを終える
+  if (WATCH.stage === 0 && moonLight.castShadow){ dropKage(); WATCH.stage = 1; return; }
+  if (WATCH.stage <= 1 && composer){ composer = null; WATCH.stage = 2; return; }
+  WATCH.stage = 3;
+  if (Q.pbr && fps < 24) reloadLow();
+}
+
 function loop(){
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 0.05);
   update(dt);
-  renderer.render(scene, camera);
+  hemiLight.color.copy(ambLight.color);              // 暁の塗り替えに追従
+  hemiLight.intensity = ambLight.intensity * HEMI_K;
+  if (bloomPass) bloomPass.strength = 0.5 * (1 - 0.5 * TOKI.k);   // 明けると滲みは控えめに（障子が白飛びしない）
+  followKage();
+  if (composer) composer.render(); else renderer.render(scene, camera);
+  watchFps(raw);
 }
 loop();
 
@@ -9333,6 +9503,18 @@ window.__machiya = {
       nonBlackPct: +(nonBlack / n * 100).toFixed(1),
       warmPct: +(warm / n * 100).toFixed(1)
     };
+  },
+  /* 画質の検証口：影・滲みを手で落として速さを比べる（戻すには読み直す） */
+  qset: function(o){
+    if (o && o.kage === false) dropKage();
+    if (o && o.bloom === false) composer = null;
+    return this.q();
+  },
+  /* 画質の段と、見張りが落としたものの現況 */
+  q: function(){
+    return { high: Q.high, pbr: Q.pbr, kage: moonLight.castShadow, bloom: !!composer,
+             lamps: roamLights.length, watch: WATCH.stage, exposure: renderer.toneMappingExposure,
+             dpr: renderer.getPixelRatio() };
   },
   info: function(){
     let meshes = 0;
