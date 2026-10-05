@@ -1599,10 +1599,40 @@ function leafTexture(hex, kind, seed0){
   }
   return { map: tex(c), alpha: tex(a) };
 }
+/* 風 ― 頂点を世界座標で揺らす（根元は動かず先ほど大きく。位置で位相をずらし、群れが同時に揺れない）。
+   mode 'y01'：position.y（0〜1）を先端率に（根元を原点に置いた稈）／'uv'：uv.y を先端率に（板）。
+   うねり・小刻み・ときどきの突風の三つを重ねる。影の深度は揺れない（静止の影で足りる） */
+const KAZE_T = { value: 0 };
+function kaze(mat, amp, mode){
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = function(sh){
+    if (prev) prev.call(this, sh);
+    sh.uniforms.uKazeT = KAZE_T;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uKazeT;')
+      // mvPosition は後続の処理（視点距離・霧）も読むので、ブロックで囲わず main 直下に置く
+      .replace('#include <project_vertex>', [
+        'vec4 kw = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING', 'kw = instanceMatrix * kw;', '#endif',
+        'kw = modelMatrix * kw;',
+        'float kf = ' + (mode === 'uv' ? 'uv.y' : 'clamp(position.y, 0.0, 1.0)') + '; kf = kf * kf;',
+        'float kph = kw.x * 0.35 + kw.z * 0.27;',
+        'float kgale = smoothstep(0.55, 1.0, sin(uKazeT * 0.13 + 1.3));',
+        'float kg = sin(uKazeT * 0.9 + kph) * 0.6 + sin(uKazeT * 2.3 + kph * 1.7) * 0.25 + kgale * 0.9;',
+        'kw.xyz += vec3(kg, -abs(kg) * 0.15, sin(uKazeT * 1.1 + kph * 0.8) * 0.4) * ' + amp.toFixed(3) + ' * kf;',
+        'vec4 mvPosition = viewMatrix * kw;',
+        'gl_Position = projectionMatrix * mvPosition;'
+      ].join('\n'));
+  };
+  const key0 = mat.customProgramCacheKey ? mat.customProgramCacheKey.bind(mat) : (() => '');
+  mat.customProgramCacheKey = function(){ return key0() + '-kaze-' + mode + amp; };
+  mat.needsUpdate = true;
+  return mat;
+}
 function leafCards(group, centers, hex, kind, s, rnd, n){
   const t = leafTexture(hex, kind, 1 + Math.floor(rnd() * 1e6));
-  const mats = [0xffffff, 0xc4c4c4, 0xe0e0e0].map(c => new LitMat({
-    map: t.map, alphaMap: t.alpha, alphaTest: 0.5, side: THREE.DoubleSide, color: c }));
+  const mats = [0xffffff, 0xc4c4c4, 0xe0e0e0].map(c => kaze(new LitMat({
+    map: t.map, alphaMap: t.alpha, alphaTest: 0.5, side: THREE.DoubleSide, color: c }), 0.07, 'uv'));
   const geo = new THREE.PlaneGeometry(1, 1);
   const per = n || 7;
   centers.forEach(cn => {
@@ -2006,7 +2036,7 @@ function buildMachiya(opt){
   g.rotation.y = opt.side < 0 ? Math.PI / 2 : -Math.PI / 2;
 
   g.userData = {
-    lantern: lantern, halo: lanternHalo, pool: pool,
+    lantern: lantern, halo: lanternHalo, pool: pool, lanternBase: lanternPos.clone(),
     noren: panels, sign: signMesh, norenRoot: norenGroup,
     lanternWorld: new THREE.Vector3(),
     baseGlow: 0.5
@@ -2472,8 +2502,24 @@ const hinoko = (function(){
   return p;
 })();
 
-/* ⑦ 渡月橋を渡る宵の人影 ― 二人連れと、提灯を提げたひとり */
+/* 篝火の煙 ― 火の粉の上から薄い灰の綿が立ちのぼり、風下へ流れて消える（舟の子＝揺れごと運ぶ） */
+const kemuri = (function(){
+  if (!FX.hinoko) return null;
+  const N = 14, list = [];
+  for (let i = 0; i < N; i++){
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0x6a6a72,
+      transparent: true, opacity: 0, depthWrite: false }));
+    s.userData = { ph: i / N };
+    s.raycast = function(){};
+    boats[0].add(s);
+    list.push(s);
+  }
+  return list;
+})();
+
+/* ⑦ 渡月橋を渡る宵の人影 ― 二人連れと、提灯を提げたひとり。通りにも二人（木戸〜竹林の口を往復） */
 const walkers = [];
+const machiWalkers = [];
 if (FX.hitokage){
   const silk = new LitMat({ color:0x14161f });
   const person = px => {
@@ -2510,6 +2556,23 @@ if (FX.hitokage){
   scene.add(solo);
   walkers.push(solo);
   if (FX.mizukagami) streakChochin = addStreak(0xffd28a, 5, 0.08, 0.7);
+
+  // 通りの人影：左の車道寄りをひとり、右を提灯を提げたひとり
+  [[-1.35, 0.35, 1, false], [1.4, 0.75, -1, true]].forEach(m => {
+    const w = new THREE.Group();
+    w.add(person(0));
+    if (m[3]){
+      const c2 = new THREE.Mesh(cho.geometry, cho.material);
+      c2.scale.y = 1.25; c2.position.set(0.20, 0.62, 0.14);
+      const h2 = new THREE.Sprite(choHalo.material);
+      h2.scale.set(0.9, 0.9, 1); h2.position.copy(c2.position);
+      w.add(c2, h2);
+      w.userData.cho = c2; w.userData.choHalo = h2;
+    }
+    Object.assign(w.userData, { lane: m[0], t: m[1], dir: m[2], v: 1 / 52 });
+    scene.add(w);
+    machiWalkers.push(w);
+  });
 }
 
 /* ⑧ 嵐山の稜線の木立 ― 峰の頂を跨いで空との際をぎざぎざに。斜面は帯を傾けて追従 */
@@ -2572,7 +2635,7 @@ const chikurin = (function(){
   const N = 256;                 // 見上げても切れ目のない壁にする（描画は一回のまま）
   const geo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
   geo.translate(0, 0.5, 0);   // 根元を原点に置き、高さは行列の scale で決める
-  const stalks = new THREE.InstancedMesh(geo, new LitMat({ map: TEX.take }), N);
+  const stalks = new THREE.InstancedMesh(geo, kaze(new LitMat({ map: TEX.take }), 0.32, 'y01'), N);   // 風にしなる
   stalks.frustumCulled = false;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eu = new THREE.Euler(),
         v3 = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
@@ -2601,10 +2664,10 @@ const chikurin = (function(){
   group.add(stalks);
 
   // 葉むら：11枚は頭上の天井、5枚は脇の中段の茂み
-  const sasaMat = new THREE.MeshBasicMaterial({
+  const sasaMat = kaze(new THREE.MeshBasicMaterial({
     map: TEX.sasa, transparent: true, opacity: 0.92,
     depthWrite: false, side: THREE.DoubleSide
-  });
+  }), 0.3, 'uv');                                   // 葉むらがそよぐ
   const canopy = [];
   for (let i = 0; i < 16; i++){
     const p = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 5.5), sasaMat);
@@ -3925,11 +3988,19 @@ const chamise = (function(){
       blending: THREE.AdditiveBlending, depthWrite: false }));
   pool.rotation.x = -Math.PI / 2;
   pool.position.set(0.6, 0.02, 0.2); g.add(pool);
+  // 湯気（床几の茶碗から立ちのぼる小さな白）
+  const yuge = [];
+  for (let i = 0; i < 6; i++){
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.glow, color: 0xd8dce4,
+      transparent: true, opacity: 0, depthWrite: false }));
+    s.userData = { ph: i / 6 };
+    g.add(s); yuge.push(s);
+  }
   g.position.set(10.8, 0, -82.4);
   g.rotation.y = 0.6;                 // 床几を川と橋の眺めへ向ける
   g.traverse(o => { if (o.isSprite) o.raycast = function(){}; });
   scene.add(g);
-  return { group: g, halo: halo, pool: pool };
+  return { group: g, halo: halo, pool: pool, yuge: yuge };
 })();
 
 /* ============================================================
@@ -4875,7 +4946,7 @@ const adashino = (function(){
   const kakoiGeo = new THREE.CylinderGeometry(0.055, 0.066, 1, 6);
   kakoiGeo.translate(0, 0.5, 0);                       // 根元を原点に。丈は行列の scale で
   const kakoiTake = new THREE.InstancedMesh(kakoiGeo,
-    new LitMat({ map: TEX.take }), TAKE_POS.length);
+    kaze(new LitMat({ map: TEX.take }), 0.28, 'y01'), TAKE_POS.length);
   kakoiTake.frustumCulled = false;                     // 位置が散るので境界球カリングは切る
   TAKE_POS.forEach((p, i) => {
     eu.set((rnd() - 0.5) * 0.08, rnd() * Math.PI, (rnd() - 0.5) * 0.08);
@@ -4899,8 +4970,8 @@ const adashino = (function(){
     [-17.2, 5.8, -56.7, 0.70]
   ];
   const kakoiHa = new THREE.InstancedMesh(new THREE.PlaneGeometry(8.5, 5.5),
-    new THREE.MeshBasicMaterial({ map: TEX.sasa, color: 0x7d8a76, transparent: true,
-      opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), HA_POS.length);
+    kaze(new THREE.MeshBasicMaterial({ map: TEX.sasa, color: 0x7d8a76, transparent: true,
+      opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), 0.3, 'uv'), HA_POS.length);
   kakoiHa.frustumCulled = false;
   HA_POS.forEach((p, i) => {
     eu.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI);
@@ -5221,7 +5292,7 @@ const nonomiya = (function(){
   }
   const takeGeo = new THREE.CylinderGeometry(0.055, 0.068, 1, 6);
   takeGeo.translate(0, 0.5, 0);
-  const take = new THREE.InstancedMesh(takeGeo, new LitMat({ map: TEX.take }),
+  const take = new THREE.InstancedMesh(takeGeo, kaze(new LitMat({ map: TEX.take }), 0.28, 'y01'),
     TAKE.length);
   take.frustumCulled = false;
   TAKE.forEach((p, i) => {
@@ -5238,8 +5309,8 @@ const nonomiya = (function(){
   const HA = [[10.6, 6.2, -43.6, 0.6], [16.4, 6.8, -43.8, 0.66], [20.4, 6.4, -47.0, 0.62],
               [20.2, 5.9, -51.6, 0.58], [11.8, 6.6, -54.0, 0.64], [17.2, 6.1, -53.8, 0.6]];
   const ha = new THREE.InstancedMesh(new THREE.PlaneGeometry(8.5, 5.5),
-    new THREE.MeshBasicMaterial({ map: TEX.sasa, color: 0x86927c, transparent: true,
-      opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), HA.length);
+    kaze(new THREE.MeshBasicMaterial({ map: TEX.sasa, color: 0x86927c, transparent: true,
+      opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), 0.3, 'uv'), HA.length);
   ha.frustumCulled = false;
   HA.forEach((p, i) => {
     eu.set(-Math.PI / 2 + (rnd() - 0.5) * 0.5, 0, rnd() * Math.PI); q0.setFromEuler(eu);
@@ -9382,6 +9453,11 @@ function update(dt){
     u.noren.forEach((p, k) => {
       p.rotation.x = Math.sin(elapsed * 1.25 + k * 0.9 + i) * 0.11;
     });
+    // 提灯が風に振れる（吊り元を支点にした小さな振り子。揺れたぶんだけわずかに持ち上がる）
+    const lsw = Math.sin(elapsed * 1.35 + i * 1.7) * 0.028 + Math.sin(elapsed * 3.1 + i) * 0.006;
+    u.lantern.position.x = u.lanternBase.x + lsw;
+    u.lantern.position.y = u.lanternBase.y - Math.abs(lsw) * 0.12;
+    u.halo.position.copy(u.lantern.position);
   });
 
   // 灯りは近い三軒へ移す
@@ -9508,6 +9584,39 @@ function update(dt){
       u.choHalo.material.opacity = 0.5 * (0.82 + Math.sin(elapsed * 8.7) * 0.18);
     }
   });
+  // 通りの人影（木戸 z+3 〜 竹林の口 z-54 を往復。向きは進む方へ）
+  machiWalkers.forEach((w, k) => {
+    w.visible = FX.hitokage;
+    if (!FX.hitokage) return;
+    const u = w.userData;
+    u.t += u.dir * u.v * dt;
+    if (u.t >= 1){ u.t = 1; u.dir = -1; }
+    else if (u.t <= 0){ u.t = 0; u.dir = 1; }
+    const face = u.dir > 0 ? Math.PI : 0;
+    u.face = u.face === undefined ? face : u.face + (face - u.face) * Math.min(1, dt * 2.5);
+    const step = Math.sin(elapsed * 3.0 + k * 1.9);
+    w.position.set(u.lane, Math.abs(step) * 0.02, 3 - u.t * 57);
+    w.rotation.y = u.face;
+    w.rotation.z = step * 0.018;
+    if (u.cho){
+      u.cho.position.z = 0.14 + Math.sin(elapsed * 2.2 + k) * 0.06;
+      u.choHalo.position.copy(u.cho.position);
+      u.choHalo.material.opacity = 0.5 * (0.82 + Math.sin(elapsed * 8.7) * 0.18);
+    }
+  });
+  // 篝火の煙：生まれて、ふくらみ、薄れて消える（舟の上の局所座標）
+  if (kemuri){
+    kemuri.forEach((s, i) => {
+      s.visible = FX.hinoko;
+      if (!FX.hinoko) return;
+      const u = (elapsed * 0.2 + s.userData.ph) % 1;
+      s.position.set(-2.32 + u * 1.1 + Math.sin(elapsed * 0.7 + i) * 0.15 * u,
+                     1.9 + u * 3.4, Math.sin(elapsed * 0.5 + i * 1.3) * 0.25 * u);
+      const sc = 0.5 + u * 2.0;
+      s.scale.set(sc, sc, 1);
+      s.material.opacity = 0.2 * (1 - u) * Math.min(1, u * 6);
+    });
+  }
   // 提灯の灯は欄干を越えて東の水面にもこぼれる
   if (streakChochin && walkers.length > 1){
     streakChochin.visible = FX.mizukagami && FX.hitokage;
@@ -9644,6 +9753,13 @@ function update(dt){
   if (FX.chamise){
     chamise.halo.material.opacity = 0.30 + Math.sin(elapsed * 4.2 + 2.2) * 0.07;
     chamise.pool.material.opacity = 0.10 + Math.sin(elapsed * 4.2 + 2.9) * 0.03;
+    chamise.yuge.forEach((s, i) => {
+      const u = (elapsed * 0.35 + s.userData.ph) % 1;
+      s.position.set(0.3 + Math.sin(elapsed * 1.3 + i) * 0.04 * u, 0.56 + u * 0.7, 0.05);
+      const sc = 0.12 + u * 0.3;
+      s.scale.set(sc, sc, 1);
+      s.material.opacity = 0.16 * (1 - u) * Math.min(1, u * 5);
+    });
   }
   // ㉔ 屋形舟：舫っているあいだ桟橋でゆれる／桟橋の行灯のまたたき
   funaasobi.group.visible = FX.fune;
@@ -9981,6 +10097,7 @@ function frame(dt){
   skyDome.mesh.visible = scene.background === TEX.sky;
   skyDome.u.uTime.value = elapsed;
   STAR_T.value = elapsed;
+  KAZE_T.value = elapsed;
   YAMA_U.fogD.value = scene.fog.density;
   WATER.tick();
   followKage();
