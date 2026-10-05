@@ -434,6 +434,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
 <script>
 (async function(){
 'use strict';
@@ -522,7 +523,7 @@ const TOUR = SPOTS;
 /* 川辺の演出の個別開閉（赤入れで気に入らないものだけ false に。__machiya.FX からも切替可） */
 const FX = {
   kirameki    : true,   // ① 川面のきらめき（月の道の光点）
-  nagare2     : true,   // ② 二層の水流
+  nagare2     : false,  // ② 二層の水流（水面がシェーダーになり波を自前で立てるので休ませる）
   kawagiri    : true,   // ③ 川霧
   touronagashi: true,   // ④ 灯篭流し
   mizukagami  : true,   // ⑤ 光の水鏡（篝火・提灯の光が水面に伸びる）
@@ -615,7 +616,7 @@ const Q = (function(){
   const mem = navigator.deviceMemory || 8;
   let high = !mobile && cores >= 4 && mem >= 4;
   if (qs === 'high') high = true; else if (qs === 'low') high = false;
-  return { high: high, kage: high, bloom: true, pbr: high,
+  return { high: high, kage: high, bloom: true, pbr: high, refl: high,
            lamps: high ? 6 : 3, dpr: high ? 2 : 1.5, forced: qs === 'high' || qs === 'low' };
 })();
 document.body.classList.add(Q.high ? 'q-high' : 'q-low');
@@ -1148,9 +1149,239 @@ const TEX = {
    ============================================================ */
 scene.background = TEX.sky;
 
+/* ============================================================
+   4a. 空のドーム・水面・遠山の肌（第2段「水面と空」）
+   ============================================================ */
+/* 空のドーム ― 背景画像は画面の階調で方角を持てないので、球の内側に空を描く。
+   仰角で四段の色をつなぎ、月の側をほのかに明るくし、ディザで縞を消す。
+   色は SKY.paint(k) に相乗りして暁／宵で塗り替える。月の都では背景ごと外す（loop） */
+const skyDome = (function(){
+  const u = {
+    uC0: { value: new THREE.Color(0x04060e) }, uC1: { value: new THREE.Color(0x0a1226) },
+    uC2: { value: new THREE.Color(0x132039) }, uC3: { value: new THREE.Color(0x25324b) },
+    uMoonDir:  { value: new THREE.Vector3(42, 46, -152).normalize() },
+    uMoonGlow: { value: new THREE.Color(0x242c48) },
+    uTime: { value: 0 }
+  };
+  const mat = new THREE.ShaderMaterial({
+    uniforms: u, side: THREE.BackSide, depthWrite: false, fog: false,
+    vertexShader: [
+      'varying vec3 vDir;',
+      'void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform vec3 uC0, uC1, uC2, uC3, uMoonDir, uMoonGlow; uniform float uTime;',
+      'varying vec3 vDir;',
+      'float dhash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }',
+      'void main(){',
+      '  vec3 d = normalize(vDir);',
+      '  float e = d.y;',
+      '  vec3 col;',
+      '  // 画布の四段（上0 / 0.42 / 0.76 / 地平1）を仰角へ写す。画面の天辺が仰角 25°ほどなので、',
+      '  // 墨（C0）は 0.45 より上、藍（C1）は 0.22、残照（C2）は 0.07、地平（C3）は 0 に置く',
+      '  if (e > 0.45)      col = uC0;',
+      '  else if (e > 0.22) col = mix(uC1, uC0, smoothstep(0.22, 0.45, e));',
+      '  else if (e > 0.07) col = mix(uC2, uC1, smoothstep(0.07, 0.22, e));',
+      '  else if (e > 0.0)  col = mix(uC3, uC2, smoothstep(0.0, 0.07, e));',
+      '  else               col = mix(uC3, uC3 * 0.5, smoothstep(0.0, -0.25, e));',
+      '  float m = max(dot(d, uMoonDir), 0.0);',
+      '  col += uMoonGlow * (pow(m, 18.0) * 0.6 + pow(m, 4.0) * 0.14);',
+      '  col = mix(col, uC3, (1.0 - smoothstep(0.0, 0.08, abs(e))) * 0.35);',
+      '  col += (dhash(gl_FragCoord.xy + fract(uTime)) - 0.5) * (2.0 / 255.0);',
+      '  gl_FragColor = vec4(col, 1.0);',
+      '  #include <tonemapping_fragment>',
+      '}'
+    ].join('\n')
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(380, 48, 28), mat);
+  mesh.renderOrder = -20;
+  mesh.frustumCulled = false;
+  mesh.raycast = function(){};
+  scene.add(mesh);
+  // 暁の塗り替えに相乗り：画布の四段と同じ色をドームにも流す
+  const paint0 = SKY.paint;
+  const YORU = [0x04060e, 0x0a1226, 0x132039, 0x25324b];
+  SKY.paint = function(k){
+    paint0(k);
+    [u.uC0, u.uC1, u.uC2, u.uC3].forEach((c, i) => c.value.setHex(mixHex(YORU[i], SKY.AKE[i], k)));
+    u.uMoonGlow.value.setHex(mixHex(0x242c48, 0x3a3a48, k));
+  };
+  return { mesh: mesh, u: u };
+})();
+
+/* 水面 ― 空の色を映し（フレネル）、波立つ法線で月を砕く自作シェーダー。
+   曹源池だけは本物の鏡（Reflector。高画質かつ池の近くで、主カメラのときだけ描く）。
+   色は暁／宵に追従（toki）。霧は scene.fog と同じ式で自前にかける */
+const WATER = (function(){
+  const S = {
+    uTime:    { value: 0 },
+    uDeep:    { value: new THREE.Color(0x0b1626) },
+    uSky:     { value: new THREE.Color(0x1e2a44) },
+    uMoonPos: { value: new THREE.Vector3(42, 46, -152) },
+    uMoonCol: { value: new THREE.Color(0xfff0d0) },
+    uMoonI:   { value: 1.0 },
+    uFogCol:  { value: scene.fog.color },      // 同じ Color を参照＝霧の塗り替えがそのまま届く
+    uFogD:    { value: scene.fog.density }
+  };
+  const vert = [
+    'uniform mat4 textureMatrix;',
+    'varying vec3 vWPos; varying vec4 vRefUV;',
+    'void main(){',
+    '  vec4 wp = modelMatrix * vec4(position, 1.0);',
+    '  vWPos = wp.xyz;',
+    '  vRefUV = textureMatrix * vec4(position, 1.0);',   // Reflector の行列は modelMatrix 込み＝ローカル座標に掛ける
+    '  gl_Position = projectionMatrix * viewMatrix * wp;',
+    '}'
+  ].join('\n');
+  function frag(reflect){
+    return [
+      'uniform float uTime, uMoonI, uFogD, uAlpha, uScale, uReflMix;',
+      'uniform vec3 uDeep, uSky, uMoonPos, uMoonCol, uFogCol;',
+      'uniform sampler2D tDiffuse;',
+      'varying vec3 vWPos; varying vec4 vRefUV;',
+      'float whash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+      'float wnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+      '  return mix(mix(whash(i), whash(i + vec2(1.0, 0.0)), f.x), mix(whash(i + vec2(0.0, 1.0)), whash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+      'float wh(vec2 p){ float t = uTime;',
+      '  return wnoise(p * 0.9 + vec2(t * 0.06, t * 0.03)) * 0.6 + wnoise(p * 2.3 - vec2(t * 0.05, t * 0.08)) * 0.3',
+      '       + sin(p.x * 6.0 + p.y * 4.0 + t * 1.6) * 0.05 + sin(p.x * 11.0 - p.y * 7.0 + t * 2.3) * 0.05; }',
+      'void main(){',
+      '  vec2 p = vWPos.xz * uScale; float e = 0.08;',
+      '  float hx = wh(p + vec2(e, 0.0)) - wh(p - vec2(e, 0.0));',
+      '  float hz = wh(p + vec2(0.0, e)) - wh(p - vec2(0.0, e));',
+      '  vec3 n = normalize(vec3(-hx * 1.6, 1.0, -hz * 1.6));',
+      '  vec3 v = normalize(cameraPosition - vWPos);',
+      '  float ndv = max(dot(n, v), 0.0);',
+      '  float fres = 0.04 + 0.96 * pow(1.0 - ndv, 4.0);',
+      '  vec3 col = mix(uDeep, uSky, fres);',
+      '  vec3 l = normalize(uMoonPos - vWPos); vec3 hv = normalize(l + v);',
+      '  float nh = max(dot(n, hv), 0.0);',
+      '  float spec = pow(nh, 180.0) * 1.4 + pow(nh, 24.0) * 0.08;',
+      '  col += uMoonCol * spec * uMoonI * (0.5 + 0.5 * fres);',
+      '  float dist = length(cameraPosition - vWPos);',
+      '  float fog = 1.0 - exp(-uFogD * uFogD * dist * dist);',
+      '  col = mix(col, uFogCol, fog);',
+      '  #if defined( TONE_MAPPING )',
+      '  col = toneMapping(col);',
+      '  #endif',
+      reflect ? [
+      '  vec4 ruv = vRefUV; ruv.xy += n.xz * 0.012 * ruv.w;',
+      '  vec3 refl = texture2DProj(tDiffuse, ruv).rgb;',
+      '  col = mix(col, refl * 0.9 + col * 0.2, (0.55 + 0.45 * fres) * uReflMix * (1.0 - fog));'
+      ].join('\n') : '',
+      '  gl_FragColor = vec4(col, uAlpha);',
+      '}'
+    ].join('\n');
+  }
+  function uni(extra){
+    return Object.assign({
+      textureMatrix: { value: new THREE.Matrix4() }, tDiffuse: { value: null }, color: { value: null },
+      uAlpha: { value: 0.94 }, uScale: { value: 1.0 }, uReflMix: { value: 0 }
+    }, S, extra || {});
+  }
+  /* ただの水面（川・広沢池・大沢池） */
+  function plain(geo, opt){
+    return new THREE.Mesh(geo, new THREE.ShaderMaterial({
+      uniforms: uni(opt), vertexShader: vert, fragmentShader: frag(false),
+      transparent: true, fog: false }));
+  }
+  /* 鏡の水面（曹源池）。Reflector が読めない・低画質なら、ただの水面に落とす */
+  let refl = null;
+  function mirror(geo, opt){
+    if (!(Q.refl && THREE.Reflector)) return plain(geo, opt);
+    const r = new THREE.Reflector(geo, {
+      textureWidth: 512, textureHeight: 512, clipBias: 0.004, color: 0xffffff,
+      shader: { uniforms: uni(Object.assign({ uReflMix: { value: 1 } }, opt || {})),
+                vertexShader: vert, fragmentShader: frag(true) }
+    });
+    // Reflector は uniforms を複製するので、共有の分だけ元の参照に差し戻す（暁の塗り替えが届くように）
+    Object.keys(S).forEach(k => { r.material.uniforms[k] = S[k]; });
+    r.material.transparent = true;
+    // 描くのは主カメラ・池の近く・地上にいるときだけ（塔の内の窓や月の都では映さない）
+    const obr = r.onBeforeRender;
+    r.onBeforeRender = function(renderer, sc, cam){
+      if (refl.on && cam === camera) obr.call(this, renderer, sc, cam);
+    };
+    refl = { mesh: r, on: true, off: false };
+    return r;
+  }
+  /* 暁／宵の色（k=0 宵・1 暁）。宵は嵐山の上の月、暁は東の低い朝日の方（MOON_DIR の先）を砕く */
+  function toki(k){
+    S.uDeep.value.setHex(mixHex(0x0b1626, 0x2a3240, k));
+    S.uSky.value.setHex(mixHex(0x1e2a44, 0x8c8088, k));
+    S.uMoonCol.value.setHex(mixHex(0xfff0d0, 0xffb98c, k));
+    S.uMoonI.value = 1.0 - 0.3 * k;
+    const d = MOON_DIR.clone().normalize().multiplyScalar(320);
+    S.uMoonPos.value.set(42 + (d.x - 42) * k, 46 + (d.y - 46) * k, -152 + (d.z + 152) * k);
+  }
+  const WTMP = new THREE.Vector3();
+  function tick(){
+    S.uTime.value = elapsed;
+    S.uFogD.value = scene.fog.density;
+    if (refl){
+      refl.mesh.getWorldPosition(WTMP);
+      const near = !TSUKI.on && !GOJU.on && camera.position.distanceTo(WTMP) < 60;
+      refl.on = near && !refl.off;
+      const u = refl.mesh.material.uniforms.uReflMix;
+      u.value += ((refl.on ? 1 : 0) - u.value) * 0.08;
+    }
+  }
+  return { S: S, plain: plain, mirror: mirror, toki: toki, tick: tick, get refl(){ return refl; } };
+})();
+
+/* 遠山の肌 ― 霧に丸ごと呑ませず、裾ほど霞み頂ほど顔を出す（空気遠近）。
+   稜線は雑音でうねらせ、山肌は木立の斑で質感を出す（頂点ずらしは見た目だけ＝当たりは変えない） */
+const YAMA_U = { fogCol: { value: scene.fog.color }, fogD: { value: scene.fog.density } };
+function yamaHada(mat, opt){
+  mat.fog = false;
+  mat.onBeforeCompile = function(sh){
+    sh.uniforms.uFogCol = YAMA_U.fogCol; sh.uniforms.uFogD = YAMA_U.fogD;
+    sh.uniforms.uHaze = { value: opt.haze }; sh.uniforms.uTop = { value: opt.top }; sh.uniforms.uRug = { value: opt.rug };
+    const noiseFn = [
+      'float yhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+      'float ynoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+      '  return mix(mix(yhash(i), yhash(i + vec2(1.0, 0.0)), f.x), mix(yhash(i + vec2(0.0, 1.0)), yhash(i + vec2(1.0, 1.0)), f.x), f.y); }'
+    ].join('\n');
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vYPos; uniform float uRug;\n' + noiseFn)
+      .replace('#include <begin_vertex>', [
+        '#include <begin_vertex>',
+        '{ vec4 yw = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING',
+        '  yw = instanceMatrix * yw;',
+        '#endif',
+        '  yw = modelMatrix * yw;',
+        '  transformed.y *= 1.0 + uRug * (ynoise(yw.xz * 0.05) - 0.5) * 2.0;',
+        '  vec4 yw2 = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING',
+        '  yw2 = instanceMatrix * yw2;',
+        '#endif',
+        '  vYPos = (modelMatrix * yw2).xyz; }'
+      ].join('\n'));
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vYPos; uniform vec3 uFogCol; uniform float uFogD, uHaze, uTop;\n' + noiseFn)
+      .replace('#include <fog_fragment>', [
+        '#include <fog_fragment>',
+        '{ float d = length(vYPos - cameraPosition);',
+        '  float f = 1.0 - exp(-uFogD * uFogD * d * d);',
+        '  float hz = mix(uHaze, 0.45, smoothstep(0.0, uTop, vYPos.y));',
+        '  float g = ynoise(vYPos.xz * 0.35) * 0.6 + ynoise(vYPos.xz * 1.7) * 0.4;',
+        '  gl_FragColor.rgb *= 0.84 + 0.32 * g;',
+        '  gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogCol, f * hz);',
+        opt.fade ? '  gl_FragColor.a *= smoothstep(0.0, 0.5, vUv.y);' : '',   // 帯の下端を溶かす（木立の帯）
+        '}'
+      ].join('\n'));
+  };
+  mat.needsUpdate = true;
+  return mat;
+}
+
 // 星（霧の影響を受けない）。加算合成ではないので、暁の一括減光には手で載せる（㊿）
+// 千二百の星に明るさの分布（数個の一等星・多くの淡い星）と色（暖・冷）とまたたきを付ける
+const STAR_T = { value: 0 };
 const starsMat = (function stars(){
-  const N = 420, pos = new Float32Array(N * 3);
+  const N = 1200, pos = new Float32Array(N * 3), col = new Float32Array(N * 3),
+        asz = new Float32Array(N), aph = new Float32Array(N);
   let seed = 99;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < N; i++){
@@ -1160,23 +1391,69 @@ const starsMat = (function stars(){
     pos[i*3]   = Math.cos(th) * Math.sin(ph) * r;
     pos[i*3+1] = Math.cos(ph) * r + 20;
     pos[i*3+2] = Math.sin(th) * Math.sin(ph) * r - 30;
+    const b = rnd();
+    asz[i] = b < 0.05 ? 1.7 + rnd() * 0.9 : (b < 0.35 ? 0.9 + rnd() * 0.5 : 0.45 + rnd() * 0.4);
+    aph[i] = rnd() * Math.PI * 2;
+    const w = rnd();
+    const c = w < 0.3 ? [1.0, 0.86, 0.72] : (w < 0.6 ? [0.86, 0.91, 1.0] : [1.0, 0.97, 0.9]);
+    col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(asz, 1));
+  geo.setAttribute('aPhase', new THREE.BufferAttribute(aph, 1));
   const mat = new THREE.PointsMaterial({
-    color:0xfff0d0, size:0.95, sizeAttenuation:true,
+    color:0xfff0d0, size:0.95, sizeAttenuation:true, vertexColors:true,
     transparent:true, opacity:0.85, fog:false, depthWrite:false
   });
-  scene.add(new THREE.Points(geo, mat));
+  mat.onBeforeCompile = function(sh){
+    sh.uniforms.uTime = STAR_T;
+    sh.vertexShader = sh.vertexShader
+      .replace('uniform float size;', 'uniform float size; uniform float uTime; attribute float aSize; attribute float aPhase; varying float vTw;')
+      .replace('gl_PointSize = size;', 'gl_PointSize = size * aSize; vTw = 0.62 + 0.38 * sin(uTime * (0.8 + fract(aPhase) * 2.2) + aPhase * 7.0);');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('uniform float opacity;', 'uniform float opacity; varying float vTw;')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse, opacity * vTw );');
+  };
+  const pts = new THREE.Points(geo, mat);
+  pts.raycast = function(){};
+  scene.add(pts);
   return mat;
 })();
+
+/* 月の肌（海の模様・小さなクレーター・縁の翳り。白を基調に薄く描く＝材質の色がそのまま乗る） */
+function moonTexture(){
+  const c = cv(256, 256), g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+  let seed = 1969;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  [[96, 92, 34, 26], [150, 80, 26, 20], [118, 140, 40, 24], [170, 150, 20, 16], [80, 160, 18, 14], [140, 190, 24, 12]].forEach(m => {
+    const rg = g.createRadialGradient(m[0], m[1], 0, m[0], m[1], m[2]);
+    rg.addColorStop(0, 'rgba(150,150,165,0.42)');
+    rg.addColorStop(0.7, 'rgba(150,150,165,0.22)');
+    rg.addColorStop(1, 'rgba(150,150,165,0)');
+    g.save(); g.translate(m[0], m[1]); g.scale(1, m[3] / m[2]); g.translate(-m[0], -m[1]);
+    g.fillStyle = rg;
+    g.beginPath(); g.arc(m[0], m[1], m[2], 0, Math.PI * 2); g.fill(); g.restore();
+  });
+  for (let i = 0; i < 40; i++){
+    const x = 20 + rnd() * 216, y = 20 + rnd() * 216, r = 2 + rnd() * 5;
+    g.fillStyle = 'rgba(140,140,160,' + (0.08 + rnd() * 0.12).toFixed(2) + ')';
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  const lim = g.createRadialGradient(128, 128, 90, 128, 128, 128);
+  lim.addColorStop(0, 'rgba(0,0,0,0)'); lim.addColorStop(1, 'rgba(60,60,80,0.35)');
+  g.fillStyle = lim; g.fillRect(0, 0, 256, 256);
+  return tex(c);
+}
 
 // 三日月（⑪月暈の輪をまとって呼吸する）
 const moonFx = (function moon(){
   const g = new THREE.Group();
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(4.2, 40),
-    new THREE.MeshBasicMaterial({ color:0xFFE9BE, fog:false })
+    new THREE.MeshBasicMaterial({ color:0xFFE9BE, fog:false, map: moonTexture() })
   );
   const bite = new THREE.Mesh(
     new THREE.CircleGeometry(3.6, 40),
@@ -1557,12 +1834,9 @@ const MAT_KAWARA = new LitMat({ color:0x171c26 });
 
 /* 桂川の水面 */
 const river = (function(){
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(220, RIVER_Z0 - RIVER_Z1),
-    new THREE.MeshBasicMaterial({ map:TEX.water.clone(), transparent:true, opacity:0.92 })
-  );
-  m.material.map.wrapS = m.material.map.wrapT = THREE.RepeatWrapping;
-  m.material.map.repeat.set(34, 3);
+  // 広い川は波を粗めに（uScale 小）
+  const m = WATER.plain(new THREE.PlaneGeometry(220, RIVER_Z0 - RIVER_Z1),
+    { uAlpha: { value: 0.93 }, uScale: { value: 0.55 } });
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, -0.22, (RIVER_Z0 + RIVER_Z1) / 2);
   // 水面は必ず最初に描く。距離順に任せると、水上の月の道や灯の照りを後から塗り潰してしまう
@@ -1747,10 +2021,10 @@ const MTS = [
 ];
 const mtGroup = (function(){
   const g = new THREE.Group();
-  const mat = new LitMat({ color:0x131c29 });
+  const mat = yamaHada(new LitMat({ color:0x131c29 }), { haze: 0.92, top: 22, rug: 0.16 });
   MTS.forEach(m => {
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(m.r, 26, 14, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+      new THREE.SphereGeometry(m.r, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), mat);
     mesh.scale.set(1, m.sy, m.sz);
     mesh.position.set(m.cx, 0, m.cz);
     g.add(mesh);
@@ -2010,10 +2284,11 @@ if (FX.kodachi){
     [ 38, 15.0, -135.6, 84, 7,  0,     false],   // 主峰の山腹（手前の森）
     [-40, 10.0, -146.4, 66, 6,  0,     false]    // 東峰の山腹
   ].forEach(k => {
+    // 帯も山と同じ空気遠近（霧に丸ごと呑ませない。頂点は動かさない）
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(k[3], k[4]),
-      new THREE.MeshBasicMaterial({ map: k[6] ? TEX.kodachi : TEX.kodachiFar,
-        transparent:true, depthWrite:false })
+      yamaHada(new THREE.MeshBasicMaterial({ map: k[6] ? TEX.kodachi : TEX.kodachiFar,
+        transparent:true, depthWrite:false }), { haze: 0.62, top: 0.01, rug: 0, fade: true })
     );
     m.position.set(k[0], k[1], k[2]);
     m.rotation.z = k[5];
@@ -2762,11 +3037,9 @@ const tenryuji = (function(){
 
   // ── 曹源池（renderOrder -2 で先に描き、水鏡の光を飲ませない＝川と同じ手） ──
   const PC = { x: -16.2, z: -69.6, rx: 5.4, rz: 3.5 };
-  const ike = new THREE.Mesh(new THREE.CircleGeometry(1, 40),
-    new THREE.MeshBasicMaterial({ map: TEX.water.clone(), color: 0x9db1d8,
-      transparent: true, opacity: 0.94 }));
-  ike.material.map.wrapS = ike.material.map.wrapT = THREE.RepeatWrapping;
-  ike.material.map.repeat.set(3, 2);
+  // 鏡の水面（方丈と月が映る。小さな池なので波は細かく）
+  const ike = WATER.mirror(new THREE.CircleGeometry(1, 40),
+    { uAlpha: { value: 0.96 }, uScale: { value: 1.6 } });
   ike.rotation.x = -Math.PI / 2;
   ike.scale.set(PC.rx, PC.rz, 1);
   ike.position.set(PC.x, 0.025, PC.z);
@@ -3607,7 +3880,7 @@ const SHIKI = (function(){
    西は保津峡の山が川面まで迫り、東は盆地へ開けて低い山と町の灯 */
 const enzan = (function(){
   const g = new THREE.Group();
-  const mat = new LitMat({ color: 0x111a26 });   // 三峰よりひとつ遠い色
+  const mat = yamaHada(new LitMat({ color: 0x111a26 }), { haze: 0.94, top: 24, rug: 0.14 });   // 三峰よりひとつ遠い色
   // [cx, cz, r, sy, sz]
   const MINE = [
     [  14,   52, 34, 0.42, 0.62],   // 小倉山（通りの延長の北、竹林の背）
@@ -3940,28 +4213,39 @@ const sora = (function(){
   milky.lookAt(0, 2, -70);          // 歩ける中心域へ正対させ
   milky.rotateZ(0.8);               // 帯を斜めに渡す
   scene.add(milky);
-  // 夜雲（墨の斑。月の手前をゆっくり流れて、時おり月が翳る）
-  const cc = cv(256, 64), cg = cc.getContext('2d');
-  cg.clearRect(0, 0, 256, 64);
-  for (let i = 0; i < 14; i++){
-    const px = 30 + rnd() * 196, py = 18 + rnd() * 28, pr = 14 + rnd() * 22;
-    const rg = cg.createRadialGradient(px, py, 0, px, py, pr);
-    rg.addColorStop(0, 'rgba(9,13,24,0.55)');
-    rg.addColorStop(0.75, 'rgba(13,19,34,0.28)');
-    rg.addColorStop(1, 'rgba(13,19,34,0)');
-    cg.fillStyle = rg;
-    cg.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+  // 夜雲（綿の塊を横に連ねた一群。月の側の綿だけ縁が照る＝墨一色の斑より立体に見える。
+  //   月の手前をゆっくり流れて、時おり月が翳る。色は毎フレーム決める＝update）
+  const pc = cv(256, 256), pg = pc.getContext('2d');
+  pg.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 26; i++){           // 小さな丸を寄せ集めて縁をもこもこに
+    const a = rnd() * Math.PI * 2, rr = rnd() * 62;
+    const px = 128 + Math.cos(a) * rr, py = 128 + Math.sin(a) * rr * 0.7, pr = 34 + rnd() * 40;
+    const rg = pg.createRadialGradient(px, py, 0, px, py, pr);
+    rg.addColorStop(0, 'rgba(255,255,255,0.55)');
+    rg.addColorStop(0.6, 'rgba(255,255,255,0.22)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    pg.fillStyle = rg; pg.fillRect(px - pr, py - pr, pr * 2, pr * 2);
   }
-  const cloudTex = tex(cc);
+  const puffTex = tex(pc);
   const clouds = [];
-  [[74, 11, 20, 47, -149, 0.55], [52, 8, -35, 41, -139, 0.34],
-   [46, 7, 55, 20, -92, 0.42]].forEach(k => {
-    const cl = new THREE.Mesh(new THREE.PlaneGeometry(k[0], k[1]),
-      new THREE.MeshBasicMaterial({ map: cloudTex, transparent: true, opacity: 0.9,
-        depthWrite: false, fog: false }));
-    cl.position.set(k[2], k[3], k[4]);
-    cl.userData = { spd: k[5] };
-    scene.add(cl); clouds.push(cl);
+  // [x, y, z, 流れる速さ, 綿の数]
+  [[20, 47, -149, 0.55, 12], [-35, 41, -139, 0.34, 10], [55, 20, -92, 0.42, 9], [-70, 52, -120, 0.28, 10]].forEach(k => {
+    const grp = new THREE.Group();
+    const n = k[4];
+    for (let i = 0; i < n; i++){
+      const t = (i / (n - 1)) * 2 - 1;      // -1..1 横並び（端ほど小さく低く）。綿は重ねて一塊に
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true,
+        depthWrite: false, fog: false, opacity: 0.32 + rnd() * 0.22, color: 0x141a2c }));
+      const w = (18 + rnd() * 12) * (1 - Math.abs(t) * 0.4);
+      s.scale.set(w, w * (0.6 + rnd() * 0.25), 1);
+      s.position.set(t * 14 + (rnd() - 0.5) * 5, (rnd() - 0.5) * 5 - Math.abs(t) * 3, (rnd() - 0.5) * 3);
+      s.userData = { t: t };
+      s.raycast = function(){};
+      grp.add(s);
+    }
+    grp.position.set(k[0], k[1], k[2]);
+    grp.userData = { spd: k[3] };
+    scene.add(grp); clouds.push(grp);
   });
   return { milky: milky, clouds: clouds };
 })();
@@ -5070,11 +5354,8 @@ const hirosawa = (function(){
   const PC = { x: -15.0, z: 16.0, rx: 8.0, rz: 7.0 };
 
   // ── 池（renderOrder -2 で先に描き、水鏡の光を飲ませない＝川・曹源池と同じ手） ──
-  const ike = new THREE.Mesh(new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ map: TEX.water.clone(), color: 0x8ea4cc,
-      transparent: true, opacity: 0.95 }));
-  ike.material.map.wrapS = ike.material.map.wrapT = THREE.RepeatWrapping;
-  ike.material.map.repeat.set(4, 3);
+  const ike = WATER.plain(new THREE.CircleGeometry(1, 48),
+    { uAlpha: { value: 0.96 }, uScale: { value: 1.3 } });
   ike.rotation.x = -Math.PI / 2;
   ike.scale.set(PC.rx, PC.rz, 1);
   ike.position.set(PC.x, 0.024, PC.z);
@@ -5232,11 +5513,8 @@ const osawa = (function(){
   const BOX = [], DARK = [], ISHI = [[], []], HI = [];
 
   // ── 池（renderOrder -2 で先に描き、水鏡の光を飲ませない） ──
-  const ike = new THREE.Mesh(new THREE.CircleGeometry(1, 44),
-    new THREE.MeshBasicMaterial({ map: TEX.water.clone(), color: 0x8ea4cc,
-      transparent: true, opacity: 0.95 }));
-  ike.material.map.wrapS = ike.material.map.wrapT = THREE.RepeatWrapping;
-  ike.material.map.repeat.set(3, 2);
+  const ike = WATER.plain(new THREE.CircleGeometry(1, 44),
+    { uAlpha: { value: 0.96 }, uScale: { value: 1.5 } });
   ike.rotation.x = -Math.PI / 2;
   ike.scale.set(PC.rx, PC.rz, 1);
   ike.position.set(PC.x, 0.024, PC.z);
@@ -8785,6 +9063,7 @@ function tokiSky(){
   akatsukiFx.akane.visible = akatsukiFx.shiro.visible = k > 0.004;
   akatsukiFx.akane.material.opacity = T.akane * k;
   akatsukiFx.shiro.material.opacity = T.shiro * k;
+  WATER.toki(k);                                   // 水の色と、砕ける光の向き
 }
 
 function updateToki(dt){
@@ -8877,8 +9156,7 @@ function update(dt){
   // 側溝の水が流れる
   waterStrips.forEach(m => { m.material.map.offset.y = (elapsed * 0.045) % 1; });
 
-  // 桂川：水がゆっくり下流へ、月の道がゆらぐ
-  river.material.map.offset.x = (elapsed * 0.006) % 1;
+  // 桂川：流れはシェーダーの波（uTime）が担う。月の道がゆらぐ
   moonPath.material.opacity = 0.14 + Math.sin(elapsed * 0.5) * 0.04;
   moonPath.scale.x = 1 + Math.sin(elapsed * 0.8) * 0.07;
 
@@ -9214,6 +9492,14 @@ function update(dt){
     if (!FX.amanogawa) return;
     cl.position.x += cl.userData.spd * dt;
     if (cl.position.x > 110) cl.position.x = -110;
+    // 月（暁は東の朝日）に向いた側の綿だけ縁が照る
+    const k = TOKI.k;
+    const toward = k < 0.5 ? Math.sign(42 - cl.position.x) : -1;
+    const rim = mixHex(0x323b58, 0x8c6c70, k), base = mixHex(0x0f1424, 0x3a3c4c, k);
+    cl.children.forEach(s => {
+      const lit = Math.max(0, Math.min(1, 0.5 + 0.5 * s.userData.t * toward));
+      s.material.color.setHex(mixHex(base, rim, lit * 0.8));
+    });
   });
   // 四季：舞うもの（花びら・落ち葉・雪）だけ毎フレーム漂わせる
   [SHIKI.petals, SHIKI.leaves, SHIKI.snow].forEach(pt => {
@@ -9390,7 +9676,7 @@ if (Q.pbr){
 /* 駒落ちの見張り：描き始めの数秒を見て足りなければ 影 → 滲み の順に落とし、
    それでも足りなければ（重いのは PBR 材質と灯の数＝走りながらは替えられない）
    低画質で一度だけ読み直す。?q= で手で選んだときは落とさない */
-const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 3 : 0 };
+const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 4 : 0 };
 function reloadLow(){
   try {
     if (sessionStorage.getItem('machiya-q-low')) return;     // 二度目はしない
@@ -9410,30 +9696,41 @@ function dropKage(){
   });
 }
 function watchFps(raw){
-  if (WATCH.stage >= 3 || raw > 0.5) return;        // タブ切替などの長い空白は数えない
+  if (WATCH.stage >= 4 || raw > 0.5) return;        // タブ切替などの長い空白は数えない
   WATCH.t += raw;
   if (WATCH.t < 3) return;                           // 読み込み直後の重さは見ない
   WATCH.acc += raw; WATCH.n++;
   if (WATCH.acc < 3) return;
   const fps = WATCH.n / WATCH.acc;
   WATCH.acc = 0; WATCH.n = 0;
-  if (fps >= 30){ WATCH.stage = 3; return; }         // 足りている＝見張りを終える
-  if (WATCH.stage === 0 && moonLight.castShadow){ dropKage(); WATCH.stage = 1; return; }
-  if (WATCH.stage <= 1 && composer){ composer = null; WATCH.stage = 2; return; }
-  WATCH.stage = 3;
+  if (fps >= 30){ WATCH.stage = 4; return; }         // 足りている＝見張りを終える
+  if (WATCH.stage === 0 && WATER.refl && !WATER.refl.off){ WATER.refl.off = true; WATCH.stage = 1; return; }
+  if (WATCH.stage <= 1 && moonLight.castShadow){ dropKage(); WATCH.stage = 2; return; }
+  if (WATCH.stage <= 2 && composer){ composer = null; WATCH.stage = 3; return; }
+  WATCH.stage = 4;
   if (Q.pbr && fps < 24) reloadLow();
 }
 
-function loop(){
-  requestAnimationFrame(loop);
-  const raw = clock.getDelta();
-  const dt = Math.min(raw, 0.05);
+/* 一駒ぶん：演出の更新 → 光と空と水の追従 → 描画（loop と検証口 step の両方がこれを呼ぶ） */
+function frame(dt){
   update(dt);
   hemiLight.color.copy(ambLight.color);              // 暁の塗り替えに追従
   hemiLight.intensity = ambLight.intensity * HEMI_K;
   if (bloomPass) bloomPass.strength = 0.5 * (1 - 0.5 * TOKI.k);   // 明けると滲みは控えめに（障子が白飛びしない）
+  // 空のドームはカメラに付いて回る（月の都では背景ごと外す）。水・星・遠山の時計も進める
+  skyDome.mesh.position.copy(camera.position);
+  skyDome.mesh.visible = scene.background === TEX.sky;
+  skyDome.u.uTime.value = elapsed;
+  STAR_T.value = elapsed;
+  YAMA_U.fogD.value = scene.fog.density;
+  WATER.tick();
   followKage();
   if (composer) composer.render(); else renderer.render(scene, camera);
+}
+function loop(){
+  requestAnimationFrame(loop);
+  const raw = clock.getDelta();
+  frame(Math.min(raw, 0.05));
   watchFps(raw);
 }
 loop();
@@ -9475,8 +9772,7 @@ window.__machiya = {
   /* 手送りで時間を進める（preview では rAF が止まることがあるため） */
   step: function(frames, dt){
     frames = frames || 1; dt = dt || 1/60;
-    for (let i = 0; i < frames; i++) update(dt);
-    renderer.render(scene, camera);
+    for (let i = 0; i < frames; i++) frame(dt);     // 本番と同じ一駒（滲み・影・水の追従も込み）
     return { elapsed: +elapsed.toFixed(2), idx: idx, phase: phase };
   },
   /* 実際に描かれた画素を読む（スクリーンショットが撮れない環境の代替） */
@@ -9506,6 +9802,7 @@ window.__machiya = {
   },
   /* 画質の検証口：影・滲みを手で落として速さを比べる（戻すには読み直す） */
   qset: function(o){
+    if (o && o.refl === false && WATER.refl) WATER.refl.off = true;
     if (o && o.kage === false) dropKage();
     if (o && o.bloom === false) composer = null;
     return this.q();
@@ -9513,6 +9810,7 @@ window.__machiya = {
   /* 画質の段と、見張りが落としたものの現況 */
   q: function(){
     return { high: Q.high, pbr: Q.pbr, kage: moonLight.castShadow, bloom: !!composer,
+             refl: !!(WATER.refl && !WATER.refl.off),
              lamps: roamLights.length, watch: WATCH.stage, exposure: renderer.toneMappingExposure,
              dpr: renderer.getPixelRatio() };
   },
