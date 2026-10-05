@@ -1372,6 +1372,111 @@ function yamaHada(mat, opt){
         '}'
       ].join('\n'));
   };
+  mat.customProgramCacheKey = function(){ return 'yama' + (opt.fade ? '-fade' : ''); };
+  mat.needsUpdate = true;
+  return mat;
+}
+
+/* 肌 ― 瓦・木目・漆喰・石畳・小石を、画像ではなく世界座標の式で描き、同じ式から法線も起こす。
+   箱ごとに UV の縮尺が違っても瓦の寸法が狂わない。法線の揺らぎは PBR（Standard）のときだけ効き、
+   Lambert では色むらだけが乗る（第3段「材質と地形」） */
+const HADA_GLSL = [
+  'float hhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+  'float hnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(hhash(i), hhash(i + vec2(1.0, 0.0)), f.x), mix(hhash(i + vec2(0.0, 1.0)), hhash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+  'float hhash3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }',
+  'float hnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(mix(hhash3(i), hhash3(i + vec3(1,0,0)), f.x), mix(hhash3(i + vec3(0,1,0)), hhash3(i + vec3(1,1,0)), f.x), f.y),',
+  '             mix(mix(hhash3(i + vec3(0,0,1)), hhash3(i + vec3(1,0,1)), f.x), mix(hhash3(i + vec3(0,1,1)), hhash3(i + vec3(1,1,1)), f.x), f.y), f.z); }'
+].join('\n');
+const HADA_KIND = {
+  // 瓦：段（高さ方向に 0.24m おき）と丸瓦の筋（棟に沿う軸に 0.30m おき）
+  kawara: { strength: 0.55, tint: 'c *= 0.80 + 0.28 * h + 0.06 * hnoise(p.xz * 7.0);', h: [
+    'float axz = abs(n.x) > abs(n.z) ? p.z : p.x;',
+    'float row = fract(p.y / 0.24);',
+    'float col = fract(axz / 0.30);',
+    'float dan = smoothstep(0.0, 0.18, row) * (1.0 - row * 0.5);',
+    'float suji = exp(-pow((col - 0.5) * 3.2, 2.0));',
+    'return dan * 0.7 + suji * 0.45;' ] },
+  // 木目：縦に走る年輪の筋と、細かな導管
+  wood: { strength: 0.18, tint: 'c *= 0.90 + 0.14 * h;', h: [
+    'float g = sin(p.y * 30.0 + hnoise(vec2(p.x + p.z, p.y * 0.3) * 4.0) * 2.5) * 0.5 + 0.5;',
+    'return g * 0.5 + hnoise(vec2(p.x + p.z, p.y) * 23.0) * 0.2;' ] },
+  // 漆喰：鏝の粒
+  plaster: { strength: 0.12, tint: 'c *= 0.93 + 0.12 * h;', h: [
+    'return hnoise(p.xy * 28.0 + p.z * 11.0) * 0.6 + hnoise((p.xy + p.zz) * 90.0) * 0.4;' ] },
+  // 石畳：互い違いの石と目地、石ごとの明るさ
+  // 石畳：画像は使わず式だけで描く（石 0.62×0.42m、列ごとに不揃いにずらす）。目地は暗く、石ごとに明暗
+  stone: { strength: 0.4, tint: 'c *= 0.55 + 0.55 * h;', h: [
+    'vec2 q = p.xz / vec2(0.62, 0.42); q.x += hhash(vec2(floor(q.y), 3.0)) * 0.7;',
+    'vec2 cell = floor(q), f = fract(q);',
+    'float edge = min(min(f.x, 1.0 - f.x) * 0.9, min(f.y, 1.0 - f.y) * 0.6);',
+    'float top = smoothstep(0.0, 0.07, edge) * (0.9 + 0.2 * hnoise(p.xz * 2.0));',   // 石の面はわずかに起伏
+    'return top * (0.5 + 0.5 * hhash(cell)) + hnoise(p.xz * 30.0) * 0.08;' ] },
+  // 小石と土（河原）
+  pebble: { strength: 0.45, tint: 'c *= 0.78 + 0.4 * h;', h: [
+    'return hnoise(p.xz * 5.0) * 0.55 + hnoise(p.xz * 17.0) * 0.3 + hnoise(p.xz * 51.0) * 0.15;' ] }
+};
+function hada(mat, kind){
+  const K = HADA_KIND[kind];
+  mat.onBeforeCompile = function(sh){
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHPos; varying vec3 vHNrm;')
+      .replace('#include <beginnormal_vertex>', [
+        '#include <beginnormal_vertex>',
+        '{ vec4 hn = vec4(objectNormal, 0.0);',
+        '#ifdef USE_INSTANCING', '  hn = instanceMatrix * hn;', '#endif',
+        '  vHNrm = normalize((modelMatrix * hn).xyz); }'].join('\n'))
+      .replace('#include <begin_vertex>', [
+        '#include <begin_vertex>',
+        '{ vec4 hp = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING', '  hp = instanceMatrix * hp;', '#endif',
+        '  vHPos = (modelMatrix * hp).xyz; }'].join('\n'));
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', ['#include <common>', 'varying vec3 vHPos; varying vec3 vHNrm;', HADA_GLSL,
+        'float hadaH(vec3 p, vec3 n){', K.h.join('\n'), '}'].join('\n'))
+      .replace('#include <map_fragment>', ['#include <map_fragment>',
+        '{ vec3 p = vHPos; vec3 n = normalize(vHNrm); float h = hadaH(p, n); vec3 c = diffuseColor.rgb;',
+        K.tint, 'diffuseColor.rgb = c; }'].join('\n'))
+      // 法線：高さの式を接線方向に微分して傾ける（Standard のみ。Lambert にはこの行が無い）
+      .replace('#include <normal_fragment_maps>', ['#include <normal_fragment_maps>',
+        '{ vec3 p = vHPos; vec3 n0 = normalize(vHNrm);',
+        '  vec3 t1 = normalize(abs(n0.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : cross(vec3(0.0, 1.0, 0.0), n0));',
+        '  vec3 t2 = normalize(cross(n0, t1));',
+        '  float e = 0.012;',
+        '  float h0 = hadaH(p, n0);',
+        '  float d1 = (hadaH(p + t1 * e, n0) - h0) / e;',
+        '  float d2 = (hadaH(p + t2 * e, n0) - h0) / e;',
+        '  vec3 nW = normalize(n0 - (t1 * d1 + t2 * d2) * ' + (K.strength * 0.02).toFixed(4) + ');',
+        '  normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz); }'].join('\n'));
+  };
+  mat.customProgramCacheKey = function(){ return 'hada-' + kind; };
+  mat.needsUpdate = true;
+  return mat;
+}
+/* 葉叢 ― 球や円錐を雑音でこぶ立たせ、葉の色むらと下側の翳りを乗せる（桜・紅葉・松・杉・竹の葉） */
+function haHada(mat, amp){
+  mat.onBeforeCompile = function(sh){
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHPos; varying float vHUp;\n' + HADA_GLSL)
+      .replace('#include <begin_vertex>', [
+        '#include <begin_vertex>',
+        '{ vec4 hp = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING', '  hp = instanceMatrix * hp;', '#endif',
+        '  vec3 wp = (modelMatrix * hp).xyz;',
+        '  float k = hnoise3(wp * 2.6) * 2.0 - 1.0 + (hnoise3(wp * 7.0) - 0.5) * 0.6;',
+        '  transformed += normalize(position) * k * ' + amp.toFixed(3) + ';',
+        '  hp = vec4(transformed, 1.0);',
+        '#ifdef USE_INSTANCING', '  hp = instanceMatrix * hp;', '#endif',
+        '  vHPos = (modelMatrix * hp).xyz; vHUp = normalize(objectNormal).y; }'].join('\n'));
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHPos; varying float vHUp;\n' + HADA_GLSL)
+      .replace('#include <map_fragment>', [
+        '#include <map_fragment>',
+        '{ float m = hnoise3(vHPos * 9.0) * 0.6 + hnoise3(vHPos * 27.0) * 0.4;',
+        '  diffuseColor.rgb *= (0.72 + 0.56 * m) * (0.75 + 0.25 * clamp(vHUp * 0.5 + 0.5, 0.0, 1.0)); }'].join('\n'));
+  };
+  mat.customProgramCacheKey = function(){ return 'ha-' + amp; };
   mat.needsUpdate = true;
   return mat;
 }
@@ -1523,7 +1628,7 @@ const akatsukiFx = (function(){
 (function ground(){
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(60, 116),
-    new LitMat({ map:TEX.stone })
+    hada(new LitMat({ color:0x252a36 }), 'stone')
   );
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, 0, -20);
@@ -1555,12 +1660,12 @@ const waterStripsYabu = [];
    5. 町屋をこしらえる
    ============================================================ */
 const MAT = {
-  wall   : new LitMat({ map:TEX.wood }),
-  wallDk : new LitMat({ map:TEX.woodDk }),
-  plaster: new LitMat({ map:TEX.plaster }),
-  roof   : new LitMat({ color:0x2b2f3a }),
-  roofEdge:new LitMat({ color:0x3d424f }),
-  bar    : new LitMat({ color:0x2a1d12 }),
+  wall   : hada(new LitMat({ map:TEX.wood }), 'wood'),
+  wallDk : hada(new LitMat({ map:TEX.woodDk }), 'wood'),
+  plaster: hada(new LitMat({ map:TEX.plaster }), 'plaster'),
+  roof   : hada(new LitMat({ color:0x2b2f3a }), 'kawara'),
+  roofEdge:hada(new LitMat({ color:0x3d424f }), 'kawara'),
+  bar    : hada(new LitMat({ color:0x2a1d12 }), 'wood'),
   bamboo : new LitMat({ color:0x574a2e }),
   dark   : new THREE.MeshBasicMaterial({ color:0x080a10 }),
   inner  : new THREE.MeshBasicMaterial({ color:0xffb968 })   // 中から漏れる灯り
@@ -1812,7 +1917,7 @@ function sandoFloor(z){
 }
 
 /* 河原・対岸・山裾（石畳はここで土の色に変わる） */
-const MAT_KAWARA = new LitMat({ color:0x171c26 });
+const MAT_KAWARA = hada(new LitMat({ color:0x171c26 }), 'pebble');
 [
   { d:12, z:-84    },      // 町側の河原
   { d:11, z:-125.5 },      // 対岸の河原
@@ -1826,7 +1931,7 @@ const MAT_KAWARA = new LitMat({ color:0x171c26 });
 /* 橋へ導く石の細道（両袂） */
 [[-84, 12], [-125.5, 11]].forEach(k => {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(3.4, k[1]),
-    new LitMat({ map:TEX.stone }));
+    hada(new LitMat({ color:0x252a36 }), 'stone'));
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, 0.005, k[0]);
   scene.add(m);
@@ -2080,7 +2185,7 @@ const kasumis = [];
   let seed = 555;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const kan = new LitMat({ color:0x3d5a40 });
-  const ha  = new LitMat({ color:0x2a4231 });
+  const ha  = haHada(new LitMat({ color:0x2a4231 }), 0.14);
   for (let i = 0; i < 12; i++){
     const x = 5.5 + rnd() * 12, z = -126.5 - rnd() * 10;
     const h = 3.4 + rnd() * 1.5;
@@ -2088,7 +2193,7 @@ const kasumis = [];
     t.position.set(x, h / 2, z);
     t.rotation.z = (rnd() - 0.5) * 0.08;
     scene.add(t);
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 6), ha);
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 10, 4), ha);
     leaf.position.set(x, h + 0.45, z);
     scene.add(leaf);
   }
@@ -3122,8 +3227,8 @@ const tenryuji = (function(){
   });
   matsuKan.instanceMatrix.needsUpdate = true;
   g.add(matsuKan);
-  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 8, 6),
-    new LitMat({ color: 0x1d3226 }), 6);
+  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 14, 10),
+    haHada(new LitMat({ color: 0x1d3226 }), 0.18), 6);
   const HA = [[-21.2, 2.0, -61.0, 1.3], [-20.6, 1.6, -61.7, 1.0], [-21.5, 1.45, -61.6, 0.8],
               [-18.8, 1.85, -62.8, 1.15], [-19.4, 1.5, -62.3, 0.9], [-18.5, 1.35, -62.1, 0.75]];
   HA.forEach((p, i) => {
@@ -3517,8 +3622,8 @@ const shoro = (function(){
   });
   matsuKan.instanceMatrix.needsUpdate = true;
   g.add(matsuKan);
-  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.6, 8, 6),
-    new LitMat({ color: 0x1d3226 }), 6);
+  const matsuHa = new THREE.InstancedMesh(new THREE.SphereGeometry(0.6, 14, 10),
+    haHada(new LitMat({ color: 0x1d3226 }), 0.18), 6);
   const HA = [[18.2, 2.2, -50.6, 1.4], [17.6, 1.8, -51.2, 1.0], [18.9, 1.7, -50.1, 0.85],
               [20.4, 2.3, -52.4, 1.3], [19.8, 1.9, -52.9, 0.95], [21.0, 1.75, -52.0, 0.8]];
   HA.forEach((p, i) => {
@@ -3777,9 +3882,9 @@ const SHIKI = (function(){
     kan.position.y = 0.85;
     kan.rotation.z = (rnd() - 0.5) * 0.2;
     t.add(kan);
-    const mat = new LitMat({ color: color });
+    const mat = haHada(new LitMat({ color: color }), 0.16);
     for (let i = 0; i < 4; i++){
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), mat);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), mat);
       b.position.set((rnd() - 0.5) * 1.2, 1.55 + rnd() * 0.75, (rnd() - 0.5) * 1.2);
       b.scale.setScalar((0.75 + rnd() * 0.5) * s);
       t.add(b);
@@ -4691,7 +4796,7 @@ const nonomiya = (function(){
   const g = new THREE.Group();
   const stone = new LitMat({ color: 0x343a46 });
   const shu   = new LitMat({ color: 0x8e3628 });   // 朱（夜なので沈んだ朱）
-  const sugiM = new LitMat({ color: 0x141d18 });
+  const sugiM = haHada(new LitMat({ color: 0x141d18 }), 0.3);
   const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), eu = new THREE.Euler(),
         vv = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
   let seed = 5252;
@@ -4994,7 +5099,7 @@ const nonomiya = (function(){
   g.add(ha);
   const SUGI = [[19.4, -44.3, 1.0], [20.8, -47.4, 0.85], [20.2, -43.2, 0.92]];
   const sugiKan = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.3, 8.6, 6), sugiM, 3);
-  const sugiHa  = new THREE.InstancedMesh(new THREE.ConeGeometry(1.5, 5.0, 7), sugiM, 3);
+  const sugiHa  = new THREE.InstancedMesh(new THREE.ConeGeometry(1.5, 5.0, 12, 6), sugiM, 3);
   SUGI.forEach((p, i) => {
     m4.compose(vv.set(p[0], 4.3 * p[2], p[1]), q0.identity(), sc.set(p[2], p[2], p[2]));
     sugiKan.setMatrixAt(i, m4);
@@ -5307,8 +5412,8 @@ const daikakuji = (function(){
   const MATSU = [[4.0, 29.0, 0.9]];        // 東の一本は観月台に場所を譲った（㊶）
   const matsuKan = kitaInst(new THREE.CylinderGeometry(0.08, 0.13, 2.0, 6), MAT.wallDk,
     MATSU.map(pp => [pp[0], 1.0 * pp[2], pp[1], 0, 0, 0, 1, pp[2], 1]));
-  const matsuHa = kitaInst(new THREE.SphereGeometry(0.6, 8, 6),
-    new LitMat({ color: 0x1d3226 }),
+  const matsuHa = kitaInst(new THREE.SphereGeometry(0.6, 14, 10),
+    haHada(new LitMat({ color: 0x1d3226 }), 0.18),
     MATSU.flatMap(pp => [
       [pp[0], 2.05 * pp[2], pp[1], 0, 0, 0, 1.3 * pp[2], 0.5 * pp[2], 1.3 * pp[2]],
       [pp[0] + 0.5 * pp[2], 1.7 * pp[2], pp[1] - 0.4 * pp[2], 0, 0, 0,
@@ -5449,8 +5554,8 @@ const hirosawa = (function(){
   shimaMatsu.position.set(IX + 0.4, 0.58, IZ + 0.15);
   shimaMatsu.rotation.z = 0.1;
   g.add(shimaMatsu);
-  const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 8, 6),
-    new LitMat({ color: 0x1a2c22 }), [
+  const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 14, 10),
+    haHada(new LitMat({ color: 0x1a2c22 }), 0.16), [
     [IX + 0.34, 1.28, IZ + 0.1, 0, 0, 0, 1.15, 0.42, 1.15],
     [IX + 0.62, 1.02, IZ + 0.3, 0, 0, 0, 0.8, 0.34, 0.8]
   ]);
@@ -5540,8 +5645,8 @@ const osawa = (function(){
   // 菊ヶ島の松
   const shimaKan = kitaInst(new THREE.CylinderGeometry(0.06, 0.1, 1.3, 6), MAT.wallDk,
     [[-9.6, 0.65, 30.0, 0, 0, 0, 1, 1, 1]]);
-  const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 8, 5),
-    new LitMat({ color: 0x1a2c22 }), [
+  const shimaHa = kitaInst(new THREE.SphereGeometry(0.55, 14, 10),
+    haHada(new LitMat({ color: 0x1a2c22 }), 0.16), [
     [-9.55, 1.4, 29.95, 0, 0, 0, 1.15, 0.44, 1.15],
     [-9.25, 1.14, 30.25, 0, 0, 0, 0.78, 0.34, 0.78]
   ]);
@@ -5771,7 +5876,7 @@ const rakushisha = (function(){
       eda.rotation.z = e[3];
       t.add(eda);
     });
-    const haM = new LitMat({ color: 0x17251b });
+    const haM = haHada(new LitMat({ color: 0x17251b }), 0.16);
     for (let i = 0; i < 4; i++){
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), haM);
       b.position.set((rnd() - 0.5) * 1.5, 2.0 + rnd() * 0.7, (rnd() - 0.5) * 1.3);
