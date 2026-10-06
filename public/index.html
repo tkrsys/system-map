@@ -186,11 +186,13 @@
   .fuda .enter:hover{ filter:brightness(1.1) }
   .fuda .enter:focus-visible{ outline:2px solid #fff; outline-offset:2px }
 
-  /* ===== 短冊（右・その場の一句を掛ける） ===== */
+  /* ===== 短冊（右・その場の一句を掛ける） =====
+     釦は無い。入口でひとりでに掛かり、二度たたくと下から巻き上がって筒になり、
+     もう一度二度たたくと広がる。句の無い場所ではそっと消える */
   .tanzaku{
     position:fixed; top:66px; right:22px; z-index:10;
     display:flex; flex-direction:column; align-items:center;
-    padding:16px 13px 12px;
+    padding:16px 0 12px;
     background:
       repeating-linear-gradient(96deg, rgba(120,96,54,0.055) 0 1px, rgba(0,0,0,0) 1px 6px),
       linear-gradient(160deg, #EFE6CD 0%, #E6DABB 55%, #DACDA6 100%);
@@ -199,10 +201,14 @@
     box-shadow:0 12px 28px rgba(0,0,0,0.6), inset 0 0 22px rgba(140,116,70,0.16);
     color:#2A2119;
     opacity:0; transform:translateY(-18px);
-    transition:opacity .55s ease, transform .55s ease;
+    transition:opacity .55s ease, transform .55s ease, padding .45s ease,
+               background .45s ease, border-radius .45s ease;
     pointer-events:none;
+    cursor:pointer;
+    touch-action:manipulation;            /* 二度たたきをブラウザの拡大に取られない */
+    -webkit-user-select:none; user-select:none;
   }
-  .tanzaku.on{ opacity:1; transform:translateY(0) }
+  .tanzaku.on{ opacity:1; transform:translateY(0); pointer-events:auto }
   /* 掛けている鋲（朱） */
   .tanzaku::before{
     content:""; position:absolute; top:-5px; left:50%; margin-left:-5px;
@@ -210,13 +216,34 @@
     background:radial-gradient(circle at 35% 30%, #F0A891, var(--shu) 72%);
     box-shadow:0 1px 3px rgba(0,0,0,0.75);
   }
+  /* 巻き代：grid の行の高さを 1fr→0fr に動かして、中身の高さなりに巻き上げる */
+  .tanzaku .tz-roll{
+    display:grid; grid-template-rows:1fr; justify-items:center;
+    padding:0 13px; overflow:hidden;
+    transition:grid-template-rows .45s ease;
+  }
   /* 揺れは内側で。外側の出し入れ（transform）と喧嘩させない */
   .tanzaku .tz-in{
     display:flex; flex-direction:column; align-items:center;
+    min-height:0;
     transform-origin:50% -14px;
     opacity:1; transition:opacity .28s ease;
   }
   .tanzaku.on .tz-in{ animation:yure 8.5s ease-in-out infinite }
+  /* 巻いた姿：幅はそのまま、短い筒。上下の陰で丸みを出し、下寄りに紙の端の線 */
+  .tanzaku.maki{
+    padding:15px 0 13px;
+    border-radius:5px;
+    background:
+      repeating-linear-gradient(96deg, rgba(120,96,54,0.045) 0 1px, rgba(0,0,0,0) 1px 6px),
+      linear-gradient(180deg, #B9AC86 0%, #DDD1AD 22%, #F1E9D2 42%, #E6DABB 62%, #C8BB94 86%, #A99C76 100%);
+  }
+  .tanzaku.maki .tz-roll{ grid-template-rows:0fr }
+  .tanzaku.maki .tz-in{ opacity:0 }
+  .tanzaku.maki::after{
+    content:""; position:absolute; left:0; right:0; bottom:7px; height:1px;
+    background:rgba(90,70,38,0.4);
+  }
   @keyframes yure{
     0%,100%{ transform:rotate(-0.75deg) }
     50%    { transform:rotate(0.75deg) }
@@ -266,6 +293,23 @@
   }
   .kaji button:hover{ border-color:var(--akari-strong); color:var(--akari-strong) }
   .kaji button:focus-visible{ outline:2px solid var(--akari-strong); outline-offset:2px }
+  /* 音の釦：スピーカーの丸い印。消えているときは斜線、灯っているときは音波 */
+  .kaji .snd{
+    width:46px; min-width:46px; height:46px; min-height:46px; padding:0;
+    border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:rgba(10,18,36,0.82);
+  }
+  .kaji .snd svg{ display:block }
+  .kaji .snd .snd-on{ display:none }
+  .kaji .snd[aria-pressed="true"]{
+    color:var(--akari-strong); border-color:var(--akari-strong);
+    box-shadow:0 0 14px rgba(255,215,138,0.35);
+  }
+  .kaji .snd[aria-pressed="true"] .snd-on{ display:block }
+  .kaji .snd[aria-pressed="true"] .snd-off{ display:none }
+  /* 丸い印ひとつだけのとき（ふだん）は枠を消して、印だけが浮いて見える */
+  .kaji.solo{ background:transparent; border-color:transparent; padding:0 }
   .hint{
     position:fixed; left:50%; bottom:66px; z-index:10;
     transform:translateX(-50%);
@@ -293,7 +337,9 @@
     .kaji{ gap:6px; padding:7px 9px }
     .kaji button{ padding:0 10px; font-size:12px }
     .hint{ display:none }
-    .tanzaku{ top:62px; right:12px; padding:13px 10px 10px }   /* 一覧の釦の下に少し余白 */
+    .tanzaku{ top:62px; right:12px; padding:13px 0 10px }   /* 一覧の釦の下に少し余白 */
+    .tanzaku .tz-roll{ padding:0 10px }
+    .tanzaku.maki{ padding:13px 0 11px }
     .tanzaku .tz-ku{ font-size:15px; letter-spacing:2.5px; line-height:2 }
   }
   /* 背の低い画面（横持ちの電話など）では題字の列を畳む */
@@ -335,13 +381,16 @@
   <a class="enter" id="f-enter" href="#" target="_blank" rel="noopener">暖 簾 を く ぐ る</a>
 </div>
 
-<!-- 短冊：いまいる停留と季節でひと句。中身は haiku.json（歳時記） -->
-<div class="tanzaku" id="tanzaku" aria-live="polite">
-  <div class="tz-in" id="tz-in">
-    <div class="tz-ku" id="tz-ku"></div>
-    <div class="tz-foot">
-      <span id="tz-kigo"></span>
-      <span class="tz-ba" id="tz-ba"></span>
+<!-- 短冊：いまいる停留と季節でひと句。中身は haiku.json（歳時記）。
+     二度たたくと巻く／広げる（tz-roll が巻き代） -->
+<div class="tanzaku" id="tanzaku" aria-live="polite" title="二度たたくと巻く">
+  <div class="tz-roll">
+    <div class="tz-in" id="tz-in">
+      <div class="tz-ku" id="tz-ku"></div>
+      <div class="tz-foot">
+        <span id="tz-kigo"></span>
+        <span class="tz-ba" id="tz-ba"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -349,10 +398,21 @@
 <div class="hint">地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き</div>
 
 <!-- 操舵：巡り（◀ ▶・点列・自動・巡り・屋形舟）の釦は廃止＝歩きが基本。
-     舟は舫った舟をタップすれば乗れる。残すのは音と短冊、場所で現れる隠し釦だけ -->
+     舟は舫った舟をタップすれば乗れる。短冊の釦も廃止（短冊そのものを二度たたく）。
+     残すのはスピーカーの丸い印と、場所で現れる隠し釦だけ -->
 <div class="kaji">
-  <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
-  <button id="btn-ku" aria-pressed="false">一句詠む</button>
+  <button id="btn-snd" class="snd" aria-pressed="false" aria-label="音を灯す" title="音を灯す">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path d="M4 9.4v5.2h3.3L12 18.8V5.2L7.3 9.4H4z" fill="currentColor"/>
+      <g class="snd-on" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <path d="M15 9.3a3.9 3.9 0 0 1 0 5.4"/>
+        <path d="M17.6 6.7a7.5 7.5 0 0 1 0 10.6"/>
+      </g>
+      <g class="snd-off" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <path d="M15.2 9.8l4.6 4.4M19.8 9.8l-4.6 4.4"/>
+      </g>
+    </svg>
+  </button>
   <button id="btn-chi" style="display:none">地へ帰る</button>
   <button id="btn-kane" style="display:none">鐘を撞く</button>
   <button id="btn-joya" style="display:none" aria-pressed="false">除夜の鐘</button>
@@ -8289,6 +8349,18 @@ function layoutBottom(){
   fuda.style.bottom   = (base + (hintShown ? 30 : 12)) + 'px';
 }
 window.addEventListener('resize', layoutBottom);
+/* 操作バーの枠：スピーカーの丸い印しか見えていないあいだは枠を消す（solo）。
+   場所で現れる隠し釦（鐘・祈る・地へ帰る）が出たら枠が戻る。
+   釦の出し入れは style.display で行われているので、その書き換えを見張る */
+function syncKaji(){
+  const others = kajiEl.querySelectorAll('button:not(.snd)');
+  const solo = ![].some.call(others, b => b.style.display !== 'none');
+  if (kajiEl.classList.contains('solo') === solo) return;
+  kajiEl.classList.toggle('solo', solo);
+  layoutBottom();                 // 枠の余白ぶん高さが変わる
+}
+new MutationObserver(syncKaji).observe(kajiEl, { attributes:true, attributeFilter:['style'], subtree:true });
+syncKaji();
 // 明朝の読み込みで操作バーの段数・高さが変わるので、確定後にもう一度置き直す
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutBottom);
 setTimeout(layoutBottom, 400);
@@ -8298,19 +8370,20 @@ layoutBottom();
 /* ============================================================
    8c. 短冊 ― その場の一句（歳時記 haiku.json より）
    いまいる停留と、きょうの季節で選ぶ。舟の上と送り火の宵は特別の句。
-   歩いて停留が変われば、掛けたままでも静かに詠み替える
+   歩いて停留が変われば、掛けたままでも静かに詠み替える。
+   釦は無い＝入口でひとりでに掛かり、短冊を二度たたくと巻く／広げる。
+   句の無い場所ではそっと消え、句のある場所へ来ればまた掛かる
    ============================================================ */
 const tzEl   = document.getElementById('tanzaku');
 const tzIn   = document.getElementById('tz-in');
 const tzKu   = document.getElementById('tz-ku');
 const tzKigo = document.getElementById('tz-kigo');
 const tzBa   = document.getElementById('tz-ba');
-const kuBtn  = document.getElementById('btn-ku');
-let kuOpen = false;
+let kuOpen = false;              // 掛けているか（入口で true にして以後そのまま）
+let kuMaki = false;              // 巻いているか（二度たたきで切り替え）
 let kuKey  = '';                 // いま掛かっている句の出どころ。変わったら詠み替える
 let kuT    = 0;
 
-if (!HAIKU || !HAIKU.ku) kuBtn.style.display = 'none';
 tzEl.setAttribute('aria-hidden', 'true');
 
 /* 詠み場 ― 巡りの停留からは消えた七軒も、歳時記の上では詠み場として残す。
@@ -8356,10 +8429,16 @@ function kuPick(){
   return { key: st.ku + '/' + SHIKI.current, ku: one, ba: st.ba };
 }
 
+/* 見える／見えない（掛けていて、かつ句がある場所でだけ見える） */
+function tzShow(v){
+  tzEl.classList.toggle('on', !!v);
+  tzEl.setAttribute('aria-hidden', String(!v));
+}
+
 function kuPaint(force){
   const p = kuPick();
-  if (!p){ if (kuOpen) setKu(false); return; }
-  if (!force && p.key === kuKey) return;
+  if (!p){ tzShow(false); kuKey = ''; return; }   // 句の無い場所＝そっと消す（掛けたままなので戻れば再び掛かる）
+  if (!force && p.key === kuKey){ tzShow(true); return; }
   const draw = () => {
     tzKu.innerHTML = '';
     p.ku.ku.forEach(line => {
@@ -8371,8 +8450,9 @@ function kuPaint(force){
     tzKigo.textContent = p.ku.kigo ? '季語　' + p.ku.kigo : (p.ku.kata || '');
     tzBa.textContent   = p.ba || '';
     kuKey = p.key;
+    tzShow(true);
   };
-  if (kuOpen && kuKey){          // 掛けたままの詠み替えは、ひと呼吸おいて
+  if (tzEl.classList.contains('on') && kuKey){   // 掛けたままの詠み替えは、ひと呼吸おいて
     tzIn.classList.add('kae');
     setTimeout(() => { draw(); tzIn.classList.remove('kae'); }, 300);
   } else {
@@ -8382,11 +8462,14 @@ function kuPaint(force){
 
 function setKu(on){
   kuOpen = !!on;
-  if (kuOpen) kuPaint(true);
-  tzEl.classList.toggle('on', kuOpen);
-  tzEl.setAttribute('aria-hidden', String(!kuOpen));
-  kuBtn.textContent = kuOpen ? '短冊を畳む' : '一句詠む';
-  kuBtn.setAttribute('aria-pressed', String(kuOpen));
+  if (kuOpen) kuPaint(true); else tzShow(false);
+}
+
+/* 巻く／広げる。巻いても鋲と筒は残り、句だけが巻き込まれる */
+function setMaki(on){
+  kuMaki = !!on;
+  tzEl.classList.toggle('maki', kuMaki);
+  tzEl.title = kuMaki ? '二度たたくと広がる' : '二度たたくと巻く';
 }
 
 /* 掛けている間だけ、場所の移りを見張る（毎フレームは要らない） */
@@ -8398,7 +8481,20 @@ function updateTanzaku(dt){
   kuPaint(false);
 }
 
-kuBtn.addEventListener('click', () => setKu(!kuOpen));
+/* 短冊の二度たたき ― 月の都の口と同じ作法（380ms 以内・34px 以内の二回）。
+   dblclick は iOS で飛ばないことがあるので自前で数える。
+   短冊は pointer-events を持つので、ここで受けた押しは地面の歩きには流れない */
+const TZDBL = { t: -1, x: 0, y: 0 };
+tzEl.addEventListener('pointerup', ev => {
+  const now = performance.now();
+  if (TZDBL.t > 0 && now - TZDBL.t < 380 &&
+      Math.hypot(ev.clientX - TZDBL.x, ev.clientY - TZDBL.y) < 34){
+    TZDBL.t = -1;
+    setMaki(!kuMaki);
+    return;
+  }
+  TZDBL.t = now; TZDBL.x = ev.clientX; TZDBL.y = ev.clientY;
+});
 
 kaneBtn.addEventListener('click', () => {
   // 撞くのだから音は要る。灯っていなければここで灯す（自動再生制限の解除はこの操作で足りる）
@@ -9105,9 +9201,12 @@ function updateSoundMix(){
   sndNodes.kaneLp.frequency.value += (kaneF - sndNodes.kaneLp.frequency.value) * k;
 }
 
+/* スピーカーの丸い印：絵の切り替えは CSS（aria-pressed）に任せ、読み上げの名だけ書き換える */
 function syncSndBtn(){
-  sndBtn.textContent = SND.on ? '♪ 音を消す' : '♪ 音を灯す';
+  const label = SND.on ? '音を消す' : '音を灯す';
   sndBtn.setAttribute('aria-pressed', String(SND.on));
+  sndBtn.setAttribute('aria-label', label);
+  sndBtn.title = label;
 }
 sndBtn.addEventListener('click', () => {
   if (!AC) buildSound();
@@ -9931,10 +10030,10 @@ function update(dt){
    ?tour=1 を付ければ壱の大覚寺から名所を自動で巡る（案内用に残す。
    巡りの釦は廃止したので、画面から巡りへ入る道はこれだけ）
    ============================================================ */
-/* 池の北縁（方丈の前庭）の西寄りに立ち、南をのぞむ。
-   塔の舞台がほぼど真ん中、月が右上、川端の茶店の傘が中央下、竹林が左手に
-   ひと目で収まる構図（ユーザー指定のスクリーンショットに合わせ込み） */
-const ENTRY = { pos:[19.9, 1.62, -65], tgt:[-0.8, 7.6, -110] };
+/* 池の奥の縁（東寄り）に立ち、西南西をのぞむ。
+   曹源池が足もといっぱいに広がり、竹林と山門が左手、紅葉が中ほど、
+   川端の茶店の傘と塔の舞台が右寄りに収まる構図（ユーザー指定のスクリーンショットに合わせ込み） */
+const ENTRY = { pos:[22.0, 1.62, -66.5], tgt:[-22.8, 7.6, -87.9] };
 if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
@@ -9943,11 +10042,11 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
   const subEl = document.querySelector('.t-sub');
   if (subEl) subEl.textContent = '池のほとりから、六軒の灯をたずねて';
-  // ひと呼吸おいて短冊を掛ける（先にご自分で触っていたら邪魔しない）
-  setTimeout(() => { if (!kuOpen && kuKey === '') setKu(true); }, 2600);
 } else {
   hintEl.textContent = HINT_RAIL;   // 巡りの手引き（HTML の既定は歩きの文言）
 }
+// ひと呼吸おいて短冊を掛ける（釦は無いので、歩きでも巡りでもここで掛かる）
+setTimeout(() => setKu(true), 2600);
 
 /* ============================================================
    10c. 影の役と材質の仕上げ（組み立てが終わってから一度だけ）
@@ -10250,15 +10349,16 @@ window.__machiya = {
   },
   /* 四季の試着：'haru'|'natsu'|'aki'|'fuyu' */
   season: function(s){ return s ? SHIKI.set(s) : SHIKI.current; },
-  /* 短冊の検証口：set で掛け外し、state で掛かっている句 */
+  /* 短冊の検証口：set で掛け外し、maki で巻き広げ、state で掛かっている句 */
   ku: {
     set: function(v){ setKu(!!v); return kuOpen; },
+    maki: function(v){ if (v !== undefined) setMaki(!!v); return kuMaki; },
     state: function(){
       return {
-        open: kuOpen, key: kuKey,
+        open: kuOpen, shown: tzEl.classList.contains('on'), maki: kuMaki, key: kuKey,
         ku: [].map.call(tzKu.children, e => e.textContent),
         kigo: tzKigo.textContent, ba: tzBa.textContent,
-        btn: kuBtn.textContent, cls: tzEl.className,
+        cls: tzEl.className,
         loaded: !!(HAIKU && HAIKU.ku)
       };
     }
