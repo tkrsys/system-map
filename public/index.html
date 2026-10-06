@@ -616,7 +616,7 @@ window.addEventListener('unhandledrejection', e => {
    端末を見て自動で決める（?q=high / ?q=low で手でも選べる）。
    高：月光の影・提灯の滲み（ブルーム）・PBR 材質・提灯灯 6 つ・粒子。
    低：影なし・滲みあり・Lambert 材質・提灯灯 3 つ・粒子なし・解像度 1.5 倍まで。
-   さらに描き始めの数秒で駒落ちが見えたら、影 → 滲みの順に自動で落とす（下の watchFps） */
+   さらに描き始めの数秒で駒落ちが見えたら、遮蔽 → 鏡を粗く → 影 → 滲みの順に自動で落とす（下の watchFps） */
 const Q = (function(){
   const qs = new URLSearchParams(location.search).get('q');
   const ua = navigator.userAgent || '';
@@ -1332,7 +1332,9 @@ const WATER = (function(){
       'uniform vec2 uShore;',                       // 川岸の z（二本）。池は遠くに置いて効かせない
       'uniform sampler2D tDiffuse;',
       'varying vec3 vWPos; varying vec4 vRefUV;',
-      'float whash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+      // 格子点は 289 で巻く：sin ハッシュは引数が大きくなる（時間で流れ続ける）と GPU によって精度が崩れ、
+      // 長く眺めるうちに波が消える・縞になる罠がある。周期 289 の繰り返しは目に見えない
+      'float whash(vec2 p){ p = mod(p, 289.0); return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
       'float wnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
       '  return mix(mix(whash(i), whash(i + vec2(1.0, 0.0)), f.x), mix(whash(i + vec2(0.0, 1.0)), whash(i + vec2(1.0, 1.0)), f.x), f.y); }',
       'float wh(vec2 p){ float t = uTime;',
@@ -1404,8 +1406,19 @@ const WATER = (function(){
         obr.call(this, renderer, sc, cam);
       }
     };
-    refl = { mesh: r, on: true, off: false, drawn: -1 };
+    refl = { mesh: r, on: true, off: false, coarse: false, drawn: -1 };
     return r;
+  }
+  /* 見張り（watchFps）が呼ぶ：鏡を消す代わりに写しの解像度を半分（512→256）に落とす。
+     映り込みは残す＝鏡は小さな追加描画が一度きりで、影や遮蔽より軽いのに、
+     消すと見た目の損が最も大きい。すでに落としてあれば false */
+  function coarse(){
+    if (!refl || refl.coarse || !refl.mesh.getRenderTarget) return false;
+    const rt = refl.mesh.getRenderTarget();
+    if (!rt || rt.width <= 256) return false;
+    rt.setSize(256, 256);
+    refl.coarse = true;
+    return true;
   }
   /* 暁／宵の色（k=0 宵・1 暁）。宵は嵐山の上の月、暁は東の低い朝日の方（MOON_DIR の先）を砕く */
   function toki(k){
@@ -1428,7 +1441,7 @@ const WATER = (function(){
       u.value += ((refl.on ? 1 : 0) - u.value) * 0.08;
     }
   }
-  return { S: S, plain: plain, mirror: mirror, toki: toki, tick: tick, get refl(){ return refl; } };
+  return { S: S, plain: plain, mirror: mirror, toki: toki, tick: tick, coarse: coarse, get refl(){ return refl; } };
 })();
 window.__dbg.water = WATER;                        // 検証口
 
@@ -10066,7 +10079,7 @@ if (Q.pbr){
   [MAT.roof, MAT.roofEdge, MAT_KAWARA].forEach(m => { m.roughness = 0.5; });
 }
 
-/* 駒落ちの見張り：描き始めの数秒を見て足りなければ 影 → 滲み の順に落とし、
+/* 駒落ちの見張り：描き始めの数秒を見て足りなければ 遮蔽 → 鏡を粗く → 影 → 滲み の順に落とし、
    それでも足りなければ（重いのは PBR 材質と灯の数＝走りながらは替えられない）
    低画質で一度だけ読み直す。?q= で手で選んだときは落とさない */
 const WATCH = { t: 0, acc: 0, n: 0, stage: Q.forced ? 5 : 0 };
@@ -10098,7 +10111,7 @@ function watchFps(raw){
   WATCH.acc = 0; WATCH.n = 0;
   if (fps >= 30){ WATCH.stage = 5; return; }         // 足りている＝見張りを終える
   if (WATCH.stage === 0 && saoPass && saoPass.enabled){ saoPass.enabled = false; WATCH.stage = 1; return; }
-  if (WATCH.stage <= 1 && WATER.refl && !WATER.refl.off){ WATER.refl.off = true; WATCH.stage = 2; return; }
+  if (WATCH.stage <= 1 && WATER.coarse()){ WATCH.stage = 2; return; }   // 鏡は消さず粗くする（曹源池の映り込みを残す）
   if (WATCH.stage <= 2 && moonLight.castShadow){ dropKage(); WATCH.stage = 3; return; }
   if (WATCH.stage <= 3 && composer){ composer = null; WATCH.stage = 4; return; }
   WATCH.stage = 5;
@@ -10208,7 +10221,8 @@ window.__machiya = {
   /* 画質の段と、見張りが落としたものの現況 */
   q: function(){
     return { high: Q.high, pbr: Q.pbr, kage: moonLight.castShadow, bloom: !!composer,
-             refl: !!(WATER.refl && !WATER.refl.off), sao: !!(saoPass && saoPass.enabled),
+             refl: !!(WATER.refl && !WATER.refl.off), reflCoarse: !!(WATER.refl && WATER.refl.coarse),
+             sao: !!(saoPass && saoPass.enabled),
              lamps: roamLights.length, watch: WATCH.stage, exposure: renderer.toneMappingExposure,
              dpr: renderer.getPixelRatio() };
   },
