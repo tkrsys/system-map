@@ -266,30 +266,6 @@
   }
   .kaji button:hover{ border-color:var(--akari-strong); color:var(--akari-strong) }
   .kaji button:focus-visible{ outline:2px solid var(--akari-strong); outline-offset:2px }
-  .kaji .dots{ display:flex; gap:2px; padding:0 4px }
-  /* 点は小さく見せるが、押せる面は 28px 確保する */
-  .kaji .dot{
-    min-width:0; min-height:0;
-    width:28px; height:28px; padding:0;
-    background:none; border:none; border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-  }
-  .kaji .dot::before{
-    content:""; display:block;
-    width:11px; height:11px; border-radius:50%;
-    background:rgba(232,185,91,0.22);
-    border:1px solid rgba(232,185,91,0.45);
-    transition:transform .2s ease;
-  }
-  .kaji .dot:hover::before{ border-color:var(--akari-strong); transform:scale(1.25) }
-  .kaji .dot.on::before{ transform:scale(1.3) }
-  .kaji .dot.kaigo.on::before { background:var(--shu);      box-shadow:0 0 10px var(--shu) }
-  .kaji .dot.hou.on::before   { background:var(--ai-light); box-shadow:0 0 10px var(--ai-light) }
-  .kaji .dot.kouken.on::before{ background:var(--moegi);    box-shadow:0 0 10px var(--moegi) }
-  .kaji .dot.dougu.on::before { background:#A08CC8;         box-shadow:0 0 10px #A08CC8 }
-  .kaji .dot.view.on::before  { background:#9FB8D8;         box-shadow:0 0 10px #9FB8D8 }
-
   .hint{
     position:fixed; left:50%; bottom:66px; z-index:10;
     transform:translateX(-50%);
@@ -316,9 +292,6 @@
     .fuda .desc{ font-size:13px }
     .kaji{ gap:6px; padding:7px 9px }
     .kaji button{ padding:0 10px; font-size:12px }
-    /* 狭い画面では点列を二段目へ回す。十二停留は 26px 点で一段に収める */
-    .kaji .dots{ order:9; width:100%; justify-content:center; gap:1px }
-    .kaji .dot{ width:26px; height:26px }
     .hint{ display:none }
     .tanzaku{ top:62px; right:12px; padding:13px 10px 10px }   /* 一覧の釦の下に少し余白 */
     .tanzaku .tz-ku{ font-size:15px; letter-spacing:2.5px; line-height:2 }
@@ -327,11 +300,9 @@
   @media (max-height:480px){
     .tate .t-sub, .tate .t-toki, .tate .t-brand{ display:none }
   }
-  /* 月の都（㊾）：転換の月白の幕と、月面での操舵の畳み */
+  /* 月の都（㊾）：転換の月白の幕 */
   #tsukifade{ position:fixed; inset:0; background:#e9edf5; opacity:0;
     pointer-events:none; z-index:120 }
-  body.tsuki-on #btn-prev, body.tsuki-on #btn-next, body.tsuki-on #dots,
-  body.tsuki-on #btn-auto, body.tsuki-on #btn-walk, body.tsuki-on #btn-fune{ display:none }
 </style>
 </head>
 <body>
@@ -375,15 +346,11 @@
   </div>
 </div>
 
-<div class="hint">← → で大覚寺から塔の舞台までめぐる　／　名所をクリックでも選べます</div>
+<div class="hint">地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き</div>
 
+<!-- 操舵：巡り（◀ ▶・点列・自動・巡り・屋形舟）の釦は廃止＝歩きが基本。
+     舟は舫った舟をタップすれば乗れる。残すのは音と短冊、場所で現れる隠し釦だけ -->
 <div class="kaji">
-  <button id="btn-prev" aria-label="前の町屋へ">◀</button>
-  <div class="dots" id="dots"></div>
-  <button id="btn-next" aria-label="次の町屋へ">▶</button>
-  <button id="btn-auto" aria-pressed="true">自動で流す</button>
-  <button id="btn-walk" aria-pressed="false">そぞろ歩き</button>
-  <button id="btn-fune" aria-pressed="false">屋形舟</button>
   <button id="btn-snd" aria-pressed="false">♪ 音を灯す</button>
   <button id="btn-ku" aria-pressed="false">一句詠む</button>
   <button id="btn-chi" style="display:none">地へ帰る</button>
@@ -7354,7 +7321,7 @@ function enterTsuki(){
     fogD: scene.fog.density, bg: scene.background,
     hint: hintEl.textContent
   };
-  auto = false; syncAutoBtn();
+  auto = false;
   if (walkMode) setWalk(false);
   TSUKI.phase = 'in1'; TSUKI.t = 0; TSUKI.yaw = 0; TSUKI.pitch = 0;
   return true;
@@ -7390,7 +7357,7 @@ function tsukiLeaveRestore(){
   chiBtn.style.display = 'none';
   hintEl.textContent = sv.hint;
   if (sv.walk){ setWalk(true); }
-  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; syncAutoBtn(); showFuda(); }
+  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; showFuda(); }
   layoutBottom();
 }
 function exitTsuki(){
@@ -7406,7 +7373,7 @@ function exitTsukiInstant(){
   tsukifadeEl.style.opacity = 0;
   if (!mid) tsukiLeaveRestore();
   else if (TSUKI.saved){                          // 行きかけ＝保存だけ戻す
-    auto = TSUKI.saved.auto; syncAutoBtn();
+    auto = TSUKI.saved.auto;
     if (TSUKI.saved.walk) setWalk(true);
     hintEl.textContent = TSUKI.saved.hint;
     TSUKI.saved = null;
@@ -7468,7 +7435,7 @@ function gojuArrive(){
     pos: camera.position.clone(), tgt: curTgt.clone(),
     hint: hintEl.textContent
   };
-  auto = false; syncAutoBtn();
+  auto = false;
   if (walkMode) setWalk(false);
   GOJU.on = true; GOJU.yaw = 0; GOJU.pitch = 0;
   GOJU.fog0 = scene.fog.density;
@@ -7503,7 +7470,7 @@ function gojuLeaveRestore(){
   camera.lookAt(curTgt);
   hintEl.textContent = sv.hint;
   if (sv.walk){ setWalk(true); }
-  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; syncAutoBtn(); showFuda(); }
+  else { phase = 'dwell'; dwellT = 0; auto = sv.auto; showFuda(); }
 }
 function exitGoju(){
   if (!GOJU.on || WARP.phase !== 'idle' || TSUKI.phase !== 'idle') return false;
@@ -7819,8 +7786,8 @@ function goTo(i, byUser){
     setRideOff('rail');
     hintEl.textContent = HINT_RAIL;
   }
-  if (walkMode){                 // 点列などから直接呼ばれたら散歩を畳んでレールへ
-    walkMode = false; syncWalkBtn();
+  if (walkMode){                 // 検証口などから直接呼ばれたら散歩を畳んでレールへ
+    walkMode = false;
     hintEl.textContent = HINT_RAIL;
   }
   const n = TOUR.length;
@@ -7829,8 +7796,7 @@ function goTo(i, byUser){
   fromTgt.copy(curTgt);
   t = 0; dwellT = 0; phase = 'travel';
   hideFuda();
-  paintDots();
-  if (byUser) auto = false, syncAutoBtn();
+  if (byUser) auto = false;
 }
 
 function updateCamera(dt){
@@ -7996,16 +7962,11 @@ function nearestStopIdx(){
   });
   return best;
 }
-function syncWalkBtn(){
-  const b = document.getElementById('btn-walk');
-  b.textContent = walkMode ? '巡りに戻る' : 'そぞろ歩き';
-  b.setAttribute('aria-pressed', String(walkMode));
-}
 function setWalk(on){
   if (on === walkMode) return;
   if (on){
     walkMode = true;
-    auto = false; syncAutoBtn();
+    auto = false;
     phase = 'dwell';                             // 近くの提灯が明るくなる判定を生かす
     // いまの視線から歩き出す
     const v = new THREE.Vector3().subVectors(curTgt, camera.position);
@@ -8022,7 +7983,6 @@ function setWalk(on){
     hintEl.textContent = HINT_RAIL;
     goTo(nearestStopIdx(), false);               // いちばん近い停留へ戻る
   }
-  syncWalkBtn();
 }
 /* ============================================================
    鐘を撞く ― 鐘楼の下に立つと操舵バーにボタンが出る。
@@ -8128,7 +8088,7 @@ function updateKane(dt){
 // 大晦日の宵はひとりでに除夜の鐘（送り火と同じ日付の作法）
 if (new Date().getMonth() === 11 && new Date().getDate() === 31) KANE.joya = true;
 
-/* 歩いて近づいた名所を控える（点列が歩きに追随する）。
+/* 歩いて近づいた名所を控える（短冊の詠み場と検証口が参照する）。
    札は出さない ―― 散歩中は景色が主役、画面の真ん中を塞がない */
 let walkShownPoi = -2;
 function updateWalkPoi(){
@@ -8143,7 +8103,7 @@ function updateWalkPoi(){
   if (bsd < 6.0 + margin) poi = bs;
   if (poi === walkShownPoi) return;
   walkShownPoi = poi;
-  if (poi >= 0){ idx = poi; paintDots(); }
+  if (poi >= 0) idx = poi;
 }
 function updateWalk(dt){
   const K = WALK.keys;
@@ -8242,13 +8202,12 @@ function enterRide(){
   RIDE.entering = 0; RIDE.u = 0; RIDE.yaw = 0; RIDE.pitch = 0;
   RIDE.fromPos.copy(camera.position);
   RIDE.fromTgt.copy(curTgt);
-  walkMode = false; syncWalkBtn();
-  auto = false; syncAutoBtn();
+  walkMode = false;
+  auto = false;
   phase = 'dwell';
   hideFuda();
   funaasobi.rope.visible = false;
   hintEl.textContent = '舟にゆられて川をひとめぐり　／　なぞって見回せます';
-  syncFuneBtn();
 }
 function setRideOff(dest){
   if (!rideActive()) return;
@@ -8257,7 +8216,6 @@ function setRideOff(dest){
   b.position.set(m.x, -0.07, m.z);
   b.rotation.set(0, m.rotY, 0);
   funaasobi.rope.visible = true;
-  syncFuneBtn();
   if (dest === 'rail') return;               // 続きは呼び出し側の goTo に任せる
   // 桟橋に降りて、そのまま散歩へ
   camera.position.set(funaasobi.pier.x, 1.84, funaasobi.pier.z);
@@ -8284,12 +8242,6 @@ function updateRide(dt){
   curTgt.copy(rideTmp.tgt);
   camera.lookAt(curTgt);
 }
-function syncFuneBtn(){
-  const b = document.getElementById('btn-fune');
-  b.textContent = rideActive() ? '舟を下りる' : '屋形舟';
-  b.setAttribute('aria-pressed', String(rideActive()));
-}
-
 /* ============================================================
    9. 札と操作
    ============================================================ */
@@ -8300,8 +8252,6 @@ const elKind = document.getElementById('f-kind');
 const elDesc = document.getElementById('f-desc');
 const elTags = document.getElementById('f-tags');
 const elEnt  = document.getElementById('f-enter');
-const dotsEl = document.getElementById('dots');
-const autoBtn= document.getElementById('btn-auto');
 
 function showFuda(){
   const h = TOUR[idx];
@@ -8327,28 +8277,11 @@ function showFuda(){
 }
 function hideFuda(){ fuda.className = 'fuda'; }
 
-TOUR.forEach((h, i) => {
-  const b = document.createElement('button');
-  b.className = 'dot ' + (h.view ? 'view' : h.kind);
-  b.title = h.kanji + '　' + h.name;
-  b.setAttribute('aria-label', h.name);
-  b.addEventListener('click', () => goTo(i, true));
-  dotsEl.appendChild(b);
-});
-function paintDots(){
-  [].forEach.call(dotsEl.children, (d, i) => {
-    d.className = 'dot ' + (TOUR[i].view ? 'view' : TOUR[i].kind) + (i === idx ? ' on' : '');
-  });
-}
-function syncAutoBtn(){
-  autoBtn.textContent = auto ? '自動で流す' : '止めている';
-  autoBtn.setAttribute('aria-pressed', String(auto));
-}
 /* 操作バーの高さは段組みで変わるので、札と手引きを毎回その上に置き直す */
 const kajiEl = document.querySelector('.kaji');
 const hintEl = document.querySelector('.hint');
-const HINT_RAIL = hintEl.textContent;   // 散歩から戻るときに元の手引きへ
-const HINT_WALK = '地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き';
+const HINT_WALK = hintEl.textContent;   // 既定＝歩きの手引き（HTML の文言をそのまま）
+const HINT_RAIL = '← → で大覚寺から塔の舞台までめぐる　／　名所をクリックでも選べます';   // ?tour=1 の巡り用
 function layoutBottom(){
   const base = 18 + kajiEl.offsetHeight;
   const hintShown = getComputedStyle(hintEl).display !== 'none';
@@ -8360,7 +8293,7 @@ window.addEventListener('resize', layoutBottom);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutBottom);
 setTimeout(layoutBottom, 400);
 
-paintDots(); syncAutoBtn(); layoutBottom();
+layoutBottom();
 
 /* ============================================================
    8c. 短冊 ― その場の一句（歳時記 haiku.json より）
@@ -8467,36 +8400,6 @@ function updateTanzaku(dt){
 
 kuBtn.addEventListener('click', () => setKu(!kuOpen));
 
-document.getElementById('btn-prev').addEventListener('click', () => goTo(idx - 1, true));
-document.getElementById('btn-next').addEventListener('click', () => goTo(idx + 1, true));
-autoBtn.addEventListener('click', () => {
-  if (rideActive()){
-    // 舟から「自動で流す」＝舟を下りて巡りを再開
-    setRideOff('rail');
-    hintEl.textContent = HINT_RAIL;
-    auto = true; syncAutoBtn();
-    goTo(nearestStopIdx(), false);
-    return;
-  }
-  if (walkMode){
-    // 散歩から「自動で流す」＝いちばん近い停留へ戻って巡りを再開
-    walkMode = false; syncWalkBtn();
-    hintEl.textContent = HINT_RAIL;
-    auto = true; syncAutoBtn();
-    goTo(nearestStopIdx(), false);
-    return;
-  }
-  auto = !auto; syncAutoBtn();
-  if (auto && phase === 'dwell') dwellT = 0;
-});
-document.getElementById('btn-walk').addEventListener('click', () => {
-  if (rideActive()){ setRideOff('walk'); return; }
-  setWalk(!walkMode);
-});
-document.getElementById('btn-fune').addEventListener('click', () => {
-  if (rideActive()){ setRideOff('walk'); return; }
-  enterRide();
-});
 kaneBtn.addEventListener('click', () => {
   // 撞くのだから音は要る。灯っていなければここで灯す（自動再生制限の解除はこの操作で足りる）
   if (!AC){ buildSound(); SND.on = true; syncSndBtn(); layoutBottom(); }
@@ -10025,7 +9928,8 @@ function update(dt){
 
 /* ============================================================
    10b. 入口 ― 既定は曹源池のほとりに立って、そぞろ歩きから始まる
-   ?tour=1 を付ければ壱の大覚寺から名所を自動で巡る（案内用に残す）
+   ?tour=1 を付ければ壱の大覚寺から名所を自動で巡る（案内用に残す。
+   巡りの釦は廃止したので、画面から巡りへ入る道はこれだけ）
    ============================================================ */
 /* 池の北縁（方丈の前庭）の西寄りに立ち、南をのぞむ。
    塔の舞台がほぼど真ん中、月が右上、川端の茶店の傘が中央下、竹林が左手に
@@ -10035,13 +9939,14 @@ if (new URLSearchParams(location.search).get('tour') !== '1'){
   camera.position.set(ENTRY.pos[0], ENTRY.pos[1], ENTRY.pos[2]);
   curTgt.set(ENTRY.tgt[0], ENTRY.tgt[1], ENTRY.tgt[2]);
   camera.lookAt(curTgt);
-  idx = 3;                        // 点列は「肆 天龍寺」を灯しておく
+  idx = 3;                        // 居どころは「肆 天龍寺」
   setWalk(true);                  // ← カメラを据えてから。向きはいまの視線から起こされる
-  paintDots();
   const subEl = document.querySelector('.t-sub');
   if (subEl) subEl.textContent = '池のほとりから、六軒の灯をたずねて';
   // ひと呼吸おいて短冊を掛ける（先にご自分で触っていたら邪魔しない）
   setTimeout(() => { if (!kuOpen && kuKey === '') setKu(true); }, 2600);
+} else {
+  hintEl.textContent = HINT_RAIL;   // 巡りの手引き（HTML の既定は歩きの文言）
 }
 
 /* ============================================================
@@ -10294,7 +10199,7 @@ window.__machiya = {
     return { hit: i, isCurrent: i === idx, dist: +hits[0].distance.toFixed(2) };
   },
   goTo: function(i){ goTo(i, true); return idx; },
-  setAuto: function(v){ auto = !!v; syncAutoBtn(); return auto; },
+  setAuto: function(v){ auto = !!v; return auto; },
   /* そぞろ歩きの検証口：set で入切、to で歩き先、state で現況 */
   walk: {
     set: function(v){ setWalk(!!v); return walkMode; },
@@ -10309,8 +10214,7 @@ window.__machiya = {
         pos: camera.position.toArray().map(v => +v.toFixed(2)),
         target: WALK.target,
         yaw: +WALK.yaw.toFixed(3), pitch: +WALK.pitch.toFixed(3),
-        poi: walkShownPoi, moving: WALK.moving,
-        btn: document.getElementById('btn-walk').textContent
+        poi: walkShownPoi, moving: WALK.moving
       };
     },
     zones: WALK_ZONES
@@ -10322,8 +10226,7 @@ window.__machiya = {
       return {
         on: RIDE.on, entering: +RIDE.entering.toFixed(2), u: +RIDE.u.toFixed(3),
         pos: camera.position.toArray().map(v => +v.toFixed(2)),
-        boat: funaasobi.boat.position.toArray().map(v => +v.toFixed(2)),
-        btn: document.getElementById('btn-fune').textContent
+        boat: funaasobi.boat.position.toArray().map(v => +v.toFixed(2))
       };
     },
     curveAt: function(u){
