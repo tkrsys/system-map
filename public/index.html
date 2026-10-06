@@ -401,6 +401,11 @@
 </div>
 
 <script>
+/* 起動時の例外の検証口：async の中で落ちるとコンソールに場所が出ないことがあるので、
+   最初の script で拾って window.__rej0 に積む（本体の __dbg.err より早く確実） */
+window.addEventListener('unhandledrejection', function(e){
+  window.__rej0 = String(e.reason && (e.reason.stack || e.reason.message) || e.reason);
+});
 /* 額縁の小物（3D の可否によらず動かす）：二十四節気の表示と迎え言葉の後片付け */
 (function(){
   // 節入りの日は年により1日前後するが、「のころ」表記なので固定日で足りる
@@ -621,7 +626,11 @@ const Q = (function(){
   const mem = navigator.deviceMemory || 8;
   let high = !mobile && cores >= 4 && mem >= 4;
   if (qs === 'high') high = true; else if (qs === 'low') high = false;
-  return { high: high, kage: high, bloom: true, pbr: high, refl: high, sao: high,
+  // 個別の切り替え（切り分け用）：?sao=0 ?refl=0 ?kage=0 ?bloom=0 ?pbr=0
+  const sp = new URLSearchParams(location.search);
+  const off = k => sp.get(k) === '0';
+  return { high: high, kage: high && !off('kage'), bloom: !off('bloom'), pbr: high && !off('pbr'),
+           refl: high && !off('refl'), sao: high && !off('sao'),
            lamps: high ? 6 : 3, dpr: high ? 2 : 1.5, forced: qs === 'high' || qs === 'low' };
 })();
 document.body.classList.add(Q.high ? 'q-high' : 'q-low');
@@ -1320,6 +1329,7 @@ const WATER = (function(){
     return [
       'uniform float uTime, uMoonI, uFogD, uAlpha, uScale, uReflMix;',
       'uniform vec3 uDeep, uSky, uMoonPos, uMoonCol, uFogCol;',
+      'uniform vec2 uShore;',                       // 川岸の z（二本）。池は遠くに置いて効かせない
       'uniform sampler2D tDiffuse;',
       'varying vec3 vWPos; varying vec4 vRefUV;',
       'float whash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
@@ -1341,6 +1351,10 @@ const WATER = (function(){
       '  float nh = max(dot(n, hv), 0.0);',
       '  float spec = pow(nh, 180.0) * 1.4 + pow(nh, 24.0) * 0.08;',
       '  col += uMoonCol * spec * uMoonI * (0.5 + 0.5 * fres);',
+      '  // 波打ち際：岸に寄るほど白く、波の雑音でちらつく',
+      '  float shoreD = min(abs(vWPos.z - uShore.x), abs(vWPos.z - uShore.y));',
+      '  float shore = (1.0 - smoothstep(0.0, 1.4, shoreD)) * (0.25 + 0.45 * wnoise(vec2(vWPos.x * 2.2 + uTime * 0.6, shoreD * 3.0)));',
+      '  col += vec3(0.42, 0.46, 0.52) * shore;',
       '  float dist = length(cameraPosition - vWPos);',
       '  float fog = 1.0 - exp(-uFogD * uFogD * dist * dist);',
       '  col = mix(col, uFogCol, fog);',
@@ -1359,7 +1373,8 @@ const WATER = (function(){
   function uni(extra){
     return Object.assign({
       textureMatrix: { value: new THREE.Matrix4() }, tDiffuse: { value: null }, color: { value: null },
-      uAlpha: { value: 0.94 }, uScale: { value: 1.0 }, uReflMix: { value: 0 }
+      uAlpha: { value: 0.94 }, uScale: { value: 1.0 }, uReflMix: { value: 0 },
+      uShore: { value: new THREE.Vector2(9999, 9999) }
     }, S, extra || {});
   }
   /* ただの水面（川・広沢池・大沢池） */
@@ -1415,6 +1430,7 @@ const WATER = (function(){
   }
   return { S: S, plain: plain, mirror: mirror, toki: toki, tick: tick, get refl(){ return refl; } };
 })();
+window.__dbg.water = WATER;                        // 検証口
 
 /* 遠山の肌 ― 霧に丸ごと呑ませず、裾ほど霞み頂ほど顔を出す（空気遠近）。
    稜線は雑音でうねらせ、山肌は木立の斑で質感を出す（頂点ずらしは見た目だけ＝当たりは変えない） */
@@ -2108,7 +2124,8 @@ const MAT_KAWARA = hada(new LitMat({ color:0x171c26 }), 'pebble');
 const river = (function(){
   // 広い川は波を粗めに（uScale 小）
   const m = WATER.plain(new THREE.PlaneGeometry(220, RIVER_Z0 - RIVER_Z1),
-    { uAlpha: { value: 0.93 }, uScale: { value: 0.55 } });
+    { uAlpha: { value: 0.93 }, uScale: { value: 0.55 },
+      uShore: { value: new THREE.Vector2(RIVER_Z0, RIVER_Z1) } });   // 両岸に波打ち際
   m.rotation.x = -Math.PI / 2;
   m.position.set(0, -0.22, (RIVER_Z0 + RIVER_Z1) / 2);
   // 水面は必ず最初に描く。距離順に任せると、水上の月の道や灯の照りを後から塗り潰してしまう
@@ -3366,7 +3383,9 @@ const tenryuji = (function(){
   ISHI.push([-20.9, 0.32, -68.3, 1.4]);
   ISHI.push([-20.3, 0.26, -70.2, 1.25]);
   ISHI.push([-19.6, 0.10, -69.5, 0.8]);                // 鯉魚石
-  const iwa = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.32, 0), stone, ISHI.length);
+  // ⚠ r128 の罠：setColorAt を使うこの岩が、色を持たない階・敷石と材質を共用すると、
+  //   鏡の池の映り込みで描画順が変わったとき色付きのプログラムが色なしの石に使われて落ちる。双子の材質を渡す
+  const iwa = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.32, 0), stone.clone(), ISHI.length);
   ISHI.forEach((s, i) => {
     eu.set(rnd() * Math.PI, rnd() * Math.PI, rnd() * 0.4); q0.setFromEuler(eu);
     m4.compose(vv.set(s[0], s[1], s[2]), q0, sc.set(s[3], s[3] * (0.8 + rnd() * 0.5), s[3]));
@@ -10040,6 +10059,8 @@ if (Q.pbr){
       if (!m || !m.isMeshStandardMaterial || seen.has(m)) return;
       seen.add(m);
       m.roughness = 0.85; m.metalness = 0;
+      // 石畳は夜露で濡れたように、月と提灯の照りを少し返す
+      if (m.customProgramCacheKey && m.customProgramCacheKey() === 'hada-stone') m.roughness = 0.58;
     });
   });
   [MAT.roof, MAT.roofEdge, MAT_KAWARA].forEach(m => { m.roughness = 0.5; });
