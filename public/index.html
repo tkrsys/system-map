@@ -308,6 +308,16 @@
   }
   .kaji .snd[aria-pressed="true"] .snd-on{ display:block }
   .kaji .snd[aria-pressed="true"] .snd-off{ display:none }
+  /* ◀ ▶：名所を前後へ移る釦（2026-10-07）。スピーカーと同じ丸い印で左右に置く。
+     押すと飛んで着き、札（看板）を掲げてそのまま歩きに戻る */
+  .kaji .arw{
+    width:46px; min-width:46px; height:46px; min-height:46px; padding:0;
+    border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:rgba(10,18,36,0.82);
+    font-size:15px; letter-spacing:0;
+  }
+  .kaji .arw:active{ transform:scale(0.94) }
   /* 丸い印ひとつだけのとき（ふだん）は枠を消して、印だけが浮いて見える */
   .kaji.solo{ background:transparent; border-color:transparent; padding:0 }
   .hint{
@@ -346,9 +356,10 @@
   @media (max-height:480px){
     .tate .t-sub, .tate .t-toki, .tate .t-brand{ display:none }
   }
-  /* 月の都（㊾）：転換の月白の幕 */
+  /* 月の都（㊾）：転換の月白の幕と、月面・塔のもとでの ◀ ▶ の畳み */
   #tsukifade{ position:fixed; inset:0; background:#e9edf5; opacity:0;
     pointer-events:none; z-index:120 }
+  body.tsuki-on .kaji .arw{ display:none }
 </style>
 </head>
 <body>
@@ -397,10 +408,12 @@
 
 <div class="hint">地面をタップで歩く　／　なぞって見回す　／　↑ ↓ 歩く・← → 向き</div>
 
-<!-- 操舵：巡り（◀ ▶・点列・自動・巡り・屋形舟）の釦は廃止＝歩きが基本。
+<!-- 操舵：巡り（点列・自動・巡り・屋形舟）の釦は廃止＝歩きが基本。
      舟は舫った舟をタップすれば乗れる。短冊の釦も廃止（短冊そのものを二度たたく）。
-     残すのはスピーカーの丸い印と、場所で現れる隠し釦だけ -->
+     残すのはスピーカーの丸い印と、その左右の ◀ ▶（名所を前後へ移る。2026-10-07）、
+     場所で現れる隠し釦だけ -->
 <div class="kaji">
+  <button id="btn-prev" class="arw" aria-label="前の名所へ" title="前の名所へ">◀</button>
   <button id="btn-snd" class="snd" aria-pressed="false" aria-label="音を灯す" title="音を灯す">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
       <path d="M4 9.4v5.2h3.3L12 18.8V5.2L7.3 9.4H4z" fill="currentColor"/>
@@ -413,6 +426,7 @@
       </g>
     </svg>
   </button>
+  <button id="btn-next" class="arw" aria-label="次の名所へ" title="次の名所へ">▶</button>
   <button id="btn-chi" style="display:none">地へ帰る</button>
   <button id="btn-kane" style="display:none">鐘を撞く</button>
   <button id="btn-joya" style="display:none" aria-pressed="false">除夜の鐘</button>
@@ -7858,6 +7872,15 @@ function goTo(i, byUser){
   hideFuda();
   if (byUser) auto = false;
 }
+/* ◀ ▶ の名所移り（2026-10-07）：いまの居どころ（idx。歩いて近づけば追随する）から前後へ飛び、
+   着いたら札（看板）を掲げてそのまま歩きに戻す（到着時の手当ては updateCamera）。
+   飛んでいる間の手引きは歩きの文言のまま＝巡りの文言に切り替えない */
+let spotJump = false;
+function goSpot(i){
+  goTo(i, true);
+  spotJump = true;
+  hintEl.textContent = HINT_WALK;
+}
 
 function updateCamera(dt){
   const s = stops[idx];
@@ -7883,7 +7906,16 @@ function updateCamera(dt){
       u*u*fromPos.z + 2*u*e*ctrl.z + e*e*s.pos.z
     );
     curTgt.lerpVectors(fromTgt, s.tgt, e);
-    if (t >= 1){ phase = 'dwell'; dwellT = 0; showFuda(); }
+    if (t >= 1){
+      phase = 'dwell'; dwellT = 0;
+      if (spotJump){
+        // ◀ ▶ で来たときは、着いたらそのまま歩きに戻す（歩きが基本）。
+        // setWalk は札を畳むので、そのあとで掲げ直す＝札（看板）は残る
+        spotJump = false;
+        setWalk(true);
+      }
+      showFuda();
+    }
   } else {
     dwellT += dt;
     camera.position.x = s.pos.x + Math.sin(dwellT * 0.62) * 0.07;
@@ -8196,6 +8228,8 @@ function updateWalk(dt){
   }
   // 壁ぎわは滑らせる（軸を分けて当てる）。両軸とも塞がれたときだけ足を止める
   WALK.moving = (vx !== 0 || vz !== 0);
+  // ◀ ▶ で着いて掲げたままの札（看板）は、歩き出した時点で畳む（散歩中は景色が主役）
+  if (WALK.moving && fuda.classList.contains('on')) hideFuda();
   if (WALK.moving){
     let moved = false;
     const nx = camera.position.x + vx;
@@ -8353,7 +8387,8 @@ window.addEventListener('resize', layoutBottom);
    場所で現れる隠し釦（鐘・祈る・地へ帰る）が出たら枠が戻る。
    釦の出し入れは style.display で行われているので、その書き換えを見張る */
 function syncKaji(){
-  const others = kajiEl.querySelectorAll('button:not(.snd)');
+  // ◀ ▶ はふだんから見えている印なので、枠を出す理由には数えない
+  const others = kajiEl.querySelectorAll('button:not(.snd):not(.arw)');
   const solo = ![].some.call(others, b => b.style.display !== 'none');
   if (kajiEl.classList.contains('solo') === solo) return;
   kajiEl.classList.toggle('solo', solo);
@@ -9208,6 +9243,9 @@ function syncSndBtn(){
   sndBtn.setAttribute('aria-label', label);
   sndBtn.title = label;
 }
+// ◀ ▶：名所を前後へ（捌の次は壱へ巡る。goTo の剰余に任せる）
+document.getElementById('btn-prev').addEventListener('click', () => goSpot(idx - 1));
+document.getElementById('btn-next').addEventListener('click', () => goSpot(idx + 1));
 sndBtn.addEventListener('click', () => {
   if (!AC) buildSound();
   SND.on = !SND.on;
