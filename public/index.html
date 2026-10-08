@@ -622,7 +622,8 @@ const FX = {
   kudari      : true,   // ㊼ 保津川下りの舟（西の早瀬から数分おきに下ってくる）
   shishi      : true,   // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
   tsukiusagi  : true,   // ㊾ 月の都（月をダブルクリックで月面へ。餅つきの兎と、夜の日本列島が灯る地球）
-  toki        : true    // ㊿ 時の巡り（十分でひと巡り。夜→東から朝日→西へ夕日→夜→深淵（丑三つ時）。false で宵に固定）
+  toki        : true,   // ㊿ 時の巡り（十分でひと巡り。夜→東から朝日→西へ夕日→夜→深淵（丑三つ時）。false で宵に固定）
+  kaii        : true    // ㊿' 深淵の怪異（鬼火・狐火の嫁入り・百鬼夜行・丑の刻参りの音・橋の人影が立ち止まる）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 //（鳥居形と広沢の池の灯篭流しも同じ晩の行事＝そろって灯る）
@@ -8749,7 +8750,8 @@ const SND = {
   kawazu: true,   // 田の蛙（木戸の先の夏の夜。北の田でだけ満ちる）
   shishi: true,   // 鹿威し（鐘楼の庭。近くにいるとき、こおんとひとつ）
   mochi : true,   // 餅つき（月の都。杵が落ちるたび、ぺったん）
-  tonai : true    // 塔の内（上つ次元の底鳴りと倍音の環と観測の律動）
+  tonai : true,   // 塔の内（上つ次元の底鳴りと倍音の環と観測の律動）
+  ushi  : true    // 丑の刻参り（深淵のあいだだけ。野宮神社の社叢の奥で木を打つ音）
 };
 let AC = null;                // AudioContext。初回の操作で作る
 const sndNodes = {};
@@ -9093,6 +9095,44 @@ function buildSound(){
   };
   setTimeout(kaneLoop, (12 + Math.random() * 8) * 1000);   // 最初のひとつは灯して十数秒後
 
+  // ── 丑の刻参り（㊿' 深淵）：野宮神社の社叢の奥で木を打つ音。こーん…こーん…こーん、と三つ打って間遠に。
+  //     木槌の乾いた当たりと幹の低い響き。大きさは updateSoundMix が場所と深さで決める ──
+  const ushiBus = AC.createGain(); ushiBus.gain.value = 0; ushiBus.connect(master);
+  sndNodes.ushiBus = ushiBus;
+  const strikeUshi = () => {
+    if (!AC || !SND.on || !SND.ushi || AC.state !== 'running') return false;
+    const t = AC.currentTime;
+    const src = AC.createBufferSource(); src.buffer = sndNodes.noise;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 820; bp.Q.value = 1.6;
+    const ng = AC.createGain();
+    ng.gain.setValueAtTime(0.42, t);
+    ng.gain.exponentialRampToValueAtTime(0.0004, t + 0.07);
+    src.connect(bp); bp.connect(ng); ng.connect(ushiBus);
+    src.start(t); src.stop(t + 0.1);
+    [[210, 0.22, 0.45], [430, 0.08, 0.25]].forEach(p => {
+      const o = AC.createOscillator();
+      o.frequency.setValueAtTime(p[0] * 1.08, t);
+      o.frequency.exponentialRampToValueAtTime(p[0], t + 0.04);
+      const g = AC.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(p[1], t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0004, t + p[2]);
+      o.connect(g); g.connect(ushiBus);
+      o.start(t); o.stop(t + p[2] + 0.1);
+    });
+    return true;
+  };
+  sndNodes.strikeUshi = strikeUshi;
+  const ushiLoop = () => {
+    if (FX.kaii && TOKI.d > 0.3){
+      strikeUshi();
+      setTimeout(strikeUshi, 1100 + Math.random() * 150);
+      setTimeout(strikeUshi, 2250 + Math.random() * 200);
+    }
+    setTimeout(ushiLoop, (9 + Math.random() * 8) * 1000);
+  };
+  setTimeout(ushiLoop, 3000);
+
   // ── 撞いた鐘（鐘楼の下でじぶんが撞く一打）：遠鐘とは別系統。
   //     高域を開けて撞木の当たりを聴かせ、余韻は長く残す ──
   const shoroBus = AC.createGain(); shoroBus.gain.value = 1;
@@ -9186,7 +9226,7 @@ function updateSoundMix(){
   if (TSUKI.on){
     // 月は音のない世界。地上の虫も川も置いてきて、遠い鐘だけかすかに届く
     const k2 = 0.06;
-    ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus'].forEach(n => {
+    ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus','ushiBus'].forEach(n => {
       sndNodes[n].gain.value += (0 - sndNodes[n].gain.value) * k2;
     });
     sndNodes.kaneBus.gain.value += (0.12 - sndNodes.kaneBus.gain.value) * k2;
@@ -9196,7 +9236,7 @@ function updateSoundMix(){
   if (GOJU.on && GOJU.naka){
     // 塔の内は異次元＝地上の音はひとつも届かない（鐘さえも）。代わりに上つ次元の音
     const k2 = 0.06;
-    ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus','kaneBus'].forEach(n => {
+    ['kawaBus','mushiBus','sasaG','higuBus','furinBus','kawazuBus','kaneBus','ushiBus'].forEach(n => {
       sndNodes[n].gain.value += (0 - sndNodes[n].gain.value) * k2;
     });
     const tb = sndNodes.tonaiBus;
@@ -9233,7 +9273,11 @@ function updateSoundMix(){
   const inTera = (x > 7.3 && z > -77 && z < -48) || (x < -8.6 && z > -77 && z < -57);
   const kaneG = inTera ? 1.75 : 1.0;
   const kaneF = inTera ? 1350 : 950;
+  // 丑の刻参り（㊿' 深淵）：野宮神社の社叢の奥。深いほど、近いほど（遠くでもかすかには届く）
+  const ud = Math.hypot(x - 14.6, z + 48.8 - NONOMIYA_SHIFT_Z);
+  const ushiT = SND.ushi && FX.kaii ? TOKI.d * (0.18 + 0.82 * Math.max(0, 1 - ud / 40)) : 0;
   const k = 0.06;
+  sndNodes.ushiBus.gain.value  += (ushiT  - sndNodes.ushiBus.gain.value)  * k;
   sndNodes.kawaBus.gain.value  += (kawaT  - sndNodes.kawaBus.gain.value)  * k;
   sndNodes.mushiBus.gain.value += (mushiT - sndNodes.mushiBus.gain.value) * k;
   sndNodes.sasaG.gain.value    += (sasaT  - sndNodes.sasaG.gain.value)    * k;
@@ -9513,6 +9557,95 @@ function updateToki(dt){
 updateToki(0);
 
 /* ============================================================
+   ㊿' 深淵の怪異 ― 丑三つ時（TOKI.d）にだけ現れるもの
+   ・鬼火：通りの奥・竹林の小径・川端・橋のたもとに青白い火が漂う（化野の鬼火と同じ作法）
+   ・狐火の嫁入り：木戸の先、落柿舎の田の向こう（西）を橙の小さな灯が一列で横切る
+   ・百鬼夜行：田の道の辻（大覚寺の表門の手前）を、提灯の点列が池の側（東）から西へ
+     霧に溶けつつ横切る。橙と青白を混ぜ、人の提げる高さで上下に揺れる
+   ・丑の刻参り：野宮神社の社叢の奥から木を打つ音（音の側＝buildSound と updateSoundMix）
+   ・橋の人影：提灯のひとりが橋の中ほどで立ち止まり、川を見る（update の人影の節）
+   どれも d が 0 のあいだは見えない。朝夜の一括塗り替え（tokiMats）からは外す＝
+   灯りが七割落ちた町でも、怪異の火だけは素の明るさで灯る
+   ============================================================ */
+const FUKA_FX = (function(){
+  let seed = 4649;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const g = new THREE.Group();
+  g.visible = false;
+  const sprite = (tex, color, sc) => {
+    const m = new THREE.SpriteMaterial({ map: tex, color: color,
+      transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    m.userData.tokiSkip = true;
+    const s = new THREE.Sprite(m);
+    s.scale.set(sc, sc, 1);
+    return s;
+  };
+  // ── 鬼火：[中心x, 中心z, 揺れ幅x, 揺れ幅z]。通りは道幅に収め、川端は横に広く ──
+  const onibi = [];
+  [[0, -14, 1.3, 5], [0, -30, 1.3, 6], [0, -46, 1.3, 5], [0, -60, 1.1, 4],
+   [0, -70, 1.1, 4], [-5, -82, 4, 2.5], [5, -84, 4, 2.5], [0, -96, 0.9, 6]].forEach(p => {
+    const s = sprite(TEX.glowCool, 0xa9d6ea, 1.1 + rnd() * 0.4);
+    s.userData = { cx: p[0], cz: p[1], rx: p[2], rz: p[3],
+      spd: 0.14 + rnd() * 0.12, fade: 0.09 + rnd() * 0.10, ph: rnd() * Math.PI * 2 };
+    g.add(s); onibi.push(s);
+  });
+  // ── 行列（狐火・百鬼夜行）：先頭から gap おきに n の灯。x0 から dir の向きへ len 進んで消え、
+  //    pause 秒おいてまた現れる。両端は一割ずつ霧に溶かす ──
+  const retsu = [];
+  function gyoretsu(o){
+    const lights = [];
+    for (let i = 0; i < o.n; i++){
+      const iro = o.colors[i % o.colors.length];
+      const s = sprite(iro === 0xa9d6ea ? TEX.glowCool : TEX.glow, iro, o.sc * (0.85 + rnd() * 0.3));
+      s.userData = { ph: rnd() * Math.PI * 2, base: o.op * (0.75 + rnd() * 0.25) };
+      g.add(s); lights.push(s);
+    }
+    retsu.push(Object.assign({ lights: lights, t: rnd() * 10 }, o));
+  }
+  // 狐火の嫁入り：落柿舎の田の向こう（z 12.5）を西の端から道の手前まで。腰の高さ、橙一色
+  gyoretsu({ n: 7, gap: 1.3, x0: 27, dir: -1, len: 22, z: 12.5, y: 0.8, bob: 0.08, v: 0.5,
+             pause: 18, sc: 0.75, op: 0.55, colors: [0xffb060] });
+  // 百鬼夜行：辻の北（z 16.6）を池の側（x 負＝東）から西へ。提げた提灯の高さ、橙と青白が混じる
+  gyoretsu({ n: 11, gap: 1.1, x0: -19, dir: 1, len: 38, z: 16.6, y: 1.7, bob: 0.16, v: 0.55,
+             pause: 26, sc: 0.95, op: 0.5, colors: [0xffc37a, 0xffc37a, 0xa9d6ea] });
+  scene.add(g);
+
+  function update(dt, d){
+    g.visible = d > 0.002;
+    if (!g.visible) return;
+    // 鬼火：ゆらゆら漂い、ふっと消えてはまた灯る（深さで灯りの強さを掛ける）
+    onibi.forEach(s => {
+      const u = s.userData;
+      const t = elapsed * u.spd + u.ph;
+      s.position.set(u.cx + Math.sin(t) * u.rx,
+                     1.3 + Math.sin(t * 0.7 + 1.3) * 0.5,
+                     u.cz + Math.sin(t * 0.83 + 2.1) * u.rz);
+      const w = 0.5 + 0.5 * Math.sin(elapsed * u.fade + u.ph * 2);
+      s.material.opacity = 0.34 * Math.max(0, w * 1.3 - 0.3) * d;
+    });
+    // 行列：先頭が len を進み切り、しんがりが抜けるまでを一巡とする
+    retsu.forEach(r => {
+      r.t += dt;
+      const run = (r.len + (r.n - 1) * r.gap) / r.v;
+      const u = r.t % (run + r.pause);
+      r.lights.forEach((s, i) => {
+        const p = u * r.v - i * r.gap;                 // 先頭からの進み（しんがりほど遅れる）
+        const on = u < run && p > 0 && p < r.len;
+        if (!on){ s.material.opacity = 0; return; }
+        const q = p / r.len;
+        const edge = Math.min(1, q / 0.1, (1 - q) / 0.1);  // 両端は霧に溶かす
+        const ud = s.userData;
+        s.position.set(r.x0 + r.dir * p,
+                       r.y + Math.sin(elapsed * 1.9 + ud.ph) * r.bob,
+                       r.z + Math.sin(elapsed * 0.6 + ud.ph) * 0.25);
+        s.material.opacity = ud.base * edge * d * (0.8 + Math.sin(elapsed * 7 + ud.ph) * 0.2);
+      });
+    });
+  }
+  return { group: g, onibi: onibi, retsu: retsu, walkers: walkers, update: update };
+})();
+
+/* ============================================================
    10. 毎フレーム
    ============================================================ */
 const clock = new THREE.Clock();
@@ -9655,12 +9788,21 @@ function update(dt){
     w.visible = FX.hitokage;
     if (!FX.hitokage) return;
     const u = w.userData;
-    u.t += u.dir * u.v * dt;
-    if (u.t >= u.t1){ u.t = u.t1; u.dir = -1; }
-    else if (u.t <= u.t0){ u.t = u.t0; u.dir = 1; }
-    const face = u.dir > 0 ? Math.PI : 0;
+    // ㊿' 深淵：提灯のひとりは橋の中ほど（じぶんの区間の町側の端）まで戻って立ち止まり、川を見る。
+    //    提灯は深淵の塗り替えで消し炭の色に落ちている＝灯の落ちた影が欄干に立つ。抜けると歩き出す
+    const tomaru = FX.kaii && u.cho && TOKI.d > 0.5;
+    let still = false;
+    if (tomaru){
+      if (u.t > u.t0 + 0.003){ u.t -= u.v * dt; u.dir = -1; }
+      else { u.t = u.t0; still = true; }
+    } else {
+      u.t += u.dir * u.v * dt;
+      if (u.t >= u.t1){ u.t = u.t1; u.dir = -1; }
+      else if (u.t <= u.t0){ u.t = u.t0; u.dir = 1; }
+    }
+    const face = still ? Math.PI / 2 : (u.dir > 0 ? Math.PI : 0);
     u.face += (face - u.face) * Math.min(1, dt * 2.5);
-    const step = Math.sin(elapsed * 3.1 + k * 2.4);
+    const step = still ? 0 : Math.sin(elapsed * 3.1 + k * 2.4);
     w.position.set(u.lane, deckY(u.t) + 0.08 + Math.abs(step) * 0.02, BRIDGE_Z0 - u.t * BRIDGE_L);
     w.rotation.y = u.face;
     w.rotation.z = step * 0.018;
@@ -10074,6 +10216,7 @@ function update(dt){
   // ㊿ 時の巡り：時計を読んでから、灯りと地物をまとめて塗り替える。
   //    ここが毎フレームの最後の書き手＝上の演出が書いた素の値の上に朝夜が乗る
   updateToki(dt);
+  FUKA_FX.update(dt, FX.kaii ? TOKI.d : 0);   // ㊿' 深淵の怪異（塗り替えの外）
   tokiPaint();
 }
 
@@ -10530,6 +10673,7 @@ window.__machiya = {
     run: function(){ TOKI.hold = false; updateToki(0); return TOKI.sec; },
     tune: TOKI.tune,
     fuka: TOKI.fuka,
+    kaii: FUKA_FX,        // ㊿' 深淵の怪異（group・onibi・retsu。灯の位置と明るさを読める）
     kizami: TOKI.KIZAMI,
     /* 暁の空の階調（上から下へ四段）。書き替えて set() で塗り直せる */
     sora: SKY.AKE,
@@ -10563,12 +10707,14 @@ window.__machiya = {
           furin: +sndNodes.furinBus.gain.value.toFixed(4),
           kawazu: +sndNodes.kawazuBus.gain.value.toFixed(4),
           kane : +sndNodes.kaneBus.gain.value.toFixed(4),
-          kaneLp: Math.round(sndNodes.kaneLp.frequency.value)
+          kaneLp: Math.round(sndNodes.kaneLp.frequency.value),
+          ushi : +sndNodes.ushiBus.gain.value.toFixed(4)
         } : null
       };
     },
     level: sndLevel,
     kane: function(){ return strikeKane(); },
+    ushi: function(){ return sndNodes.strikeUshi ? sndNodes.strikeUshi() : false; },
     furin: function(){ return sndNodes.strikeFurin ? sndNodes.strikeFurin() : false; },
     shishi: function(){ return strikeShishi(); },
     /* 塔の内の音の赤入れ口：四層の大きさを耳で決める（音を灯してから）
