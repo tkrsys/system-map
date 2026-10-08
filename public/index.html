@@ -622,7 +622,7 @@ const FX = {
   kudari      : true,   // ㊼ 保津川下りの舟（西の早瀬から数分おきに下ってくる）
   shishi      : true,   // ㊽ 鹿威し（鐘楼の庭の隅。こおんとひとつ鳴る）
   tsukiusagi  : true,   // ㊾ 月の都（月をダブルクリックで月面へ。餅つきの兎と、夜の日本列島が灯る地球）
-  toki        : true    // ㊿ 時の巡り（十分でひと巡り。夜→東から朝日→西へ夕日→夜。false で宵に固定）
+  toki        : true    // ㊿ 時の巡り（十分でひと巡り。夜→東から朝日→西へ夕日→夜→深淵（丑三つ時）。false で宵に固定）
 };
 // 送り火は本来八月十六日だけの行事。ふだんは灯さず、その日にだけ東山に「大」が燃える
 //（鳥居形と広沢の池の灯篭流しも同じ晩の行事＝そろって灯る）
@@ -1240,16 +1240,22 @@ const SKY = (function(){
   // ここを明るくすると一気に「朝」になって、月あかり前提の景が総崩れになる
   const AKE  = [0x0c1630, 0x27395f, 0x60687f, 0xcf9b78];
   const t = tex(c);
-  function paint(k){
+  /* k で暁へ、d で深淵へ（深淵の四段は TOKI.fuka.sora。TOKI はあとで定義されるので呼ぶ時に読む） */
+  function dan(i, k, d){
+    const c = mixHex(YORU[i], AKE[i], k);
+    return d > 0 ? mixHex(c, TOKI.fuka.sora[i], d) : c;
+  }
+  function paint(k, d){
+    d = d || 0;
     const grd = g.createLinearGradient(0, 0, 0, 512);
     for (let i = 0; i < STOP.length; i++){
-      grd.addColorStop(STOP[i], hexStr(mixHex(YORU[i], AKE[i], k)));
+      grd.addColorStop(STOP[i], hexStr(dan(i, k, d)));
     }
     g.fillStyle = grd; g.fillRect(0, 0, 8, 512);
     t.needsUpdate = true;
   }
   paint(0);
-  return { tex: t, paint: paint, AKE: AKE };
+  return { tex: t, paint: paint, dan: dan, AKE: AKE };
 })();
 
 const TEX = {
@@ -1331,11 +1337,13 @@ const skyDome = (function(){
   scene.add(mesh);
   // 暁の塗り替えに相乗り：画布の四段と同じ色をドームにも流す
   const paint0 = SKY.paint;
-  const YORU = [0x04060e, 0x0a1226, 0x132039, 0x25324b];
-  SKY.paint = function(k){
-    paint0(k);
-    [u.uC0, u.uC1, u.uC2, u.uC3].forEach((c, i) => c.value.setHex(mixHex(YORU[i], SKY.AKE[i], k)));
-    u.uMoonGlow.value.setHex(mixHex(0x242c48, 0x3a3a48, k));
+  SKY.paint = function(k, d){
+    d = d || 0;
+    paint0(k, d);
+    [u.uC0, u.uC1, u.uC2, u.uC3].forEach((c, i) => c.value.setHex(SKY.dan(i, k, d)));
+    // 月のまわりのほの明かりも、深淵では翳る（TOKI はあとで定義されるので d が立つ時だけ読む）
+    const glow = mixHex(0x242c48, 0x3a3a48, k);
+    u.uMoonGlow.value.setHex(d > 0 ? mixHex(glow, TOKI.fuka.glow, d) : glow);
   };
   return { mesh: mesh, u: u };
 })();
@@ -9202,8 +9210,9 @@ function updateSoundMix(){
   // 川：通りでは側溝の水音がかすかに、z-30 から川の気配、川端 z-78 で満ちる
   const rv = Math.min(1, Math.max(0, (-z - 30) / 48));
   const kawaT = SND.kawa ? 0.05 + 0.20 * rv * rv : 0;
-  // 夜の声（虫と蜩）は明けるにつれて遠のく。川と鐘は朝も変わらず（㊿）
-  const yoru = 1 - TOKI.k;
+  // 夜の声（虫と蜩）は明けるにつれて遠のく。川と鐘は朝も変わらず（㊿）。
+  // 深淵（丑三つ時）では虫も蜩も蛙も鳴きやんで、川と鐘だけが残る
+  const yoru = (1 - TOKI.k) * (1 - TOKI.fuka.mushi * TOKI.d);
   // 虫：通りで満ち、川端では控えめに
   const mushiT = SND.mushi ? (1 - 0.75 * Math.min(1, Math.max(0, (-z - 48) / 32))) * yoru : 0;
   // 笹：竹林（z-56〜-78）でだけ山なりに
@@ -9217,7 +9226,7 @@ function updateSoundMix(){
   const furinT = SND.furin ? 0.6 * fg * fg : 0;
   // 蛙：木戸の先の田でだけ。木戸ごしにもかすかに届く
   const kz = Math.min(1, Math.max(0, (z + 2) / 9));
-  const kawazuT = SND.kawazu ? 0.85 * kz * kz : 0;
+  const kawazuT = SND.kawazu ? 0.85 * kz * kz * (1 - TOKI.fuka.mushi * TOKI.d) : 0;
   // 鐘：天龍寺の境内と念仏寺の野にいるあいだは近く、すこし明るく響く
   //（念仏寺の鐘は本堂の北脇の三宝の鐘）
   //（鐘楼の庭 z-49〜-58.4 も境内のうち。撞く鐘の足もとなので近く響く）
@@ -9263,34 +9272,48 @@ document.addEventListener('visibilitychange', () => {
    祈る・参るの導線はやめ、時計で回す。実時刻の毎時 0・10・20・30・40・50 分を起点に、
      夜（0〜1分）→ 夜明け（1〜3分。東から朝日）
      → 朝（3〜6分。日は低いまま東から西へ渡る）
-     → 夕暮れ（6〜8分。西に日が沈む）→ 夜（8〜10分）
+     → 夕暮れ（6〜8分。西に日が沈む）→ 夜（8〜9分）
+     → 深淵（9〜10分。丑三つ時。草木も眠る）→ 夜（0〜1分）…
    と巡る。誰がいつ開いても同じ時分になる（刻は KIZAMI で変えられる）。
 
    明るさは真昼まで行かず「暁（夜明け）」で止める ―― この町は月あかりの
    世界として組んであるので、竹の月漏れも水鏡も鬼火も、薄明かりのなかで
    なら生きたまま残る。有明の月も薄く残すので、月の都（㊾）への口も塞がない。
 
-   仕掛けは二つの数。TOKI.k（0=宵 / 1=暁）が明るさ、TOKI.w（0=東 / 1=西）が
+   仕掛けは三つの数。TOKI.k（0=宵 / 1=暁）が明るさ、TOKI.w（0=東 / 1=西）が
    日の在り処。空・霧・明かり・月・東西の空はこれを読み、灯りと地物は毎フレームの
    最後に一括で塗り替える。あとから景を足しても、この一箇所を通るので自動で朝夜に乗る。
+   三つ目の TOKI.d（0=ふだんの夜 / 1=深淵）は丑三つ時の深さ。月が翳って光が青く細り、
+   霧が沈み、町の灯が落ちて寝静まり、虫の声が止む。星だけ冴える。入りに遠鐘がひとつ。
    ============================================================ */
 const TOKI = {
   k: 0,                 // 0=宵 / 1=暁。移ろいのあいだは途中の値
   w: 0,                 // 0=東 / 1=西。日の在り処（k が 0 のあいだは効かない）
+  d: 0,                 // 0=ふだんの夜 / 1=深淵（丑三つ時）。k が 0 のあいだだけ立つ
   CYCLE: 10 * 60,       // ひと巡り（秒）＝十分
-  // 刻（周期内の秒）：夜明けの始まり／朝の始まり／夕暮れの始まり／夜の始まり
-  KIZAMI: { ake: 1 * 60, asa: 3 * 60, kure: 6 * 60, yoru: 8 * 60 },
+  // 刻（周期内の秒）：夜明けの始まり／朝の始まり／夕暮れの始まり／夜の始まり／深淵の始まり
+  KIZAMI: { ake: 1 * 60, asa: 3 * 60, kure: 6 * 60, yoru: 8 * 60, fuka: 9 * 60 },
+  FUCHI: 15,            // 深淵の縁（秒）。入りと抜けをこの長さでなだらかに
   sec: 0,               // いまの周期内の秒
   offset: 0,            // 検証用：時計をずらす（秒）。?toki=分 でも入る
-  hold: false,          // 検証用：true のあいだ時計を止め、k・w を手で持つ
-  painted: -1,          // 最後に空を塗った k・w（変わった時だけ塗り直す）
+  hold: false,          // 検証用：true のあいだ時計を止め、k・w・d を手で持つ
+  fukaKane: false,      // 深淵の入りに鐘をひとつ撞いた印（抜けたら下ろす）
+  painted: -1,          // 最後に空を塗った k・w・d（変わった時だけ塗り直す）
   paintedW: -1,
+  paintedD: -1,
   /* 赤入れ用の目盛り。__machiya.toki.tune を書き替えて set() で試着できる。
      霧の色を明るくしすぎると嵐山が白い壁になって形を失う（見比べて決めた値） */
   /* 環境光を下げ、朝日を強める＝日に向いた面だけが茜に照り、裏は藍の影に沈む（影の有無が見える） */
   tune: { amb: 0.56, ambCol: 0x77809a, sun: 0.85, sunCol: 0xffb98c,
           fog: 0.0208, fogCol: 0x4d5b74, clear: 0x4c5972, tint: 0.42,
-          akane: 0.52, shiro: 0.34 }
+          akane: 0.52, shiro: 0.34 },
+  /* 深淵（丑三つ時）の目盛り。__machiya.toki.fuka を書き替えて set(0, 0, 1) で試着できる。
+     amb・tsuki は宵の値（AKARI_YORU）からここへ寄せる。lamps・kami・land・hoshi は
+     灯り・紙の灯・地物・星の掛け率（1 で全部落ちる／hoshi は冴える分）。mushi は虫の声を細らせる率 */
+  fuka: { amb: 0.24, ambCol: 0x1c2438, tsuki: 0.26, tsukiCol: 0x8fa3c8,
+          fog: 0.027, fogCol: 0x050a16, clear: 0x02040a, glow: 0x121726,
+          sora: [0x020309, 0x05091a, 0x0b1328, 0x141c2e],
+          lamps: 0.70, kami: 0.85, land: 0.28, hoshi: 0.18, mushi: 0.92 }
 };
 
 /* 時計：実時刻を周期で折り返した秒（offset でずらせる） */
@@ -9298,17 +9321,22 @@ function tokiClock(){
   const s = (Date.now() / 1000 + TOKI.offset) % TOKI.CYCLE;
   return s < 0 ? s + TOKI.CYCLE : s;
 }
-/* 周期内の秒 → 明るさ k と日の在り処 w。移ろいは両端をなだらかに（smoothstep） */
+/* 周期内の秒 → 明るさ k・日の在り処 w・深淵の深さ d。移ろいは両端をなだらかに（smoothstep）。
+   深淵は夜の終わり（fuka〜周期の終わり）に置き、縁 FUCHI 秒で入って同じ長さで抜ける＝
+   周期の頭（夜 0〜1分）へ切れ目なくつながる */
 function tokiAt(sec){
   const Z = TOKI.KIZAMI;
   const sm = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
-  if (sec < Z.ake)  return { k: 0, w: 0 };
-  if (sec < Z.asa)  return { k: sm((sec - Z.ake) / (Z.asa - Z.ake)), w: 0 };
-  if (sec < Z.kure) return { k: 1, w: sm((sec - Z.asa) / (Z.kure - Z.asa)) };
-  if (sec < Z.yoru) return { k: 1 - sm((sec - Z.kure) / (Z.yoru - Z.kure)), w: 1 };
-  return { k: 0, w: 1 };
+  if (sec < Z.ake)  return { k: 0, w: 0, d: 0 };
+  if (sec < Z.asa)  return { k: sm((sec - Z.ake) / (Z.asa - Z.ake)), w: 0, d: 0 };
+  if (sec < Z.kure) return { k: 1, w: sm((sec - Z.asa) / (Z.kure - Z.asa)), d: 0 };
+  if (sec < Z.yoru) return { k: 1 - sm((sec - Z.kure) / (Z.yoru - Z.kure)), w: 1, d: 0 };
+  if (sec < Z.fuka) return { k: 0, w: 1, d: 0 };
+  const F = TOKI.FUCHI;
+  const d = sm((sec - Z.fuka) / F) * (1 - sm((sec - (TOKI.CYCLE - F)) / F));
+  return { k: 0, w: 1, d: d };
 }
-/* 周期の何分目から始めるか（検証用。?toki=2.5 なら 2 分半＝夜明けの終わりごろから） */
+/* 周期の何分目から始めるか（検証用。?toki=2.5 なら 2 分半＝夜明けの終わりごろから。?toki=9 で深淵の入り） */
 function tokiJump(min){
   TOKI.offset = min * 60 - Date.now() / 1000;
   TOKI.hold = false;
@@ -9386,7 +9414,7 @@ const tokiMats = (function(){
       }
     });
   });
-  lamps.push({ m: starsMat, base: starsMat.opacity, wrote: NaN });   // 星は加算ではないので手で
+  lamps.push({ m: starsMat, base: starsMat.opacity, wrote: NaN, hoshi: true });   // 星は加算ではないので手で（深淵では冴える）
   return { lamps: lamps, kami: kami, lands: lands };
 })();
 
@@ -9394,58 +9422,67 @@ const tokiMats = (function(){
    演出の側が毎フレーム opacity や色を書き直すので、「前に自分が書いた値と
    違っていたら、それが素の値」という見分け方で、素と塗りを取り違えない */
 function tokiPaint(){
-  const k = TOKI.k, f = 1 - k;
+  const k = TOKI.k, f = 1 - k, d = TOKI.d, F = TOKI.fuka;
+  // 深淵：灯りは落ち（lamps）、星だけ冴える（hoshi）。紙の灯は消し炭の色へ、地物は沈む
+  const fL = f * (1 - F.lamps * d), fH = f * (1 + F.hoshi * d);
+  const kK = Math.max(k, F.kami * d), dL = 1 - F.land * d;
   const L = tokiMats.lamps;
   for (let i = 0; i < L.length; i++){
     const r = L[i];
     if (r.m.opacity !== r.wrote) r.base = r.m.opacity;
-    r.m.opacity = r.base * f;
+    r.m.opacity = Math.min(1, r.base * (r.hoshi ? fH : fL));
     r.wrote = r.m.opacity;
   }
   const K = tokiMats.kami;
   for (let i = 0; i < K.length; i++){
     const r = K[i], cur = r.m.color.getHex();
     if (cur !== r.wrote) r.base = cur;
-    const nx = mixHex(r.base, keshiIro(r.base), k);
+    const nx = mixHex(r.base, keshiIro(r.base), kK);
     r.m.color.setHex(nx); r.wrote = nx;
   }
   const D = tokiMats.lands;
   for (let i = 0; i < D.length; i++){
     const r = D[i], cur = r.m.color.getHex();
     if (cur !== r.wrote) r.base = cur;
-    const nx = akeIro(r.base, k);
+    const nx = d > 0 ? scaleHex(akeIro(r.base, k), dL) : akeIro(r.base, k);
     r.m.color.setHex(nx); r.wrote = nx;
     if (r.m.emissive){
       const ce = r.m.emissive.getHex();
       if (ce !== r.wroteE) r.baseE = ce;
-      const ne = mixHex(r.baseE, 0x000000, k);
+      const ne = mixHex(r.baseE, 0x000000, kK);
       r.m.emissive.setHex(ne); r.wroteE = ne;
     }
   }
   // 提灯の点光源は素の強さを持たない（毎フレーム決め直される）ので、その場で掛ける
-  for (let i = 0; i < roamLights.length; i++) roamLights[i].intensity *= f;
+  for (let i = 0; i < roamLights.length; i++) roamLights[i].intensity *= fL;
+}
+/* 色を一様に暗くする（深淵で地物を沈める） */
+function scaleHex(hex, s){
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  return (Math.round(r * s) << 16) | (Math.round(g * s) << 8) | Math.round(b * s);
 }
 
 /* 空・霧・明かり・月・東西の空。k か w が動いた時だけ呼ぶ（夜のあいだは一度も触らない） */
 function tokiSky(){
-  const k = TOKI.k, w = TOKI.w, T = TOKI.tune, Y = AKARI_YORU;
-  SKY.paint(k);
+  const k = TOKI.k, w = TOKI.w, d = TOKI.d, T = TOKI.tune, Y = AKARI_YORU, F = TOKI.fuka;
+  SKY.paint(k, d);
+  // 暁へ寄せた値から、深淵の分だけさらに沈める（d は k が 0 のあいだしか立たない）
   if (!TSUKI.on){                                  // 月の都では霧を休ませている＝触らない
-    scene.fog.color.setHex(mixHex(Y.fog, T.fogCol, k));
-    scene.fog.density = Y.fogD + (T.fog - Y.fogD) * k;
+    scene.fog.color.setHex(mixHex(mixHex(Y.fog, T.fogCol, k), F.fogCol, d));
+    scene.fog.density = Y.fogD + (T.fog - Y.fogD) * k + (F.fog - Y.fogD) * d;
   }
-  renderer.setClearColor(mixHex(Y.clear, T.clear, k), 1);
-  ambLight.color.setHex(mixHex(Y.amb, T.ambCol, k));
-  ambLight.intensity = Y.ambI + (T.amb - Y.ambI) * k;
-  moonLight.color.setHex(mixHex(Y.tsuki, T.sunCol, k));
-  moonLight.intensity = Y.tsukiI + (T.sun - Y.tsukiI) * k;
+  renderer.setClearColor(mixHex(mixHex(Y.clear, T.clear, k), F.clear, d), 1);
+  ambLight.color.setHex(mixHex(mixHex(Y.amb, T.ambCol, k), F.ambCol, d));
+  ambLight.intensity = Y.ambI + (T.amb - Y.ambI) * k + (F.amb - Y.ambI) * d;
+  moonLight.color.setHex(mixHex(mixHex(Y.tsuki, T.sunCol, k), F.tsukiCol, d));
+  moonLight.intensity = Y.tsukiI + (T.sun - Y.tsukiI) * k + (F.tsuki - Y.tsukiI) * d;
   hiDir(k, w, MOON_DIR);                           // 日の在り処（置き場は followKage が毎フレーム決める）
   // 空のドームのほの明かり：宵は嵐山の月のまわり、明るいあいだは日の在り処のまわり
   HI_TMP.copy(MOON_DIR).normalize();
   skyDome.u.uMoonDir.value.copy(SORA_TSUKI).lerp(HI_TMP, k).normalize();
-  // 有明の月：色を褪せさせるだけで消さない。欠けぎわは明けていく空の色に寄せる
-  moonFx.disc.material.color.setHex(mixHex(0xFFE9BE, 0xE7ECF4, k));
-  moonFx.bite.material.color.setHex(mixHex(0x0a1226, SKY.AKE[1], k));
+  // 有明の月：色を褪せさせるだけで消さない。欠けぎわは明けていく空の色に寄せる。深淵では翳る
+  moonFx.disc.material.color.setHex(mixHex(mixHex(0xFFE9BE, 0xE7ECF4, k), 0x9aa6bd, d));
+  moonFx.bite.material.color.setHex(mixHex(mixHex(0x0a1226, SKY.AKE[1], k), F.sora[1], d));
   // 東西の空（板は灯る側だけ描く＝宵のあいだは描かない）。日が東から西へ渡るにつれて移る
   const e = k * (1 - w), ni = k * w;
   akatsukiFx.akane.visible  = akatsukiFx.shiro.visible  = e  > 0.004;
@@ -9460,12 +9497,16 @@ function tokiSky(){
 function updateToki(dt){
   if (!TOKI.hold){
     TOKI.sec = tokiClock();
-    const t = FX.toki ? tokiAt(TOKI.sec) : { k: 0, w: 0 };
-    TOKI.k = t.k; TOKI.w = t.w;
+    const t = FX.toki ? tokiAt(TOKI.sec) : { k: 0, w: 0, d: 0 };
+    TOKI.k = t.k; TOKI.w = t.w; TOKI.d = t.d;
   }
+  // 深淵の入りに遠鐘をひとつ（音が灯っていなければ鳴らないだけ）。抜けたら印を下ろす
+  if (TOKI.d > 0.5 && !TOKI.fukaKane){ TOKI.fukaKane = true; strikeKane(); }
+  else if (TOKI.d < 0.1 && TOKI.fukaKane) TOKI.fukaKane = false;
   // 変わった時だけ空を塗り直す。移ろいは十分かけて進むので、一歩の差は色一段に満たない
-  if (Math.abs(TOKI.k - TOKI.painted) > 0.001 || Math.abs(TOKI.w - TOKI.paintedW) > 0.001){
-    TOKI.painted = TOKI.k; TOKI.paintedW = TOKI.w;
+  if (Math.abs(TOKI.k - TOKI.painted) > 0.001 || Math.abs(TOKI.w - TOKI.paintedW) > 0.001 ||
+      Math.abs(TOKI.d - TOKI.paintedD) > 0.001){
+    TOKI.painted = TOKI.k; TOKI.paintedW = TOKI.w; TOKI.paintedD = TOKI.d;
     tokiSky();
   }
 }
@@ -10468,14 +10509,15 @@ window.__machiya = {
     }
   },
   /* ㊿ 時の巡りの検証口。
-     set(k, w)：時計を止めて即その景色に（k 0=宵／1=暁、w 0=東／1=西。w 省略は 0）。
+     set(k, w, d)：時計を止めて即その景色に（k 0=宵／1=暁、w 0=東／1=西、d 0=夜／1=深淵。省略は 0）。
      at(分)：周期の何分目から時計を回し直すか（?toki=分 と同じ）。run()：止めた時計を戻す。
-     kizami：刻（周期内の秒）。書き替えれば配分を試せる */
+     kizami：刻（周期内の秒）。書き替えれば配分を試せる。fuka：深淵の目盛り */
   toki: {
-    set: function(v, w){
+    set: function(v, w, d){
       TOKI.hold = true;
       TOKI.k = Math.max(0, Math.min(1, +v || 0));
       TOKI.w = Math.max(0, Math.min(1, +w || 0));
+      TOKI.d = Math.max(0, Math.min(1, +d || 0));
       TOKI.painted = -1;
       updateToki(0);
       // 提灯の点光源は毎フレーム決め直される値なので、更新を一周（dt=0）回してから塗る。
@@ -10487,12 +10529,13 @@ window.__machiya = {
     at: function(min){ tokiJump(+min || 0); updateToki(0); return TOKI.sec; },
     run: function(){ TOKI.hold = false; updateToki(0); return TOKI.sec; },
     tune: TOKI.tune,
+    fuka: TOKI.fuka,
     kizami: TOKI.KIZAMI,
     /* 暁の空の階調（上から下へ四段）。書き替えて set() で塗り直せる */
     sora: SKY.AKE,
     state: function(){
       return {
-        k: +TOKI.k.toFixed(3), w: +TOKI.w.toFixed(3),
+        k: +TOKI.k.toFixed(3), w: +TOKI.w.toFixed(3), d: +TOKI.d.toFixed(3),
         min: +(TOKI.sec / 60).toFixed(2), hold: TOKI.hold,
         mats: { lamps: tokiMats.lamps.length, kami: tokiMats.kami.length,
                 lands: tokiMats.lands.length },
